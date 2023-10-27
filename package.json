@@ -1,0 +1,30 @@
+{
+  "name": "idn-migration-tool",
+  "version": "1.0.0",
+  "description": "IdentityNow Object Migration Tool",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "export": "node src/index.js --export --detokenize --src_env=$npm_config_src_env",
+    "exportRaw": "node src/index.js --export --src_env=$npm_config_src_env",
+    "export:win": "node src/index.js --export --detokenize --src_env=%npm_config_src_env%",
+    "exportRaw:win": "node src/index.js --export --src_env=%npm_config_src_env%",
+    "deploy": "node src/index.js --deploy --target_env=$npm_config_target_env",
+    "deploy:win": "node src/index.js --deploy --target_env=%npm_config_target_env%"
+  },
+  "keywords": [],
+  "author": "Patrick Boston <pboston@ipllc.co>",
+  "license": "ISC",
+  "dependencies": {
+    "cli-color": "^2.0.3",
+    "jsonpath": "^1.1.1",
+    "jsonpath-plus": "^7.2.0",
+    "lodash": "^4.17.21",
+    "sailpoint-api-client": "^1.2.3",
+    "typescript": "^5.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.6",
+    "ts-node": "^10.9.1"
+  }
+}

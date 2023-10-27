@@ -1,0 +1,114 @@
+#!/usr/bin/env node
+import { runExport, reverseTokenize, buildObjectsForEnvironment, buildDeploymentFile, runDeploy } from "./util.js";
+import { Configuration } from "sailpoint-api-client";
+import axiosRetry from "axios-retry";
+import clc from "cli-color";
+
+console.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
+
+const results = [];
+const nodeArgs = (argList => {
+    const args = {};
+
+    for (let c = 0, n = argList.length; c < n; c++) {
+        const thisOpt = argList[c].trim();
+        let opt = thisOpt.replace(/^\-+/, '');
+        let curOpt;
+
+        if (opt === thisOpt) {
+            if (curOpt) args[curOpt] = opt;
+            curOpt = null;
+        } else {
+            if (~opt.indexOf('=')) {
+                opt = opt.split('=');
+                curOpt = opt[0];
+                opt = opt.slice(1).join('=');
+                args[curOpt] = opt;
+            } else {
+                curOpt = opt;
+                args[curOpt] = true;
+            }
+        }
+    }
+
+    return args;
+})(process.argv);
+
+//Input cmd args
+let {
+    export: isExport,
+    deploy: isDeploy,
+    detokenize: isDetokenize,
+    src_env: srcEnvName,
+    target_env: targetEnvName
+} = nodeArgs;
+
+//Process args
+srcEnvName = srcEnvName && srcEnvName.toLowerCase();
+targetEnvName = targetEnvName && targetEnvName.toLowerCase();
+
+//Check export params
+if (isExport && (!srcEnvName || srcEnvName == "%npm_config_src_env%")) {
+    console.error(clc.bgRed("FAILED: --src_env argument is required for export but was not supplied, exiting"));
+    process.exit(1);
+} else {
+    console.info(clc.bgMagentaBright(`Running with src_env: ${srcEnvName}`));
+}
+
+//Check deploy params
+if (isDeploy && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
+    console.error(clc.bgRed("FAILED: --target_env argument is required for deploy but was not supplied, exiting"));
+    process.exit(1);
+} else {
+    console.info(clc.bgMagentaBright(`Running with target_env: ${targetEnvName}`));
+}
+
+//Perform export setup and process
+if (isExport) {
+    //Set up config based on envirnments
+    const { default: srcEnvParams } = await import("./../" + srcEnvName + ".env.js");
+
+    let srcApiConfig = new Configuration(srcEnvParams);
+    srcApiConfig.retriesConfig = {
+        retries: 4,
+        retryDelay: axiosRetry.exponentialDelay,
+        onRetry(retryCount, error, requestConfig) {
+            console.log(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
+        }
+    }
+
+    if (isExport && isDetokenize) {
+        console.log(clc.bgMagentaBright("Running export and de-tokenization..."));
+        await runExport(srcApiConfig).then((res) => {
+            reverseTokenize();
+        });
+    } else if (isExport && !isDetokenize) {
+        console.log(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
+        await runExport(srcApiConfig);
+    }
+}
+
+//Perform deploy setup and process
+if (isDeploy) {
+    const { default: targetEnvParams } = await import("./../" + targetEnvName + ".env.js");
+
+    let targetApiConfig = new Configuration(targetEnvParams);
+    targetApiConfig.retriesConfig = {
+        retries: 4,
+        retryDelay: axiosRetry.exponentialDelay,
+        onRetry(retryCount, error, requestConfig) {
+            console.log(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
+        }
+    }
+
+    await buildObjectsForEnvironment(targetEnvName).then(() => {
+        buildDeploymentFile().then((deployObj, rej) => {
+            runDeploy(targetApiConfig, deployObj).then((result, rej) => {
+                console.log(result);
+            });
+        });
+    });
+}
+
+
+process.exit(0);
