@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { runExport, reverseTokenize, buildObjectsForEnvironment, buildDeploymentFile, runDeploy } from "./util.js";
 import { Configuration } from "sailpoint-api-client";
+import * as fs from "fs";
 import axiosRetry from "axios-retry";
 import clc from "cli-color";
 
@@ -101,12 +102,17 @@ if (isDeploy) {
         }
     }
 
-    await buildObjectsForEnvironment(targetEnvName).then(() => {
-        buildDeploymentFile().then((deployObj, rej) => {
-            runDeploy(targetApiConfig, deployObj).then((result, rej) => {
-                console.log(result);
-            });
-        });
+    await buildObjectsForEnvironment(targetEnvName);
+    const deployObj = buildDeploymentFile();
+
+    //Convert to a Blob for the HTTP multipart form data
+    const jsonString = JSON.stringify(deployObj);
+    const blobPayload = new Blob([jsonString], {
+        type: 'application/json'
+    });
+
+    await runDeploy(targetApiConfig, blobPayload).then((result) => {
+        console.info(JSON.stringify(result, null, 4));
     });
 }
 

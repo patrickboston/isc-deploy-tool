@@ -54,11 +54,11 @@ const checkExportStatus = async (spConfigApi, jobId, timeout = 10000) => {
                         setTimeout(wait, 100);
                     } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
                         console.error(response);
-                        reject("Export job [" + jobId + "] has been cancelled or failed!");
+                        resolve("Export job [" + jobId + "] has been cancelled or failed!");
                     }
                 })
             })();
-        }, 1000);
+        }, 3000);
     });
 }
 
@@ -104,6 +104,7 @@ const runExport = async (apiConfig) => {
         spConfigApi.exportSpConfig(spConfigReq).then((response) => {
             const jobId = response.data.jobId;
             checkExportStatus(spConfigApi, jobId).then((response) => {
+                console.log(response);
                 resolve(getExportResult(spConfigApi, jobId));
             });
         });
@@ -189,10 +190,10 @@ const buildObjectsForEnvironment = async (env) => {
     });
 }
 
-const buildDeploymentFile = async () => {
-    return new Promise((resolve, reject) => {
+const buildDeploymentFile = () => {
+    try {
         if (!fs.existsSync("./build/config/")) {
-            reject("./build/config directory does not exist, no objects to deploy");
+            throw new Error("./build/config directory does not exist, no objects to deploy");
         }
 
         let objectArray = [];
@@ -206,9 +207,11 @@ const buildDeploymentFile = async () => {
         const deploymentObj = {
             objects: objectArray
         };
-        fs.writeFile("./build/deploy.json", JSON.stringify(deploymentObj, null, 4));
-        resolve(deploymentObj);
-    });
+        fs.writeFileSync("./build/deploy.json", JSON.stringify(deploymentObj, null, 4));
+        return deploymentObj;
+    } catch (error) {
+        throw new Error(error);
+    }
 }
 
 const checkImportStatus = async (spConfigApi, jobId, timeout = 10000) => {
@@ -223,17 +226,20 @@ const checkImportStatus = async (spConfigApi, jobId, timeout = 10000) => {
                         console.log(clc.green("Import job [" + jobId + "] still in progress..."));
                         setTimeout(wait, 100);
                     } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
-                        reject("Import job [" + jobId + "] has been cancelled or failed!");
+                        resolve(clc.red("Import job [" + jobId + "] has been cancelled or failed!"));
                     }
-                })
+                });
             })();
-        }, 1000);
+        }, 3000);
     });
 }
 
 const getImportResult = async (spConfigApi, jobId) => {
-    await spConfigApi.getSpConfigImport({ id: jobId }).then((response) => {
-        const result = response.results;
+    return new Promise((resolve) => {
+        spConfigApi.getSpConfigImport({ id: jobId }).then((response) => {
+            const result = response.data;
+            resolve(result);
+        });
     });
 }
 
@@ -242,11 +248,11 @@ const runDeploy = async (apiConfig, importData) => {
         console.info(clc.bgBlueBright("Performing tenant deployment"));
         let spConfigApi = new SPConfigBetaApi(apiConfig);
 
-        spConfigApi.importSpConfig(importData).then((response) => {
+        spConfigApi.importSpConfig({ data: importData }).then((response) => {
             const jobId = response.data.jobId;
             checkImportStatus(spConfigApi, jobId).then((response) => {
                 resolve(getImportResult(spConfigApi, jobId));
-            });
+            })
         });
     });
 }
