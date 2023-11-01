@@ -3,7 +3,7 @@ The IdentityNow Object Migration tool is a NodeJS command-line utility that allo
 
 It offers the following features:
 - Export objects as-is (raw) out of an environment
-- Export objects and perform reverse-tokenization via JSONPath which replaces actual setting values with a token in the format of %%TOKEN_NAME%%. This allows a single object to be maintained in a code repository which can be "built" for any IdentityNow environment
+- Export objects and perform reverse-tokenization via JSONPath which replaces actual setting values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any IdentityNow environment
 - Tokenize and deploy objects to a target IdentityNow environment which is the process of replacing the repository tokens with actual setting values which are needed for a specific environment (i.e. IQService host for an Active Directory Source)
 
 If used properly, this tool can offer deployment workflows like the following:
