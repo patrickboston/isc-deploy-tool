@@ -25,7 +25,11 @@ function walk(dir, files = []) {
 }
 
 function deepOmit(obj, keysToOmit) {
-    var keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
+    let keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
+    const keysToIgnore = [
+        "owner",
+        "passwordPolicies"
+    ];
 
     function omitFromObject(obj) { // the inner function which will be called recursivley
 
@@ -33,9 +37,8 @@ function deepOmit(obj, keysToOmit) {
             if (key in keysToOmitIndex) { // if the key is in the index skip it
                 return;
             }
-
-            // if the key is an object run it through the inner function - omitFromObject, also if the objet is "owner" leave as is so we retain ID
-            result[key] = _.isObject(value) && key !== "owner" ? omitFromObject(value) : value;
+            
+            result[key] = _.isObject(value) && !keysToIgnore.includes(key) ? omitFromObject(value) : value;
         })
     }
     return omitFromObject(obj); // return the inner function result
@@ -104,7 +107,6 @@ const runExport = async (apiConfig) => {
         spConfigApi.exportSpConfig(spConfigReq).then((response) => {
             const jobId = response.data.jobId;
             checkExportStatus(spConfigApi, jobId).then((response) => {
-                console.log(response);
                 resolve(getExportResult(spConfigApi, jobId));
             });
         });
@@ -148,6 +150,7 @@ const reverseTokenize = async () => {
             //Save the updated JSON
             fs.writeFileSync(fileLocation, JSON.stringify(json, null, 4));
         });
+        console.info(clc.bgGreenBright("Reverse tokenization complete"));
         resolve("Reverse tokenization complete");
     })
 }
@@ -258,7 +261,6 @@ const runDeploy = async (apiConfig, importData) => {
 }
 
 export {
-    walk,
     buildObjectsForEnvironment,
     buildDeploymentFile,
     runExport,

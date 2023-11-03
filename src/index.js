@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { runExport, reverseTokenize, buildObjectsForEnvironment, buildDeploymentFile, runDeploy } from "./util.js";
 import { Configuration } from "sailpoint-api-client";
-import * as fs from "fs";
 import axiosRetry from "axios-retry";
 import clc from "cli-color";
 

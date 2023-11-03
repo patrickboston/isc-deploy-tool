@@ -89,5 +89,10 @@ To perform tokenization and deploy/import into a specific environemnt based on t
 npm run deploy:win -target-env=<env>
 ```
 
-## Known Issues
+## Known Issues/Limitations
 - SP-Config APIs allow exports of objects which are not able to be imported
+- SP-Config Import relies on certain ID references to be retained. This means ID references will need to be tokenized in some objects. The known ones are:
+  - All objects 
+    - owner.id
+  - Source
+    - passwordPolicies[*].id (only on update imports for an object, initial creation does not need it)
