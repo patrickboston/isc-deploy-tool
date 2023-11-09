@@ -37,7 +37,7 @@ function deepOmit(obj, keysToOmit) {
             if (key in keysToOmitIndex) { // if the key is in the index skip it
                 return;
             }
-            
+
             result[key] = _.isObject(value) && !keysToIgnore.includes(key) ? omitFromObject(value) : value;
         })
     }
@@ -122,33 +122,43 @@ const reverseTokenize = async () => {
         Object.entries(reverseTokens).forEach((objectEntry) => {
             const [fileName, tokens] = objectEntry;
             const fileLocation = "./config/" + fileName;
-            const fileSource = fs.readFileSync(fileLocation);
-            let json = JSON.parse(fileSource);
+            try {
+                const fileSource = fs.readFileSync(fileLocation);
 
-            //Iterate each token for a specific object/file
-            Object.entries(tokens).forEach((token) => {
-                const [jPath, tokenValue] = token;
-                console.info(`Checking file [${fileName}] for JSONPath [${jPath}]`);
+                console.info(`Checking file: ${fileLocation}`);
+                let json = JSON.parse(fileSource);
 
-                let results = JSONPath({
-                    path: jPath,
-                    json: json,
-                    resultType: "all"
+                //Iterate each token for a specific object/file
+                Object.entries(tokens).forEach((token) => {
+                    const [jPath, tokenValue] = token;
+                    console.info(`Checking file [${fileName}] for JSONPath [${jPath}]`);
+
+                    let results = JSONPath({
+                        path: jPath,
+                        json: json,
+                        resultType: "all"
+                    });
+
+                    //If we find a matching object via JSONPath, replace it with the reverse token
+                    if (Array.isArray(results) && results.length > 0) {
+                        //Convert the JSONPath pointer to make it actual JavaScript dot notation
+                        let correctPointer = results[0].pointer.replaceAll("/", ".").substring(1);
+                        _.set(json, correctPointer, tokenValue);
+                        console.info(clc.bgGreen(`JSONPath match found, replacing value with token: ${tokenValue}`));
+                    } else {
+                        console.warn(clc.yellow("Could not find JSON element for path: " + jPath));
+                    }
                 });
 
-                //If we find a matching object via JSONPath, replace it with the reverse token
-                if (Array.isArray(results) && results.length > 0) {
-                    //Convert the JSONPath pointer to make it actual JavaScript dot notation
-                    let correctPointer = results[0].pointer.replaceAll("/", ".").substring(1);
-                    _.set(json, correctPointer, tokenValue);
-                    console.info(clc.bgGreen(`JSONPath match found, replacing value with token: ${tokenValue}`));
+                //Save the updated JSON
+                fs.writeFileSync(fileLocation, JSON.stringify(json, null, 4));
+            } catch (err) {
+                if (err.code === 'ENOENT') {
+                    console.info(clc.bgRed(`File not found defined in reverse.target.js: ${fileLocation}`));
                 } else {
-                    console.warn(clc.yellow("Could not find JSON element for path: " + jPath));
+                    throw err;
                 }
-            });
-
-            //Save the updated JSON
-            fs.writeFileSync(fileLocation, JSON.stringify(json, null, 4));
+            }
         });
         console.info(clc.bgGreenBright("Reverse tokenization complete"));
         resolve("Reverse tokenization complete");
