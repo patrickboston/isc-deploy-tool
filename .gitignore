@@ -1,8 +1,6 @@
 # IDN Project Specific
 build/
 *.env.js
-*.target.js
-reverse.target.js
 
 # Logs
 logs
