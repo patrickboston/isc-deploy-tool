@@ -14,7 +14,9 @@ If used properly, this tool can offer deployment workflows like the following:
 5. Once configuration is fully exported, tokenized, and ready to deploy to another environment, use the deploy process
 
 ## Setup
-This a NodeJS project that was written on NodeJS 18. You will need NodeJS installed prior to using this tool.
+This a NodeJS project that was written on NodeJS 18. You will need NodeJS installed prior to using this tool. Find the latest NodeJS download here: https://nodejs.org/en/download
+
+You can then clone this repository. Once the repository is cloned, run `npm install` within the cloned repository directory to install all project dependencies.
 
 You will also need to set up the following files in the root of your project to be able to export/import from IdentityNow environments:
 - `<env>.env.js` - Holds the parameters needed to login to hit IDN API endpoints via a PAT (Personal Access Token). There is an example in this repository, but it needs to look like this:
