@@ -95,8 +95,106 @@ npm run deploy:win -target-env=<env>
 
 ## Known Issues/Limitations
 - SP-Config APIs allow exports of objects which are not able to be imported. See more here: https://developer.sailpoint.com/idn/docs/saas-configuration
+- SP-Config imports can fail if referenced objects do not exist yet. For example, if an Identity Profile attribute references a Source that does not exist, you may receive a dependency failure. You may need to import some objects before others to resolve this until this tool imports objects in a specific order. Example error
+```json
+"IDENTITY_PROFILE": {
+    "infos": [],
+    "warnings": [],
+    "errors": [
+        {
+            "key": "IDENTITY_PROFILE_IMPORT_FAILED",
+            "text": "An error occurred while importing Identity Profile with name 'Employee'",
+            "detail": {
+                "exceptionMessage": "Referenced Authoritative Source \"{1}\" was not found."
+            }
+        }
+    ],
+    "importedObjects": []
+}
+```
 - SP-Config Import relies on certain ID references to be retained. This means ID references will need to be tokenized in some objects. The known ones are:
   - All objects 
-    - owner.id
+    - `owner.id`
+    ```json
+    "owner": {
+        "type": "IDENTITY",
+        "id": "87b682d779e2419cb1875b759b7fc2af",
+        "name": "pboston.pboston"
+    },
+    ```
+    - RULE Reference `id`
+    ```JSON
+    "reference": {
+        "type": "RULE",
+        "id": "daf71540b5274f4eb32fa572796ac683",
+        "name": "Cloud Promote Identity Attribute"
+    }
+    ```
   - Source
     - passwordPolicies[*].id (only on update imports for an object, initial creation does not need it)
+    ```json
+    "passwordPolicies": [
+        {
+            "type": "PASSWORD_POLICY",
+            "id": "4b10c69768a040019383afb258898e67",
+            "name": "Default"
+        }
+    ]
+    ```
+
+## Appendix
+### Finding Owner Info via API
+One of the easiest ways is to use the `/v3/search` endpoints to search for the specific identity you want. For example:
+```json
+{
+    "indices": [
+        "identities"
+    ],
+    "queryType": "SAILPOINT",
+    "queryVersion": "5.2",
+    "query": {
+        "query": "lastName:Ingon"
+    }
+}
+```
+Will give you a result like so which you just need the `id` and `name` from:
+```json
+[
+    {
+        "name": "46-7960700",
+        "firstName": "Brook",
+        "lastName": "Ingon",
+        "displayName": "Brook Ingon",
+        "id": "0c5f67b1ec1a46cda26a3996e3155f34",
+        "email": "test@test.com",
+        "created": "2023-09-25T02:25:46.652Z",
+        "inactive": false,
+        "protected": false,
+        "status": "UNREGISTERED",
+        "employeeNumber": "46-7960700",
+        "manager": {
+            "id": "0b7f4a4a70ee4ef8985b0d756e0d104d",
+            "name": "07-7960018",
+            "displayName": "Rhett Opie"
+        },
+        "isManager": false,
+        "identityProfile": {
+            "id": "f8e3f69568b64fd0974bbf658fa3b540",
+            "name": "HR"
+        },
+        "source": {
+            "id": "43b2199fe2b349049c04573b138587fb",
+            "name": "HR"
+        },
+        "attributes": {
+            .....
+        }
+    }
+]
+```
+
+You can also retrieve this information from the Search UI by performing your identity search and adding the `ID` column to your search result table:
+![Idetity Search](/resources/readme/IdentitySearchID.png)
+
+Lastly, you can also get this information when viewing an identity from the identity list page:
+![Identity View](/resources/readme/IdentityView.png)
