@@ -95,6 +95,7 @@ npm run deploy:win -target-env=<env>
 
 ## Known Issues/Limitations
 - SP-Config APIs allow exports of objects which are not able to be imported. See more here: https://developer.sailpoint.com/idn/docs/saas-configuration
+- SP-Config APIs do not export encrypted attributes such as passwords. This means they will not exist on your exported objects any subsequent imports of those object will clear out those encrypted attributes
 - SP-Config imports can fail if referenced objects do not exist yet. For example, if an Identity Profile attribute references a Source that does not exist, you may receive a dependency failure. You may need to import some objects before others to resolve this until this tool imports objects in a specific order. Example error
 ```json
 "IDENTITY_PROFILE": {
