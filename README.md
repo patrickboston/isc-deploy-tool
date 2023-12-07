@@ -93,6 +93,11 @@ To perform tokenization and deploy/import into a specific environemnt based on t
 npm run deploy:win -target-env=<env>
 ```
 
+## Future Enhancements
+- Build output files for SP-Config import without deploying to a tenant
+- Implement local secret injection for passwords, etc. which would be stored in a locally Git ignored file and would inject secrets into built files which would also be Git ignored (secrets should never make it to the remote repository)
+- Implement secret injection for a PAM tool, similar to local secret injection but password are stored encrypted in a PAM tool and retrieved live during file builds
+
 ## Known Issues/Limitations
 - SP-Config APIs allow exports of objects which are not able to be imported. See more here: https://developer.sailpoint.com/idn/docs/saas-configuration
 - SP-Config APIs do not export encrypted attributes such as passwords. This means they will not exist on your exported objects any subsequent imports of those object will clear out those encrypted attributes
