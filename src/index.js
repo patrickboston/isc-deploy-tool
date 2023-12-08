@@ -37,6 +37,7 @@ const nodeArgs = (argList => {
 //Input cmd args
 let {
     export: isExport,
+    build: isBuild,
     deploy: isDeploy,
     detokenize: isDetokenize,
     src_env: srcEnvName,
@@ -55,12 +56,20 @@ if (isExport && (!srcEnvName || srcEnvName == "%npm_config_src_env%")) {
     console.info(clc.bgMagentaBright(`Running with src_env: ${srcEnvName}`));
 }
 
+//Check build params
+if (isBuild && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
+    console.error(clc.bgRed("FAILED: --target_env argument is required for build but was not supplied, exiting"));
+    process.exit(1);
+} else {
+    console.info(clc.bgMagentaBright(`Running build with target_env: ${targetEnvName}`));
+}
+
 //Check deploy params
 if (isDeploy && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
     console.error(clc.bgRed("FAILED: --target_env argument is required for deploy but was not supplied, exiting"));
     process.exit(1);
 } else {
-    console.info(clc.bgMagentaBright(`Running with target_env: ${targetEnvName}`));
+    console.info(clc.bgMagentaBright(`Running deploy with target_env: ${targetEnvName}`));
 }
 
 //Perform export setup and process
@@ -86,6 +95,12 @@ if (isExport) {
         console.log(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
         await runExport(srcApiConfig);
     }
+}
+
+//Perform local build only
+if (isBuild) {
+    await buildObjectsForEnvironment(targetEnvName);
+    buildDeploymentFile();
 }
 
 //Perform deploy setup and process

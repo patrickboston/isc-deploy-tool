@@ -1,16 +1,17 @@
 # IdentityNow Object Migration Tool
-The IdentityNow Object Migration tool is a NodeJS command-line utility that allows you to export configuration objects such as Sources, Transforms, Rules, and more out of one IdentityNow environment and import/deploy them to other IdentityNow environments. It utulizes the [SP-Config API endpoints](https://developer.sailpoint.com/idn/api/beta/sp-config) to perform all export and import operations. One of the main benefits from using this tool is the ability to maintain single configuration objects that can be deploy to any environemnt via tokenization. This allows Source Code Management to actually make sense for IDN implementations and this process could easily be plugged into a CI/CD pipeline.
+The IdentityNow Object Migration tool is a NodeJS command-line utility that allows you to export configuration objects such as Sources, Transforms, Rules, and more out of one IdentityNow environment and import/deploy them to other IdentityNow environments. It utilizes the [SP-Config API endpoints](https://developer.sailpoint.com/idn/api/beta/sp-config) to perform all export and import operations. One of the main benefits from using this tool is the ability to maintain single configuration objects that can be deploy to any environment via tokenization. This allows Source Code Management to actually make sense for IDN implementations and this process could easily be plugged into a CI/CD pipeline.
 
 It offers the following features:
 - Export objects as-is (raw) out of an environment
 - Export objects and perform reverse-tokenization via JSONPath which replaces actual setting values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any IdentityNow environment
-- Tokenize and deploy objects to a target IdentityNow environment which is the process of replacing the repository tokens with actual setting values which are needed for a specific environment (i.e. IQService host for an Active Directory Source)
+- Tokenize and build objects for a target IdentityNow environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual setting values which are needed for a specific environment (i.e. IQService host for an Active Directory Source)
+- Tokenize and deploy objects to a target IdentityNow environment
 
 If used properly, this tool can offer deployment workflows like the following:
 1. Perform initial sandbox setup
 2. Export objects you wish to be maintained in SCM and to be deployed to higher environments via this process
 3. Replace configuration values with tokens in configuration files and set up reverse tokenization to retain tokens on subsequent tenant exports
-4. Continue development in sandbox and export periodially, committing changes to a SCM repository. Changes could also be made directly in JSON configuration files in local repository and deployed back to an environment
+4. Continue development in sandbox and export periodically, committing changes to a SCM repository. Changes could also be made directly in JSON configuration files in local repository and deployed back to an environment
 5. Once configuration is fully exported, tokenized, and ready to deploy to another environment, use the deploy process
 
 ## Setup
@@ -71,30 +72,35 @@ export default
 ```
 
 ## Commands
-Once you have all the pre-reqs above setup, you can now start running some commands. Open up your favorite terminal and navigate to your project location. Our `src/index.js` file is the main file that is run with NodejS. We run the app with the following if we wanted
+Once you have all the pre-requisites above setup, you can now start running some commands. Open up your favorite terminal and navigate to your project location. Our `src/index.js` file is the main file that is run with NodejS. We can run the app with the following if we wanted
 ```
 node src/index.js --export --detokenize
 ```
-However, in the `package.json`, there are a number of scripts set up which make the commanda slightly easier to run
+However, in the `package.json`, there are a number of scripts set up which make the commands slightly easier to run
 
 **NOTE: The example commands below all use `:win` variation of the commands. If you are on a Linux OS, omit the `:win` when running the command. There are different sets of commands because of how dynamic command line parameters are passed in NodeJS**
 
 ### Export
-To export objects from a specific environment and perform reverse-tokenization based on properties defined in your `reverse.target.js` file, run the following where `<env>` is the actual name of your environemnt such as `sb`. This process relies on the `export-config.js` file you have configured to determine which objects you want to export out of your source IdentityNow environment.
+To export objects from a specific environment and perform reverse-tokenization based on properties defined in your `reverse.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`. This process relies on the `export-config.js` file you have configured to determine which objects you want to export out of your source IdentityNow environment.
 
 **NOTE:** The export process will overwrite any manual changes made in your `/config/` directory. This is why it is crucial to set up your reverse tokenization properties if you wish to retain a neutral object state that can be deployed to any target environment.
 ```
 npm run export:win -src-env=<env>
 ```
 
+### Build
+To perform tokenization and build objects locally for specific target environment based on tokens defined in your `<env>.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`. The built objects will reside in the `/build/config` directory
+```
+npm run build:win -target-env=<env>
+```
+
 ### Deploy/Import
-To perform tokenization and deploy/import into a specific environemnt based on tokens defined in your `<env>.target.js` file, run the following where `<env>` is the actual name of your environemnt such as `sb`
+To perform tokenization and deploy/import into a specific target environment based on tokens defined in your `<env>.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`
 ```
 npm run deploy:win -target-env=<env>
 ```
 
 ## Future Enhancements
-- Build output files for SP-Config import without deploying to a tenant
 - Implement local secret injection for passwords, etc. which would be stored in a locally Git ignored file and would inject secrets into built files which would also be Git ignored (secrets should never make it to the remote repository)
 - Implement secret injection for a PAM tool, similar to local secret injection but password are stored encrypted in a PAM tool and retrieved live during file builds
 
@@ -200,7 +206,7 @@ Will give you a result like so which you just need the `id` and `name` from:
 ```
 
 You can also retrieve this information from the Search UI by performing your identity search and adding the `ID` column to your search result table:
-![Idetity Search](/resources/readme/IdentitySearchID.png)
+![Identity Search](/resources/readme/IdentitySearchID.png)
 
 Lastly, you can also get this information when viewing an identity from the identity list page:
 ![Identity View](/resources/readme/IdentityView.png)

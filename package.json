@@ -9,6 +9,8 @@
     "exportRaw": "node src/index.js --export --src_env=$npm_config_src_env",
     "export:win": "node src/index.js --export --detokenize --src_env=%npm_config_src_env%",
     "exportRaw:win": "node src/index.js --export --src_env=%npm_config_src_env%",
+    "build": "node src/index.js --build --target_env=$npm_config_target_env",
+    "build:win": "node src/index.js --build --target_env=%npm_config_target_env%",
     "deploy": "node src/index.js --deploy --target_env=$npm_config_target_env",
     "deploy:win": "node src/index.js --deploy --target_env=%npm_config_target_env%"
   },
