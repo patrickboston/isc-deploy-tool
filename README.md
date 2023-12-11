@@ -101,6 +101,7 @@ npm run deploy:win -target-env=<env>
 ```
 
 ## Future Enhancements
+- Implement import order during deployments so reference issues, etc. do not break an entire import. Would be useful for initial imports of a large set of objects with have dependencies on each other
 - Implement local secret injection for passwords, etc. which would be stored in a locally Git ignored file and would inject secrets into built files which would also be Git ignored (secrets should never make it to the remote repository)
 - Implement secret injection for a PAM tool, similar to local secret injection but password are stored encrypted in a PAM tool and retrieved live during file builds
 
