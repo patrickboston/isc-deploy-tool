@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { runExport, reverseTokenize, buildObjectsForEnvironment, buildDeploymentFile, runDeploy } from "./util.js";
+import { getSources } from "./sourceUtil.js";
 import { Configuration } from "sailpoint-api-client";
 import axiosRetry from "axios-retry";
 import clc from "cli-color";
@@ -91,6 +92,11 @@ if (isExport) {
         await runExport(srcApiConfig).then((res) => {
             reverseTokenize();
         });
+
+        await getSources(srcApiConfig).then((res) => {
+            console.log(res.data);
+        });
+
     } else if (isExport && !isDetokenize) {
         console.log(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
         await runExport(srcApiConfig);
