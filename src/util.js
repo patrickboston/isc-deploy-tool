@@ -24,7 +24,7 @@ function walk(dir, files = []) {
     return files;
 }
 
-function deepOmit(obj, keysToOmit) {
+function deepOmit(obj, keysToOmit = ["id", "created", "modified"]) {
     let keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
     const keysToIgnore = [
         "owner",
@@ -42,6 +42,32 @@ function deepOmit(obj, keysToOmit) {
         })
     }
     return omitFromObject(obj); // return the inner function result
+}
+
+/**
+* Writes a IDN Config file to the specified location
+* creating a directory if needed to hold the object
+* Also omits certain attributes by default
+* @param {Configuration} apiConfig
+*/
+const writeConfigFile = (objectType, objectName, object, overrideDir = null) => {
+    const dir = overrideDir ? "./config/" + overrideDir : "./config/" + objectType;
+    //const dir = "./config/" + objectType;
+    //Create directory for object type if it does not exist yet
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+
+    if (objectType == "RULE") {
+        const source = objectSource.sourceCode.script;
+        const ruleSourceFileName = dir + "/" + objectName + ".source.txt";
+        fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
+    }
+
+    //Write JSON file for object
+    const fileName = dir + "/" + objectName + ".json";
+    let omittedObj = deepOmit(object);
+    fs.writeFileSync(fileName, JSON.stringify(omittedObj, null, 4));
 }
 
 const checkExportStatus = async (spConfigApi, jobId, timeout = 10000) => {
@@ -275,5 +301,7 @@ export {
     buildDeploymentFile,
     runExport,
     runDeploy,
-    reverseTokenize
+    reverseTokenize,
+    writeConfigFile,
+    deepOmit
 };
