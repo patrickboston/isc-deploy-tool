@@ -17,20 +17,20 @@ const getSources = async (apiConfig) => {
         const sourceName = source.name;
         console.log(clc.bgCyan(`Processing export for source: ${sourceName}`));
 
+        //Get and write referenced schemas on source
         const sourceSchemas = await sourcesApi.listSourceSchemas({ sourceId: source.id });
         for (const schema of sourceSchemas.data) {
-            console.info("WRITING SCHEMAS");
             writeConfigFile("CONNECTOR_SCHEMA", schema.name, schema, "SOURCE/" + sourceName + "/CONNECTOR_SCHEMA");
         }
 
+        //Get and write referenced policies on source
         const sourcePolicies = await sourcesApi.listProvisioningPolicies({ sourceId: source.id });
         for (const policy of sourcePolicies.data) {
-            console.info("WRITING POLICY");
             const policyFileName = policy.name + "_" + policy.usageType;
             writeConfigFile("PROVISIONING_POLICY", policyFileName, policy, "SOURCE/" + sourceName + "/PROVISIONING_POLICY");
         }
 
-        console.info("WRITING MAIN SOURCE");
+        //Write the actual source
         writeConfigFile("SOURCE", sourceName, source, "SOURCE/" + sourceName);
     }
 };
