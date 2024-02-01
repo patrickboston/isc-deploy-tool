@@ -1,8 +1,8 @@
 export default
     {
         "SOURCE/Active Directory/Active Directory.json": {
-            "$.object.owner.id": "%%AD_OWNER_ID%%",
-            "$.object.connectorAttributes.IQServicePort": "%%AD_IQSERVICE_PORT%%",
+            "$.owner.id": "%%AD_OWNER_ID%%",
+            "$.connectorAttributes.IQServicePort": "%%AD_IQSERVICE_PORT%%",
             "$.notfound": "%%ABC%%"
         }
     }

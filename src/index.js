@@ -89,15 +89,9 @@ if (isExport) {
 
     if (isExport && isDetokenize) {
         console.log(clc.bgMagentaBright("Running export and de-tokenization..."));
-        /*
-        await runExport(srcApiConfig).then((res) => {
-            reverseTokenize();
-        });
-        */
 
         await getSources(srcApiConfig);
-
-        //await reverseTokenize();
+        await reverseTokenize();
 
     } else if (isExport && !isDetokenize) {
         console.log(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
