@@ -7,7 +7,7 @@ import { writeConfigFile } from "./util.js";
 * Source files and referenced objects
 * @param {Configuration} apiConfig
 */
-const getSources = async (apiConfig) => {
+const exportSources = async (apiConfig) => {
     console.info(clc.bgBlueBright("Performing Source export"));
     const sourcesApi = new SourcesApi(apiConfig);
 
@@ -36,5 +36,5 @@ const getSources = async (apiConfig) => {
 };
 
 export {
-    getSources,
+    exportSources,
 };

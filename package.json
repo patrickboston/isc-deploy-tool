@@ -18,6 +18,7 @@
   "author": "Patrick Boston <pboston@ipllc.co>",
   "license": "ISC",
   "dependencies": {
+    "axios-debug-log": "^1.0.0",
     "cli-color": "^2.0.3",
     "jsonpath": "^1.1.1",
     "jsonpath-plus": "^7.2.0",
