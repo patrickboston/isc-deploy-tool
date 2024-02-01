@@ -1,6 +1,6 @@
 import clc from "cli-color";
 import { SourcesApi, Paginator } from "sailpoint-api-client";
-import { writeConfigFile, writeConfigFileAsync } from "./util.js";
+import { writeConfigFile } from "./util.js";
 
 /**
 * Gets all sources via v3/sources and write appropriate 
