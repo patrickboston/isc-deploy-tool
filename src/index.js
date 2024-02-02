@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { runExport, reverseTokenize, buildObjectsForEnvironment, buildDeploymentFile, runDeploy } from "./util.js";
 import { exportSources } from "./sourceUtil.js";
-import { exportIdentityAttributeConfig } from "./identityConfigUtil.js";
+import { exportIdentityAttributeConfig, exportIdentityProfiles } from "./identityConfigUtil.js";
 import { Configuration } from "sailpoint-api-client";
 import axiosRetry from "axios-retry";
 import clc from "cli-color";
@@ -93,6 +93,7 @@ if (isExport) {
 
         await exportSources(srcApiConfig);
         await exportIdentityAttributeConfig(srcApiConfig);
+        await exportIdentityProfiles(srcApiConfig);
         await reverseTokenize();
 
     } else if (isExport && !isDetokenize) {

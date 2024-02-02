@@ -24,7 +24,7 @@ function walk(dir, files = []) {
     return files;
 }
 
-function deepOmit(obj, keysToOmit = ["id", "created", "modified"]) {
+function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId"]) {
     let keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
     const keysToIgnore = [
         "owner",
