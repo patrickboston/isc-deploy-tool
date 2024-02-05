@@ -5,14 +5,16 @@ export default
             
         ],
         "includeTypes": [
-            "SOURCE"
+            "SOURCE",
+            "TRANSFORM",
+            "RULE"
         ],
         "objectOptions": {
             "SOURCE": {
                 "includedIds": [
                 ],
                 "includedNames": [
-                    "Active Directory - Test Import2"
+                    "Active Directory"
                 ]
             }
         }
