@@ -1,0 +1,47 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "EM OldValue"
+    },
+    "object": {
+        "name": "EM OldValue",
+        "type": "lower",
+        "attributes": {
+            "input": {
+                "type": "concat",
+                "attributes": {
+                    "ignoreErrors": "true",
+                    "values": [
+                        {
+                            "type": "firstValid",
+                            "attributes": {
+                                "ignoreErrors": "true",
+                                "values": [
+                                    "$oldValue",
+                                    {
+                                        "type": "accountAttribute",
+                                        "attributes": {
+                                            "attributeName": "Company",
+                                            "sourceName": "EM Employees"
+                                        }
+                                    },
+                                    "none"
+                                ]
+                            }
+                        },
+                        "-",
+                        {
+                            "type": "accountAttribute",
+                            "attributes": {
+                                "attributeName": "Company",
+                                "sourceName": "EM Employees"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "internal": false
+    }
+}

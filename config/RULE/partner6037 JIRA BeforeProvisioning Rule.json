@@ -1,0 +1,25 @@
+{
+    "version": 1,
+    "self": {
+        "type": "RULE",
+        "name": "partner6037 JIRA BeforeProvisioning Rule"
+    },
+    "object": {
+        "description": "Before Provisioning Rule which injects identity attributes into the provisioning plan to be used for JIRA ticket creation.",
+        "type": "BeforeProvisioning",
+        "signature": {
+            "input": [],
+            "output": null
+        },
+        "sourceCode": {
+            "version": "2023-09-26 14:40:38",
+            "script": "\n  import sailpoint.object.ProvisioningPlan;\n  import sailpoint.object.Identity;\n\n\n  //Grab our identity and inject attributes into the plan arguments (using put())\n  Identity identity = plan.getIdentity();\n  plan.put(\"UID\", identity.getAttribute(\"uid\"));\n  plan.put(\"Email\", identity.getAttribute(\"email\"));\n  plan.put(\"Last_Name\", identity.getAttribute(\"lastname\"));\n  plan.put(\"Start_Date\", identity.getAttribute(\"startDate\"));\n  plan.put(\"End_Date\", identity.getAttribute(\"endDate\"));\n  plan.put(\"Manager\", identity.getAttribute(\"manager\"));\n  plan.put(\"First_Name\", identity.getAttribute(\"firstname\"));\n  plan.put(\"Display_Name\", identity.getAttribute(\"displayName\"));\n  plan.put(\"Identification_Number\", identity.getAttribute(\"identificationNumber\"));\n  plan.put(\"Lifecycle_State\", identity.getAttribute(\"cloudLifecycleState\"));\n  plan.put(\"Location\", identity.getAttribute(\"location\"));\n  plan.put(\"Test_Attribute1\", identity.getAttribute(\"testattribute1\"));\n  plan.put(\"Test_Attribute2\", identity.getAttribute(\"testattribute2\"));\n  plan.put(\"Test_Attribute3\", identity.getAttribute(\"testattribute3\"));\n  plan.put(\"Test_Attribute4\", identity.getAttribute(\"testattribute4\"));\n   "
+        },
+        "attributes": {
+            "sourceVersion": "2023-09-26 14:40:38"
+        },
+        "name": "partner6037 JIRA BeforeProvisioning Rule"
+    },
+    "jwsHeader": "eyJhbGciOiJFUzI1NiJ9",
+    "jwsSignature": "2GNNiXMWk3dAzqAeura20cp5SIqQ9-BUhr50ITvw5lPKmeqAoSfBtpoGb3g-GrlC6N2BEI4Esq06mC0EkMzPhg"
+}

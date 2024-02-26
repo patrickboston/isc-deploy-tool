@@ -1,0 +1,34 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "deriveEmployeeType"
+    },
+    "object": {
+        "name": "deriveEmployeeType",
+        "type": "lookup",
+        "attributes": {
+            "input": {
+                "attributes": {
+                    "input": {
+                        "attributes": {
+                            "attributeName": "ID",
+                            "sourceName": "Employee Feed"
+                        },
+                        "type": "accountAttribute"
+                    },
+                    "end": 1,
+                    "begin": 0
+                },
+                "type": "substring"
+            },
+            "table": {
+                "P": "Employee",
+                "default": "Employee",
+                "T": "Temporary",
+                "X": "Contractor"
+            }
+        },
+        "internal": false
+    }
+}

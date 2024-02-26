@@ -1,0 +1,21 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "orangeHRM_Lifecycle"
+    },
+    "object": {
+        "name": "orangeHRM_Lifecycle",
+        "type": "lookup",
+        "attributes": {
+            "table": {
+                "Active Employee": "active",
+                "Active Contractor": "active",
+                "Inactive Employee": "inactive",
+                "Inactive Contractor": "inactive",
+                "default": ""
+            }
+        },
+        "internal": false
+    }
+}

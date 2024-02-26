@@ -1,0 +1,107 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "Identity_FirstName"
+    },
+    "object": {
+        "name": "Identity_FirstName",
+        "type": "static",
+        "attributes": {
+            "requiresPeriodicRefresh": "true",
+            "LCSCurrent": {
+                "type": "firstValid",
+                "attributes": {
+                    "values": [
+                        {
+                            "type": "identityAttribute",
+                            "attributes": {
+                                "name": "cloudLifecycleState"
+                            }
+                        },
+                        {
+                            "type": "static",
+                            "attributes": {
+                                "value": "unknown"
+                            }
+                        }
+                    ]
+                }
+            },
+            "firstNameSource": {
+                "type": "identityAttribute",
+                "attributes": {
+                    "name": "firstNameSource"
+                }
+            },
+            "firstName": {
+                "type": "identityAttribute",
+                "attributes": {
+                    "name": "firstname"
+                }
+            },
+            "firstNameNew": {
+                "type": "identityAttribute",
+                "attributes": {
+                    "name": "firstNameNew"
+                }
+            },
+            "firstNameBlank": {
+                "type": "conditional",
+                "attributes": {
+                    "expression": "$firstNameExist eq none",
+                    "negativeCondition": "no",
+                    "positiveCondition": "yes",
+                    "firstNameExist": {
+                        "type": "firstValid",
+                        "attributes": {
+                            "values": [
+                                {
+                                    "type": "identityAttribute",
+                                    "attributes": {
+                                        "name": "firstname"
+                                    }
+                                },
+                                {
+                                    "type": "static",
+                                    "attributes": {
+                                        "value": "none"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "firstNameNewBlank": {
+                "type": "conditional",
+                "attributes": {
+                    "expression": "$firstNameNewExist eq none",
+                    "negativeCondition": "no",
+                    "positiveCondition": "yes",
+                    "firstNameNewExist": {
+                        "type": "firstValid",
+                        "attributes": {
+                            "values": [
+                                {
+                                    "type": "identityAttribute",
+                                    "attributes": {
+                                        "name": "firstNameNew"
+                                    }
+                                },
+                                {
+                                    "type": "static",
+                                    "attributes": {
+                                        "value": "none"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "value": "#if($LCSCurrent=='nameChangeFinish' && $firstNameNewBlank=='no')$firstNameNew#elseif($firstNameBlank=='yes')$firstNameSource#{else}$firstName#end"
+        },
+        "internal": false
+    }
+}

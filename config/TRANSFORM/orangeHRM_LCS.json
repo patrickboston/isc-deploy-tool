@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "orangeHRM_LCS"
+    },
+    "object": {
+        "name": "orangeHRM_LCS",
+        "type": "lookup",
+        "attributes": {
+            "table": {
+                "0": "active",
+                "1": "inactive"
+            }
+        },
+        "internal": false
+    }
+}

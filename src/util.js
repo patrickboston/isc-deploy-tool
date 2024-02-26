@@ -1,7 +1,8 @@
 import { default as exportConfig } from "./../export-config.js";
 import { default as reverseTokens } from "./../reverse.target.js";
 import * as fs from "fs";
-import _ from 'lodash';
+const { lastIndexOf } = pkg;
+import pkg from 'lodash';
 import clc from "cli-color";
 import { JSONPath } from "jsonpath-plus";
 import { SPConfigBetaApi } from "sailpoint-api-client";
@@ -216,12 +217,28 @@ const buildDeploymentFile = () => {
             console.info(`Including file ${fileName} for deployment`);
             const objectJson = JSON.parse(fileSource);
             objectArray.push(objectJson);
+
+            
+
+            //Moved this code block into the loop, trying to have it write separate objects (see +deploymentObjName+) based on each fileName, not working / erroring
+            
+            const deploymentObjName = fileName.substring(14,fileName.lastIndexOf("/"));
+
+            const deploymentObj = {
+                objects: objectArray
+            };
+            fs.writeFileSync("./build/deploy" + deploymentObjName + ".json", JSON.stringify(deploymentObj, null, 4));
+            return deploymentObj;
+            
+            //
         });
+        /*
         const deploymentObj = {
             objects: objectArray
         };
         fs.writeFileSync("./build/deploy.json", JSON.stringify(deploymentObj, null, 4));
         return deploymentObj;
+        */
     } catch (error) {
         throw new Error(error);
     }
@@ -256,6 +273,7 @@ const getImportResult = async (spConfigApi, jobId) => {
     });
 }
 
+//Assuming I need to figure out how to have this loop through different json objects to run the deployment
 const runDeploy = async (apiConfig, importData) => {
     return new Promise((resolve, reject) => {
         console.info(clc.bgBlueBright("Performing tenant deployment"));

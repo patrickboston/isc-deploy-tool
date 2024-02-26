@@ -1,0 +1,34 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "displayName"
+    },
+    "object": {
+        "name": "displayName",
+        "type": "concat",
+        "attributes": {
+            "values": [
+                {
+                    "attributes": {
+                        "name": "firstname"
+                    },
+                    "type": "identityAttribute"
+                },
+                {
+                    "attributes": {
+                        "value": " "
+                    },
+                    "type": "static"
+                },
+                {
+                    "attributes": {
+                        "name": "lastname"
+                    },
+                    "type": "identityAttribute"
+                }
+            ]
+        },
+        "internal": false
+    }
+}

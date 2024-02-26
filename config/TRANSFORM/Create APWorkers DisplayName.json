@@ -1,0 +1,36 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "Create APWorkers DisplayName"
+    },
+    "object": {
+        "name": "Create APWorkers DisplayName",
+        "type": "concat",
+        "attributes": {
+            "values": [
+                {
+                    "attributes": {
+                        "sourceName": "APWorkers",
+                        "name": "firstname"
+                    },
+                    "type": "accountAttribute"
+                },
+                {
+                    "attributes": {
+                        "value": "."
+                    },
+                    "type": "static"
+                },
+                {
+                    "attributes": {
+                        "sourceName": "APWorkers",
+                        "name": "lastname"
+                    },
+                    "type": "accountAttribute"
+                }
+            ]
+        },
+        "internal": false
+    }
+}

@@ -1,0 +1,23 @@
+
+  import sailpoint.object.ProvisioningPlan;
+  import sailpoint.object.Identity;
+
+
+  //Grab our identity and inject attributes into the plan arguments (using put())
+  Identity identity = plan.getIdentity();
+  plan.put("UID", identity.getAttribute("uid"));
+  plan.put("Email", identity.getAttribute("email"));
+  plan.put("Last_Name", identity.getAttribute("lastname"));
+  plan.put("Start_Date", identity.getAttribute("startDate"));
+  plan.put("End_Date", identity.getAttribute("endDate"));
+  plan.put("Manager", identity.getAttribute("manager"));
+  plan.put("First_Name", identity.getAttribute("firstname"));
+  plan.put("Display_Name", identity.getAttribute("displayName"));
+  plan.put("Identification_Number", identity.getAttribute("identificationNumber"));
+  plan.put("Lifecycle_State", identity.getAttribute("cloudLifecycleState"));
+  plan.put("Location", identity.getAttribute("location"));
+  plan.put("Test_Attribute1", identity.getAttribute("testattribute1"));
+  plan.put("Test_Attribute2", identity.getAttribute("testattribute2"));
+  plan.put("Test_Attribute3", identity.getAttribute("testattribute3"));
+  plan.put("Test_Attribute4", identity.getAttribute("testattribute4"));
+   

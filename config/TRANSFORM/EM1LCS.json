@@ -1,0 +1,66 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "EM1LCS"
+    },
+    "object": {
+        "name": "EM1LCS",
+        "type": "static",
+        "attributes": {
+            "requiresPeriodicRefresh": "true",
+            "firstName": {
+                "type": "identityAttribute",
+                "attributes": {
+                    "name": "firstname"
+                }
+            },
+            "firstNameNew": {
+                "type": "identityAttribute",
+                "attributes": {
+                    "name": "firstNameNew"
+                }
+            },
+            "firstNamePrior": {
+                "type": "firstValid",
+                "attributes": {
+                    "values": [
+                        {
+                            "type": "identityAttribute",
+                            "attributes": {
+                                "name": "firstNamePrior"
+                            }
+                        },
+                        {
+                            "type": "static",
+                            "attributes": {
+                                "value": "none"
+                            }
+                        }
+                    ]
+                }
+            },
+            "LCSCurrent": {
+                "type": "firstValid",
+                "attributes": {
+                    "values": [
+                        {
+                            "type": "identityAttribute",
+                            "attributes": {
+                                "name": "cloudLifecycleState"
+                            }
+                        },
+                        {
+                            "type": "static",
+                            "attributes": {
+                                "value": "unknown"
+                            }
+                        }
+                    ]
+                }
+            },
+            "value": "#if($LCSCurrent!='unknown' && $firstName==$firstNamePrior)$LCSCurrent#elseif($LCSCurrent=='nameChangeStart' && $firstNameNew!='none')nameChangeFinish#elseif($LCSCurrent=='unknown')unknown#{else}inactive#end"
+        },
+        "internal": false
+    }
+}

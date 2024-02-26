@@ -1,0 +1,23 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "managerDN"
+    },
+    "object": {
+        "name": "managerDN",
+        "type": "firstValid",
+        "attributes": {
+            "values": [
+                {
+                    "attributes": {
+                        "value": "$identity.manager.attributes.dn"
+                    },
+                    "type": "static"
+                },
+                "Manager DN not found"
+            ]
+        },
+        "internal": false
+    }
+}

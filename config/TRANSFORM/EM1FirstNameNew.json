@@ -1,0 +1,80 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "EM1FirstNameNew"
+    },
+    "object": {
+        "name": "EM1FirstNameNew",
+        "type": "static",
+        "attributes": {
+            "requiresPeriodicRefresh": "true",
+            "firstName": {
+                "type": "identityAttribute",
+                "attributes": {
+                    "name": "firstname"
+                }
+            },
+            "firstNameNew": {
+                "type": "identityAttribute",
+                "attributes": {
+                    "name": "firstNameNew"
+                }
+            },
+            "LCSCurrent": {
+                "type": "firstValid",
+                "attributes": {
+                    "values": [
+                        {
+                            "type": "identityAttribute",
+                            "attributes": {
+                                "name": "cloudLifecycleState"
+                            }
+                        },
+                        {
+                            "type": "static",
+                            "attributes": {
+                                "value": "none"
+                            }
+                        }
+                    ]
+                }
+            },
+            "firstNameNewBlank": {
+                "type": "conditional",
+                "attributes": {
+                    "expression": "$firstNameNewExist eq none",
+                    "negativeCondition": "no",
+                    "positiveCondition": "yes",
+                    "firstNameNewExist": {
+                        "type": "firstValid",
+                        "attributes": {
+                            "values": [
+                                {
+                                    "type": "identityAttribute",
+                                    "attributes": {
+                                        "name": "firstNameNew"
+                                    }
+                                },
+                                {
+                                    "type": "static",
+                                    "attributes": {
+                                        "value": "none"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "Blank": {
+                "type": "static",
+                "attributes": {
+                    "value": ""
+                }
+            },
+            "value": "#if(($LCSCurrent=='nameChangeStart' || $LCSCurrent=='nameChangeFinish') && $firstNameNewBlank=='yes')$firstName#elseif($LCSCurrent=='nameChangeStart' && $firstNameNewBlank=='no')$firstNameNew#{else}$Blank#end"
+        },
+        "internal": false
+    }
+}

@@ -1,0 +1,93 @@
+{
+    "version": 1,
+    "self": {
+        "type": "TRANSFORM",
+        "name": "EM1FirstNamePrior"
+    },
+    "object": {
+        "name": "EM1FirstNamePrior",
+        "type": "static",
+        "attributes": {
+            "requiresPeriodicRefresh": "true",
+            "firstName": {
+                "type": "identityAttribute",
+                "attributes": {
+                    "name": "firstname"
+                }
+            },
+            "firstNameNew": {
+                "type": "identityAttribute",
+                "attributes": {
+                    "name": "firstNameNew"
+                }
+            },
+            "LCSCurrent": {
+                "type": "firstValid",
+                "attributes": {
+                    "values": [
+                        {
+                            "type": "identityAttribute",
+                            "attributes": {
+                                "name": "cloudLifecycleState"
+                            }
+                        },
+                        {
+                            "type": "static",
+                            "attributes": {
+                                "value": "unknown"
+                            }
+                        }
+                    ]
+                }
+            },
+            "firstNamePrior": {
+                "type": "firstValid",
+                "attributes": {
+                    "values": [
+                        {
+                            "type": "identityAttribute",
+                            "attributes": {
+                                "name": "firstNamePrior"
+                            }
+                        },
+                        {
+                            "type": "static",
+                            "attributes": {
+                                "value": "none"
+                            }
+                        }
+                    ]
+                }
+            },
+            "firstNameNewBlank": {
+                "type": "conditional",
+                "attributes": {
+                    "expression": "$firstNameNewExist eq none",
+                    "negativeCondition": "no",
+                    "positiveCondition": "yes",
+                    "firstNameNewExist": {
+                        "type": "firstValid",
+                        "attributes": {
+                            "values": [
+                                {
+                                    "type": "identityAttribute",
+                                    "attributes": {
+                                        "name": "firstNameNew"
+                                    }
+                                },
+                                {
+                                    "type": "static",
+                                    "attributes": {
+                                        "value": "none"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "value": "#if($LCSCurrent=='nameChangeFinish' && $firstNameNewBlank=='no')$firstNameNew#elseif($firstNamePrior!='none')$firstNamePrior#{else}$firstName#end"
+        },
+        "internal": false
+    }
+}
