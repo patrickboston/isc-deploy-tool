@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { runExport, reverseTokenize, buildObjectsForEnvironment, buildDeploymentFile, runDeploy } from "./util.js";
-import { exportSources } from "./sourceUtil.js";
-import { exportIdentityAttributeConfig, exportIdentityProfiles } from "./identityConfigUtil.js";
+import { exportSources, migrateSource } from "./service/sourceService.js";
+import { exportIdentityAttributeConfig, exportIdentityProfiles } from "./service/identityConfigService.js";
 import { Configuration } from "sailpoint-api-client";
 import axiosRetry from "axios-retry";
 import clc from "cli-color";
+import * as fs from "fs";
 
 console.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
 
@@ -86,7 +87,7 @@ if (isExport) {
         onRetry(retryCount, error, requestConfig) {
             console.log(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
         }
-    }
+    }    
 
     if (isExport && isDetokenize) {
         console.log(clc.bgMagentaBright("Running export and de-tokenization..."));
@@ -120,6 +121,10 @@ if (isDeploy) {
             console.log(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
         }
     }
+
+    const s = fs.readFileSync("./config/SOURCE/JAR TEST/JAR TEST.json");
+    await migrateSource(srcApiConfig, s);
+    process.exit(0);
 
     await buildObjectsForEnvironment(targetEnvName);
     const deployObj = buildDeploymentFile();

@@ -1,6 +1,6 @@
 import clc from "cli-color";
 import { IdentityAttributesBetaApi, IdentityProfilesApi } from "sailpoint-api-client";
-import { writeConfigFile } from "./util.js";
+import { writeConfigFile } from "../util.js";
 
 const IDENTITY_OBJECT_CONFIG = "IDENTITY_OBJECT_CONFIG";
 const IDENTITY_PROFILE = "IDENTITY_PROFILE";

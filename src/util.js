@@ -1,4 +1,4 @@
-import { default as exportConfig } from "./../export-config.js";
+import { default as defaultExportConfig } from "./../export-config.js";
 import { default as reverseTokens } from "./../reverse.target.js";
 import * as fs from "fs";
 import _ from 'lodash';
@@ -92,39 +92,45 @@ const checkExportStatus = async (spConfigApi, jobId, timeout = 10000) => {
 }
 
 const getExportResult = async (spConfigApi, jobId) => {
-    await spConfigApi.getSpConfigExport({ id: jobId }).then((response) => {
-        const responseObjects = response.data.objects;
-        responseObjects.forEach((responseObject) => {
-            const objectType = responseObject.self.type;
-            const objectName = responseObject.self.name;
-            const objectSource = responseObject.object;
-            console.log(`Exporting object: ${objectName} (${objectType})`);
 
-            //Delete id, created, modified where applicable
-            responseObject = deepOmit(responseObject, ["id", "created", "modified"]);
+    const spConfigResponse = await spConfigApi.getSpConfigExport({ id: jobId });
+    return spConfigResponse.data.objects;
 
-            //Create directory for object type if it does not exist yet
-            if (!fs.existsSync("./config/" + objectType)) {
-                fs.mkdirSync("./config/" + objectType, { recursive: true });
-            }
+    /*
+    const responseObjects = response.data.objects;
+    responseObjects.forEach((responseObject) => {
+        const objectType = responseObject.self.type;
+        const objectName = responseObject.self.name;
+        const objectSource = responseObject.object;
+        console.log(`Exporting object: ${objectName} (${objectType})`);
 
-            if (objectType == "RULE") {
-                const source = objectSource.sourceCode.script;
-                const ruleSourceFileName = "./config/" + objectType + "/" + objectName + ".source.txt";
-                fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
-            }
+        //Delete id, created, modified where applicable
+        responseObject = deepOmit(responseObject, ["id", "created", "modified"]);
 
-            //Write JSON file for object
-            const fileName = "./config/" + objectType + "/" + objectName + ".json";
-            fs.writeFileSync(fileName, JSON.stringify(responseObject, null, 4));
-        })
-    });
+        //Create directory for object type if it does not exist yet
+        if (!fs.existsSync("./config/" + objectType)) {
+            fs.mkdirSync("./config/" + objectType, { recursive: true });
+        }
+
+        if (objectType == "RULE") {
+            const source = objectSource.sourceCode.script;
+            const ruleSourceFileName = "./config/" + objectType + "/" + objectName + ".source.txt";
+            fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
+        }
+
+        //Write JSON file for object
+        const fileName = "./config/" + objectType + "/" + objectName + ".json";
+        fs.writeFileSync(fileName, JSON.stringify(responseObject, null, 4));
+    })
+    */
 }
 
-const runExport = async (apiConfig) => {
-    console.info(clc.bgBlueBright("Performing tenant export"));
+const runExport = async (apiConfig, exportConfig) => {
     return new Promise((resolve, reject) => {
         let spConfigApi = new SPConfigBetaApi(apiConfig);
+
+        //Check if we have an input, if not default to file
+        if (!exportConfig) exportConfig = defaultExportConfig;
 
         let spConfigReq = {
             exportPayloadBeta: JSON.stringify(exportConfig)
@@ -202,7 +208,7 @@ const buildObjectsForEnvironment = async (env) => {
     }
 
     //Iterate each config file from export
-    const configFileNames = walk('./config');
+    const configFileNames = walk("./config");
     configFileNames.forEach((fileName) => {
         if (fileName.endsWith(".json")) {
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
@@ -217,9 +223,8 @@ const buildObjectsForEnvironment = async (env) => {
             });
 
             //Write tokenized file to /build/[TYPE] directory
-            const objectJson = JSON.parse(fileSource);
-            const outputDir = "./build/config/" + objectJson.self.type
-            const outputFileName = outputDir + "/" + objectJson.self.name + ".json";
+            const outputFileName = "./build/" + fileName.substring(2);
+            const outputDir = outputFileName.substring(0, outputFileName.lastIndexOf('/'));
 
             if (!fs.existsSync(outputDir)) {
                 fs.mkdirSync(outputDir, { recursive: true });
@@ -303,5 +308,6 @@ export {
     runDeploy,
     reverseTokenize,
     writeConfigFile,
-    deepOmit
+    deepOmit,
+    walk
 };
