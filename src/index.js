@@ -2,6 +2,11 @@
 import { runExport, reverseTokenize, buildObjectsForEnvironment, buildDeploymentFile, runDeploy } from "./util.js";
 import { exportSources, migrateSource } from "./service/sourceService.js";
 import { exportIdentityAttributeConfig, exportIdentityProfiles } from "./service/identityConfigService.js";
+import { exportAccessRequestConfig } from "./service/accessRequestUtil.js";
+import { exportNotificationTemplates, migrateNotificationTemplate } from "./service/notificationUtil.js";
+import { exportRules } from "./service/ruleUtil.js";
+import { exportTransforms, migrateTransform } from "./service/transformUtil.js";
+import { exportWorkflows, migrateWorkflow } from "./service/workflowUtil.js";
 import { Configuration } from "sailpoint-api-client";
 import axiosRetry from "axios-retry";
 import clc from "cli-color";
@@ -92,9 +97,15 @@ if (isExport) {
     if (isExport && isDetokenize) {
         console.log(clc.bgMagentaBright("Running export and de-tokenization..."));
 
+        //await exportRules(srcApiConfig);
+        await exportTransforms(srcApiConfig);
         await exportSources(srcApiConfig);
         await exportIdentityAttributeConfig(srcApiConfig);
         await exportIdentityProfiles(srcApiConfig);
+        await exportAccessRequestConfig(srcApiConfig);
+        await exportNotificationTemplates(srcApiConfig);
+        await exportWorkflows(srcApiConfig);
+        
         await reverseTokenize();
 
     } else if (isExport && !isDetokenize) {
@@ -106,7 +117,7 @@ if (isExport) {
 //Perform local build only
 if (isBuild) {
     await buildObjectsForEnvironment(targetEnvName);
-    buildDeploymentFile();
+    //buildDeploymentFile();
 }
 
 //Perform deploy setup and process
@@ -122,8 +133,15 @@ if (isDeploy) {
         }
     }
 
-    const s = fs.readFileSync("./config/SOURCE/JAR TEST/JAR TEST.json");
-    await migrateSource(srcApiConfig, s);
+    /*********************** TESTING *******************************/
+    //const s = fs.readFileSync("./config/SOURCE/JAR TEST/JAR TEST.json");
+    //await migrateSource(srcApiConfig, s);
+    //const w = fs.readFileSync("./config/WORKFLOW/Mover Certification New Deploy.json");
+    //await migrateWorkflow(targetApiConfig, w);
+    //const t = fs.readFileSync("./config/TRANSFORM/TestTransform.json");
+    //await migrateTransform(targetApiConfig, t);
+    const t = fs.readFileSync("./config/NOTIFICATION_TEMPLATE/Non-Employee Account Upload Failed.json");
+    await migrateNotificationTemplate(targetApiConfig, t);
     process.exit(0);
 
     await buildObjectsForEnvironment(targetEnvName);

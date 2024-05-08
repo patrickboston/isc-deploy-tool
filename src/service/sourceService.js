@@ -9,7 +9,7 @@ import _ from 'lodash';
 
 const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
-const ATTRIBUTE_SYNC = "ATTRIBUTE_SYNC";
+const ATTR_SYNC_SOURCE_CONFIG = "ATTR_SYNC_SOURCE_CONFIG";
 const existingAttributeToKeep = [
     "id", "authoritative", "connectorAttributes.cloudExternalId", "passwordPolicies", "connectorAttributes.healthy", "healthy"
 ];
@@ -50,7 +50,7 @@ const exportSources = async (apiConfig) => {
         const attrSyncConfigResponse = await betaSourcesApi.getSourceAttrSyncConfig({id: source.id});
         if (attrSyncConfigResponse.data) {
             const attrSyncFileName = sourceName + "_ATTR_SYNC";
-            writeConfigFile(ATTRIBUTE_SYNC, attrSyncFileName, attrSyncConfigResponse.data, `SOURCE/${sourceName}/ATTRIBUTE_SYNC`);
+            writeConfigFile(ATTR_SYNC_SOURCE_CONFIG, attrSyncFileName, attrSyncConfigResponse.data, `SOURCE/${sourceName}/${ATTR_SYNC_SOURCE_CONFIG}`);
         }
 
         //Write the actual source
@@ -87,7 +87,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
 
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
     if (!currentTartgetSource) {
-        console.log("CREATING NEW SOURCE");
+        console.log(`Creating new source for: ${localSource.name}`);
         const csvSource = localSource.type === "Delimited File";
         const createSourceResponse = await sourcesApi.createSource({
             source: localSource,
@@ -95,7 +95,6 @@ const migrateSource = async (apiConfig, sourceJson) => {
         });
 
         currentTartgetSource = createSourceResponse.data;
-        console.log(currentTartgetSource);
     } else {
         console.log(`Found existing source in target environment: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
     }
@@ -111,9 +110,8 @@ const migrateSource = async (apiConfig, sourceJson) => {
     //TODO: Create correlation config once public API is available, uses /diana endpoint today
 
     //Attribute sync config
-    //TODO: THIS SHOULD CHECK THE BUILD DIRECTORY, NOT CONFIG
     const betaSourcesApi = new SourcesBetaApi(apiConfig);
-    const localAttrSyncFiles = walk(`./config/SOURCE/${localSource.name}/ATTRIBUTE_SYNC`);
+    const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
     for (const localAttrSyncFile of localAttrSyncFiles) {
         let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
         _.set(attrSyncCopy, "source.name", currentTartgetSource.id);
@@ -144,8 +142,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
     }
 
     //Create/Update all Provisioning Policies
-    //TODO: THIS SHOULD CHECK THE BUILD DIRECTORY, NOT CONFIG
-    const localPolicyFiles = walk(`./config/SOURCE/${localSource.name}/PROVISIONING_POLICY`);
+    const localPolicyFiles = walk(`./build/config/SOURCE/${localSource.name}/PROVISIONING_POLICY`);
     for (const localPolicyFile of localPolicyFiles) {
         let policyCopy = JSON.parse(fs.readFileSync(localPolicyFile, { encoding: "utf8" }));
         let createPolicy = true;
@@ -189,9 +186,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
      * schema. Also need to update the schema reference ID in the source itself as we update the referenced
      * schema object
     */
-
-    //TODO: THIS SHOULD CHECK THE BUILD DIRECTORY, NOT CONFIG
-    const localSchemaFiles = walk(`./config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
+    const localSchemaFiles = walk(`./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
     for (const localSchemaFile of localSchemaFiles) {
         let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
         let createSchema = true;

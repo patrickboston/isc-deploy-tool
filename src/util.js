@@ -24,11 +24,11 @@ function walk(dir, files = []) {
     return files;
 }
 
-function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId"]) {
+function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "cloudExternalId", "cloudCacheUpdate", "since", "status", "healthy"]) {
     let keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
     const keysToIgnore = [
-        "owner",
-        "passwordPolicies"
+        //"owner",
+        //"passwordPolicies"
     ];
 
     function omitFromObject(obj) { // the inner function which will be called recursivley
@@ -51,6 +51,8 @@ function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId"]) {
 * @param {Configuration} apiConfig
 */
 const writeConfigFile = (objectType, objectName, object, overrideDir = null) => {
+    //TODO: Create export ignore properties to avoid writing certain config files
+
     const dir = overrideDir ? "./config/" + overrideDir : "./config/" + objectType;
     //const dir = "./config/" + objectType;
     //Create directory for object type if it does not exist yet
@@ -58,14 +60,8 @@ const writeConfigFile = (objectType, objectName, object, overrideDir = null) => 
         fs.mkdirSync(dir, { recursive: true });
     }
 
-    if (objectType == "RULE") {
-        const source = objectSource.sourceCode.script;
-        const ruleSourceFileName = dir + "/" + objectName + ".source.txt";
-        fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
-    }
-
     //Write JSON file for object
-    const fileName = dir + "/" + objectName + ".json";
+    let fileName = dir + "/" + objectName.replace(/[/\\?%*:|"<>]/g, '-') + ".json";
     let omittedObj = deepOmit(object);
     fs.writeFileSync(fileName, JSON.stringify(omittedObj, null, 4));
 }

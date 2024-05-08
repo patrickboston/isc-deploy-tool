@@ -1,4 +1,8 @@
 import { runExport } from "./../util.js";
+import { writeConfigFile } from "../util.js";
+import * as fs from "fs";
+
+const RULE = "RULE";
 
 const getAllRules = async (apiConfig) => {
     const ruleExportConfig = {
@@ -15,6 +19,19 @@ const getAllRules = async (apiConfig) => {
     return rulesResponse;
 }
 
+const exportRules = async (apiConfig) => {
+    const rules = await getAllRules(apiConfig);
+    for (const rule of rules) {
+        writeConfigFile(RULE, rule.self.name, rule);
+
+        //Write separate txt file with source code for easy reference
+        const source = rule.object.sourceCode.script;
+        const ruleSourceFileName = `./config/RULE/${rule.self.name}.source.txt`;
+        fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
+    }
+}
+
 export {
-    getAllRules
+    getAllRules,
+    exportRules
 };
