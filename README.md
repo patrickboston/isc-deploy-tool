@@ -100,114 +100,39 @@ To perform tokenization and deploy/import into a specific target environment bas
 npm run deploy:win -target-env=<env>
 ```
 
-## Future Enhancements
-- Implement import order during deployments so reference issues, etc. do not break an entire import. Would be useful for initial imports of a large set of objects with have dependencies on each other
-- Implement local secret injection for passwords, etc. which would be stored in a locally Git ignored file and would inject secrets into built files which would also be Git ignored (secrets should never make it to the remote repository)
-- Implement secret injection for a PAM tool, similar to local secret injection but password are stored encrypted in a PAM tool and retrieved live during file builds
+## Configuration Object Special Considerations
+### Owner References
+There are many objects throughout IDN that have owner references which point to an identity that have created an object, modified an object, etc. It is very important that owners are properly set up in exported configuration objects.
 
-## Known Issues/Limitations
-- SP-Config APIs allow exports of objects which are not able to be imported. See more here: https://developer.sailpoint.com/idn/docs/saas-configuration
-- SP-Config APIs do not export encrypted attributes such as passwords. This means they will not exist on your exported objects any subsequent imports of those object will clear out those encrypted attributes
-- SP-Config imports can fail if referenced objects do not exist yet. For example, if an Identity Profile attribute references a Source that does not exist, you may receive a dependency failure. You may need to import some objects before others to resolve this until this tool imports objects in a specific order. Example error
-```json
-"IDENTITY_PROFILE": {
-    "infos": [],
-    "warnings": [],
-    "errors": [
-        {
-            "key": "IDENTITY_PROFILE_IMPORT_FAILED",
-            "text": "An error occurred while importing Identity Profile with name 'Employee'",
-            "detail": {
-                "exceptionMessage": "Referenced Authoritative Source \"{1}\" was not found."
-            }
-        }
-    ],
-    "importedObjects": []
-}
-```
-- SP-Config Import relies on certain ID references to be retained. This means ID references will need to be tokenized in some objects. The known ones are:
-  - All objects 
-    - `owner.id`
-    ```json
-    "owner": {
-        "type": "IDENTITY",
-        "id": "87b682d779e2419cb1875b759b7fc2af",
-        "name": "pboston.pboston"
-    },
-    ```
-    - RULE Reference `id`
-    ```JSON
-    "reference": {
-        "type": "RULE",
-        "id": "daf71540b5274f4eb32fa572796ac683",
-        "name": "Cloud Promote Identity Attribute"
-    }
-    ```
-  - Source
-    - passwordPolicies[*].id (only on update imports for an object, initial creation does not need it)
-    ```json
-    "passwordPolicies": [
-        {
-            "type": "PASSWORD_POLICY",
-            "id": "4b10c69768a040019383afb258898e67",
-            "name": "Default"
-        }
-    ]
-    ```
-
-## Appendix
-### Finding Owner Info via API
-One of the easiest ways is to use the `/v3/search` endpoints to search for the specific identity you want. For example:
+By default, you will see owner references contain a `type` which is always set to `IDENTITY`, an `id` which points to a very environment specific `id` for the identity that owns the objects (this is actually omitted during the export process), and lastly a `name` which is more of a soft reference that points to the owning identity. The `name` value can very between different object types, but is most often the `displayName` of an identity which is not ideal and does not guarantee a unique identity when looking up an identity by this name during migration to other environments. The only unique soft reference attribute on identities that guarantee a unique lookup is the `alias` attribute. **When you run the export process, objects with owner references will automatically have the `name` property value written as the owning identity's `alias` as opposed to their `displayName`.** This will allow us to perform unique identity lookups when migrating objects with owners to another environment. If an identity with that alias does not exist, the migration import will fail.  If you need different owners per environment because of preference or because an identity with a specific alias will next exist in the next environment, you will need to perform the following tokenization steps:
+1. Set up a reverse token in `reverse.target.js` for the object being exported. You could also hard code an identity alias here that will be the same owner across all environments instead of using a token
 ```json
 {
-    "indices": [
-        "identities"
-    ],
-    "queryType": "SAILPOINT",
-    "queryVersion": "5.2",
-    "query": {
-        "query": "lastName:Ingon"
+    "SOURCE/Active Directory/Active Directory.json": {
+        "$.owner.name": "%%AD_OWNER_ALIAS%%"
     }
 }
 ```
-Will give you a result like so which you just need the `id` and `name` from:
+2. For each `<env>.target.js` properties files, set up a corresponding token with a value that points to the `alias` attribute of the owning identity
 ```json
-[
-    {
-        "name": "46-7960700",
-        "firstName": "Brook",
-        "lastName": "Ingon",
-        "displayName": "Brook Ingon",
-        "id": "0c5f67b1ec1a46cda26a3996e3155f34",
-        "email": "test@test.com",
-        "created": "2023-09-25T02:25:46.652Z",
-        "inactive": false,
-        "protected": false,
-        "status": "UNREGISTERED",
-        "employeeNumber": "46-7960700",
-        "manager": {
-            "id": "0b7f4a4a70ee4ef8985b0d756e0d104d",
-            "name": "07-7960018",
-            "displayName": "Rhett Opie"
-        },
-        "isManager": false,
-        "identityProfile": {
-            "id": "f8e3f69568b64fd0974bbf658fa3b540",
-            "name": "HR"
-        },
-        "source": {
-            "id": "43b2199fe2b349049c04573b138587fb",
-            "name": "HR"
-        },
-        "attributes": {
-            .....
-        }
-    }
-]
+{
+    "%%AD_OWNER_ALIAS%%": "03-1013143",
+    "%%AD_IQSERVICE_PORT%%": "1111",
+}
 ```
 
-You can also retrieve this information from the Search UI by performing your identity search and adding the `ID` column to your search result table:
-![Identity Search](/resources/readme/IdentitySearchID.png)
+During the deployment process, the pipeline will attempt to find a corresponding identity by that alias via the `GET /beta/identities` endpoint get the unique `id` and insert it into the owner reference before deploying.
 
-Lastly, you can also get this information when viewing an identity from the identity list page:
-![Identity View](/resources/readme/IdentityView.png)
+The following object types have owner references that will need to be considered during your implementation:
+- ACCESS_REQUEST_CONFIG
+- IDENTITY_PROFILE
+- SOURCE
+- WORKFLOW
+
+### Deleting Objects
+There are two scenarios to consider when deleting objects:
+- When objects are deleted directly inside of a tenant, they must also be removed in your build directory/repository because the export process does not consider cleaning up objects that may have been deleted in a tenant. If not cleaned up, they may be re-deployed inadvertently
+- When objects are deleted from your build directory/repository, they will not automatically be cleaned up during the next build deployment. You must also delete objects directly in the tenant if you are removing them from your build repository
+
+## Known Issues/Limitations
+- 

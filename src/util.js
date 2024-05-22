@@ -27,8 +27,7 @@ function walk(dir, files = []) {
 function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "cloudExternalId", "cloudCacheUpdate", "since", "status", "healthy"]) {
     let keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
     const keysToIgnore = [
-        //"owner",
-        //"passwordPolicies"
+        "transformDefinition" //This is very specific to identity profile transform references using key 'id'
     ];
 
     function omitFromObject(obj) { // the inner function which will be called recursivley

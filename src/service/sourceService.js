@@ -2,7 +2,7 @@ import clc from "cli-color";
 import { SourcesApi, Paginator, SourcesBetaApi } from "sailpoint-api-client";
 import { writeConfigFile, walk } from "../util.js";
 import { getAllClusters } from "./clusterUtil.js"
-import { getIdentityByName } from "./identityUtil.js";
+import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import { getAllRules } from "./ruleUtil.js";
 import * as fs from "fs";
 import _ from 'lodash';
@@ -28,7 +28,9 @@ const exportSources = async (apiConfig) => {
 
     const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSources, { limit: 1000 }, 250);
     for (const source of sources.data) {
+        //Clone for modifications
         let sourceClone = structuredClone(source);
+
         const sourceName = source.name;
         console.log(clc.bgCyan(`Processing export for source: ${sourceName}`));
 
@@ -53,8 +55,13 @@ const exportSources = async (apiConfig) => {
             writeConfigFile(ATTR_SYNC_SOURCE_CONFIG, attrSyncFileName, attrSyncConfigResponse.data, `SOURCE/${sourceName}/${ATTR_SYNC_SOURCE_CONFIG}`);
         }
 
+        //Update source owner to alias for lookup when migrating
+        //TODO: Cache owners as we iterate so we don't hit up the API every time
+        const owner = await getIdentityById(apiConfig, source.owner.id);
+        sourceClone.owner.name = owner.alias;
+
         //Write the actual source
-        writeConfigFile("SOURCE", sourceName, source, `SOURCE/${sourceName}`);
+        writeConfigFile("SOURCE", sourceName, sourceClone, `SOURCE/${sourceName}`);
     }
 };
 
@@ -74,7 +81,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
     }
 
     //Get corresponding owner by name and add id
-    const owner = await getIdentityByName(apiConfig, _.get(localSource, "owner.name"));
+    const owner = await getIdentityByAlias(apiConfig, _.get(localSource, "owner.name"));
     _.set(localSource, "owner.id", owner.id);
 
     //Check and see if a source with this name already exists in the target environment

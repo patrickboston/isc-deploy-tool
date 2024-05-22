@@ -1,7 +1,7 @@
 import clc from "cli-color";
 import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
 import { writeConfigFile } from "../util.js";
-import { getIdentityByName } from "./identityUtil.js";
+import { getIdentityByAlias } from "./identityUtil.js";
 import _ from 'lodash';
 
 const WORKFLOW = "WORKFLOW";
@@ -24,15 +24,15 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     console.log(clc.bgBlueBright(`Migrating workflow: ${localWorkflow.name}`));
 
     //Get corresponding owner by name and add id
-    const owner = await getIdentityByName(apiConfig, _.get(localWorkflow, "owner.name"));
+    const owner = await getIdentityByAlias(apiConfig, _.get(localWorkflow, "owner.name"));
     _.set(localWorkflow, "owner.id", owner.id);
 
     //Get corresponding creator by name and add id
-    const creator = await getIdentityByName(apiConfig, _.get(localWorkflow, "creator.name"));
+    const creator = await getIdentityByAlias(apiConfig, _.get(localWorkflow, "creator.name"));
     _.set(localWorkflow, "creator.id", creator.id);
 
     //Get corresponding modified by name and add id
-    const modifiedBy = await getIdentityByName(apiConfig, _.get(localWorkflow, "modifiedBy.name"));
+    const modifiedBy = await getIdentityByAlias(apiConfig, _.get(localWorkflow, "modifiedBy.name"));
     _.set(localWorkflow, "modifiedBy.id", modifiedBy.id);
 
     //Check and see if a workflow with this name already exists in the target environment

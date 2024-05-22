@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { runExport, reverseTokenize, buildObjectsForEnvironment, buildDeploymentFile, runDeploy } from "./util.js";
 import { exportSources, migrateSource } from "./service/sourceService.js";
-import { exportIdentityAttributeConfig, exportIdentityProfiles } from "./service/identityConfigService.js";
-import { exportAccessRequestConfig } from "./service/accessRequestUtil.js";
+import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfile } from "./service/identityConfigService.js";
+import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestUtil.js";
 import { exportNotificationTemplates, migrateNotificationTemplate } from "./service/notificationUtil.js";
 import { exportRules } from "./service/ruleUtil.js";
 import { exportTransforms, migrateTransform } from "./service/transformUtil.js";
 import { exportWorkflows, migrateWorkflow } from "./service/workflowUtil.js";
+import { exportGovernanceGroups, migrateGovernanceGroup } from "./service/identityUtil.js";
 import { Configuration } from "sailpoint-api-client";
 import axiosRetry from "axios-retry";
 import clc from "cli-color";
@@ -92,7 +93,7 @@ if (isExport) {
         onRetry(retryCount, error, requestConfig) {
             console.log(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
         }
-    }    
+    }
 
     if (isExport && isDetokenize) {
         console.log(clc.bgMagentaBright("Running export and de-tokenization..."));
@@ -105,7 +106,8 @@ if (isExport) {
         await exportAccessRequestConfig(srcApiConfig);
         await exportNotificationTemplates(srcApiConfig);
         await exportWorkflows(srcApiConfig);
-        
+        await exportGovernanceGroups(srcApiConfig);
+
         await reverseTokenize();
 
     } else if (isExport && !isDetokenize) {
@@ -133,19 +135,30 @@ if (isDeploy) {
         }
     }
 
+    await buildObjectsForEnvironment(targetEnvName);
+    //const deployObj = buildDeploymentFile();
+
     /*********************** TESTING *******************************/
-    //const s = fs.readFileSync("./config/SOURCE/JAR TEST/JAR TEST.json");
-    //await migrateSource(srcApiConfig, s);
-    //const w = fs.readFileSync("./config/WORKFLOW/Mover Certification New Deploy.json");
+    //const s = fs.readFileSync("./build/config/SOURCE/JAR TEST/JAR TEST.json");
+    //await migrateSource(targetApiConfig, s);
+    //const w = fs.readFileSync("./build/config/WORKFLOW/Mover Certification New Deploy.json");
     //await migrateWorkflow(targetApiConfig, w);
-    //const t = fs.readFileSync("./config/TRANSFORM/TestTransform.json");
+    //const t = fs.readFileSync("./build/config/TRANSFORM/TestTransform.json");
     //await migrateTransform(targetApiConfig, t);
-    const t = fs.readFileSync("./config/NOTIFICATION_TEMPLATE/Non-Employee Account Upload Failed.json");
-    await migrateNotificationTemplate(targetApiConfig, t);
+    //const t = fs.readFileSync("./build/config/NOTIFICATION_TEMPLATE/Non-Employee Account Upload Failed.json");
+    //await migrateNotificationTemplate(targetApiConfig, t);
+    //const a = fs.readFileSync("./build/config/ACCESS_REQUEST_CONFIG/ACCESS_REQUEST_CONFIG.json");
+    //await updateAccessRequestConfig(targetApiConfig, a);
+    //const a = fs.readFileSync("./build/config/GOVERNANCE_GROUP/Test Deploy.json");
+    //await migrateGovernanceGroup(targetApiConfig, a);
+    //const i = fs.readFileSync("./build/config/IDENTITY_OBJECT_CONFIG/IDENTITY_OBJECT_CONFIG.json");
+    //await migrateIdentityAttributeConfig(targetApiConfig, i);
+    const i = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
+    await migrateIdentityProfile(targetApiConfig, i);
+    
     process.exit(0);
 
-    await buildObjectsForEnvironment(targetEnvName);
-    const deployObj = buildDeploymentFile();
+    
 
     //Convert to a Blob for the HTTP multipart form data
     const jsonString = JSON.stringify(deployObj);
