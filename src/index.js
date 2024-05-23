@@ -119,7 +119,6 @@ if (isExport) {
 //Perform local build only
 if (isBuild) {
     await buildObjectsForEnvironment(targetEnvName);
-    //buildDeploymentFile();
 }
 
 //Perform deploy setup and process
@@ -136,7 +135,6 @@ if (isDeploy) {
     }
 
     await buildObjectsForEnvironment(targetEnvName);
-    //const deployObj = buildDeploymentFile();
 
     /*********************** TESTING *******************************/
     //const s = fs.readFileSync("./build/config/SOURCE/JAR TEST/JAR TEST.json");

@@ -51,21 +51,19 @@ function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "c
 */
 const writeConfigFile = (objectType, objectName, object, overrideDir = null) => {
     //TODO: Create export ignore properties to avoid writing certain config files
-
     const dir = overrideDir ? "./config/" + overrideDir : "./config/" + objectType;
-    //const dir = "./config/" + objectType;
     //Create directory for object type if it does not exist yet
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
 
-    //Write JSON file for object
+    //Write JSON file for object, replace characters not allowed in file names with dash
     let fileName = dir + "/" + objectName.replace(/[/\\?%*:|"<>]/g, '-') + ".json";
     let omittedObj = deepOmit(object);
     fs.writeFileSync(fileName, JSON.stringify(omittedObj, null, 4));
 }
 
-const checkExportStatus = async (spConfigApi, jobId, timeout = 10000) => {
+const checkExportStatus = async (spConfigApi, jobId, timeout = 500) => {
     return new Promise((resolve, reject) => {
         setTimeout(() => {
             (async function wait() {
@@ -75,49 +73,20 @@ const checkExportStatus = async (spConfigApi, jobId, timeout = 10000) => {
                         resolve(response);
                     } else if (response.data.status == "IN_PROGRESS") {
                         console.log(clc.green("Export job [" + jobId + "] still in progress..."));
-                        setTimeout(wait, 100);
+                        setTimeout(wait, timeout);
                     } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
-                        console.error(response);
-                        resolve("Export job [" + jobId + "] has been cancelled or failed!");
+                        console.error(response.data);
+                        resolve("SP-Config Export job [" + jobId + "] has been cancelled or failed!");
                     }
                 })
             })();
-        }, 3000);
+        }, timeout);
     });
 }
 
 const getExportResult = async (spConfigApi, jobId) => {
-
     const spConfigResponse = await spConfigApi.getSpConfigExport({ id: jobId });
     return spConfigResponse.data.objects;
-
-    /*
-    const responseObjects = response.data.objects;
-    responseObjects.forEach((responseObject) => {
-        const objectType = responseObject.self.type;
-        const objectName = responseObject.self.name;
-        const objectSource = responseObject.object;
-        console.log(`Exporting object: ${objectName} (${objectType})`);
-
-        //Delete id, created, modified where applicable
-        responseObject = deepOmit(responseObject, ["id", "created", "modified"]);
-
-        //Create directory for object type if it does not exist yet
-        if (!fs.existsSync("./config/" + objectType)) {
-            fs.mkdirSync("./config/" + objectType, { recursive: true });
-        }
-
-        if (objectType == "RULE") {
-            const source = objectSource.sourceCode.script;
-            const ruleSourceFileName = "./config/" + objectType + "/" + objectName + ".source.txt";
-            fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
-        }
-
-        //Write JSON file for object
-        const fileName = "./config/" + objectType + "/" + objectName + ".json";
-        fs.writeFileSync(fileName, JSON.stringify(responseObject, null, 4));
-    })
-    */
 }
 
 const runExport = async (apiConfig, exportConfig) => {
@@ -151,8 +120,6 @@ const reverseTokenize = async () => {
             const fileLocation = "./config/" + fileName;
             try {
                 const fileSource = fs.readFileSync(fileLocation);
-
-                console.info(`Checking file: ${fileLocation}`);
                 let json = JSON.parse(fileSource);
 
                 //Iterate each token for a specific object/file
