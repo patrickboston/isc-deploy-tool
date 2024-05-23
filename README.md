@@ -135,4 +135,4 @@ There are two scenarios to consider when deleting objects:
 - When objects are deleted from your build directory/repository, they will not automatically be cleaned up during the next build deployment. You must also delete objects directly in the tenant if you are removing them from your build repository
 
 ## Known Issues/Limitations
-- 
+- Identity Profiles which reference transforms use a key named `id` with a value of the transform name. Because of this, some actual `id` references are not omitted from Identity Profile objects. It will not harm the migration/deployment process at all as those `id` references would be replaced with the proper target `id` anyways. A future enhancement could make this better.

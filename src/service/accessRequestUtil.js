@@ -1,6 +1,6 @@
 import { AccessRequestsApi } from "sailpoint-api-client";
 import { writeConfigFile } from "../util.js";
-import { getIdentityByAlias, getGovGroupByName, getGovGroupById } from "./identityUtil.js";
+import { getIdentityByAlias, getIdentityById, getGovGroupByName, getGovGroupById } from "./identityUtil.js";
 import clc from "cli-color";
 import _ from 'lodash';
 
@@ -10,6 +10,12 @@ const exportAccessRequestConfig = async (apiConfig) => {
     const accessRequestApi = new AccessRequestsApi(apiConfig);
     const accessRequestConfigResponse = await accessRequestApi.getAccessRequestConfig();
     let accessRequestConfig = accessRequestConfigResponse.data;
+
+    //Update fallbackApproverRef.name to alias for lookup when migrating
+    if (accessRequestConfig.approvalReminderAndEscalationConfig.fallbackApproverRef) {
+        const owner = await getIdentityById(apiConfig, accessRequestConfig.approvalReminderAndEscalationConfig.fallbackApproverRef.id);
+        accessRequestConfig.approvalReminderAndEscalationConfig.fallbackApproverRef.name = owner.alias;
+    }
 
     //If there is a gov group approver, convert the id to the name so we can look it up in the next environment
     let grantRequestApprovalSchemes = accessRequestConfig.entitlementRequestConfig.grantRequestApprovalSchemes;

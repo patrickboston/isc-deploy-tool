@@ -1,7 +1,7 @@
 import clc from "cli-color";
 import _ from 'lodash';
 import { IdentityAttributesBetaApi, IdentityProfilesApi, SourcesApi } from "sailpoint-api-client";
-import { getIdentityByAlias } from "./identityUtil.js";
+import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import { getAllRules } from "./ruleUtil.js";
 import { writeConfigFile } from "../util.js";
 
@@ -27,7 +27,13 @@ const exportIdentityProfiles = async (apiConfig) => {
     console.info(clc.bgBlueBright("Performing Identity Profiles export"));
     const identityProfilesApi = new IdentityProfilesApi(apiConfig);
     const identityProfiles = await identityProfilesApi.exportIdentityProfiles();
-    for (const profile of identityProfiles.data) {
+    for (let profile of identityProfiles.data) {
+        //Update owner to alias for lookup when migrating, default IDN Admin won't have owner
+        if (profile.object.owner) {
+            const owner = await getIdentityById(apiConfig, profile.object.owner.id);
+            profile.object.owner.name = owner.alias;
+        }
+
         //This is basically using SP-Config in the backend so we need to reference self.name here
         writeConfigFile(IDENTITY_PROFILE, profile.self.name, profile);
     }
@@ -129,7 +135,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
     if (!currentTargetSource) throw new Error(`Cannot find authoritative source [${sourceLookupName}] for Identity Profile [${localIdentityProfile.self.name}] in target environment`);
     localIdentityProfile.object.authoritativeSource.id = currentTargetSource.id;
-    
+
 
     //Iterate each identity attribute mapping and update references
     for (let attributeMapping of localIdentityProfile.object.identityAttributeConfig.attributeTransforms) {

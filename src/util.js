@@ -24,7 +24,7 @@ function walk(dir, files = []) {
     return files;
 }
 
-function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "cloudExternalId", "cloudCacheUpdate", "since", "status", "healthy"]) {
+function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "cloudExternalId", "cloudCacheUpdate", "since", "status", "healthy", "identityCount"]) {
     let keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
     const keysToIgnore = [
         "transformDefinition" //This is very specific to identity profile transform references using key 'id'

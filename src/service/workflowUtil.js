@@ -1,7 +1,7 @@
 import clc from "cli-color";
 import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
 import { writeConfigFile } from "../util.js";
-import { getIdentityByAlias } from "./identityUtil.js";
+import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import _ from 'lodash';
 
 const WORKFLOW = "WORKFLOW";
@@ -12,7 +12,21 @@ const existingAttributeToKeep = [
 const exportWorkflows = async (apiConfig) => {
     const workflowsApi = new WorkflowsApi(apiConfig);
     const workflows = await Paginator.paginate(workflowsApi, workflowsApi.listWorkflows, { limit: 1000 }, 250);
-    for (const workflow of workflows.data) {
+    for (let workflow of workflows.data) {
+        //Update owner/creator/modifiedBy to alias for lookup when migrating
+        if (workflow.owner) {
+            const owner = await getIdentityById(apiConfig, workflow.owner.id);
+            workflow.owner.name = owner.alias;
+        }
+        if (workflow.creator) {
+            const creator = await getIdentityById(apiConfig, workflow.creator.id);
+            workflow.creator.name = creator.alias;
+        }
+        if (workflow.modifiedBy) {
+            const modifiedBy = await getIdentityById(apiConfig, workflow.modifiedBy.id);
+            workflow.modifiedBy.name = modifiedBy.alias;
+        }
+
         writeConfigFile(WORKFLOW, workflow.name, workflow);
     }
 }
@@ -24,15 +38,15 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     console.log(clc.bgBlueBright(`Migrating workflow: ${localWorkflow.name}`));
 
     //Get corresponding owner by name and add id
-    const owner = await getIdentityByAlias(apiConfig, _.get(localWorkflow, "owner.name"));
+    const owner = await getIdentityByAlias(apiConfig, localWorkflow.owner.name);
     _.set(localWorkflow, "owner.id", owner.id);
 
     //Get corresponding creator by name and add id
-    const creator = await getIdentityByAlias(apiConfig, _.get(localWorkflow, "creator.name"));
+    const creator = await getIdentityByAlias(apiConfig, localWorkflow.creator.name);
     _.set(localWorkflow, "creator.id", creator.id);
 
     //Get corresponding modified by name and add id
-    const modifiedBy = await getIdentityByAlias(apiConfig, _.get(localWorkflow, "modifiedBy.name"));
+    const modifiedBy = await getIdentityByAlias(apiConfig, localWorkflow.modifiedBy.name);
     _.set(localWorkflow, "modifiedBy.id", modifiedBy.id);
 
     //Check and see if a workflow with this name already exists in the target environment

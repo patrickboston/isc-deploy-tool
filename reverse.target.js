@@ -8,6 +8,5 @@ export default
         "SOURCE/JAR TEST/JAR TEST.json": {
         },
         "ACCESS_REQUEST_CONFIG/ACCESS_REQUEST_CONFIG.json": {
-            "$.approvalReminderAndEscalationConfig.fallbackApproverRef.name": "%%JAR_TEST_OWNER_ALIAS%%"
         }
     }
