@@ -1,6 +1,6 @@
 import clc from "cli-color";
 import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
-import { writeConfigFile } from "../util.js";
+import { writeConfigFile, sleep } from "../util.js";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import _ from 'lodash';
 
@@ -75,16 +75,39 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     } else {
         console.log(`Found existing workflow in target environment: ${currentTargetWorkflow.name} (${currentTargetWorkflow.id})`)
 
+        /*
+         * If workflow is currently enabled, need to disable it before we can modify and then re-enable
+         * Additionally, the repo is authoritative for whether the workflow stays enabled or not after
+         * it's been modified, so we won't re-enable it if it was enabled in the target, but the repo
+         * has it set as disabled
+        */
+        if (currentTargetWorkflow.enabled) {
+            console.log("Workflow was enabled, disabling it to allow modification");
+            //Patch workflow to disable so we can update
+            workflowsApi.patchWorkflow({
+                id: currentTargetWorkflow.id,
+                jsonPatchOperationBeta: [
+                    {
+                        op: "replace",
+                        path: "/enabled",
+                        value: false
+                    }
+                ]
+            });
+
+            //Let the patch bake in for a second or else might throw an error that it's still enabled
+            await sleep(1000);
+        }
+
         //Restore attributes from the currently deployed target workflow into our template workflow
         for (const workflowKey of existingAttributeToKeep) {
             _.set(localWorkflow, workflowKey, _.get(currentTargetWorkflow, workflowKey));
         }
 
         //Update the workflow with all config, references, etc.
-        console.log(`Workflow JSON to be deployed:\n ${JSON.stringify(localWorkflow, null, 4)}`);
-        await workflowsApi.putWorkflow({
+        await workflowsApi.updateWorkflow({
             id: localWorkflow.id,
-            workflowBody: localWorkflow
+            workflowBodyBeta: localWorkflow
         });
     }
 }

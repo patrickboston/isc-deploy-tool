@@ -6,6 +6,10 @@ import clc from "cli-color";
 import { JSONPath } from "jsonpath-plus";
 import { SPConfigBetaApi } from "sailpoint-api-client";
 
+const sleep = (ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function walk(dir, files = []) {
     // Get an array of all files and directories in the passed directory using fs.readdirSync
     const fileList = fs.readdirSync(dir);
@@ -271,5 +275,6 @@ export {
     reverseTokenize,
     writeConfigFile,
     deepOmit,
-    walk
+    walk,
+    sleep
 };
