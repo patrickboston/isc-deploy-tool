@@ -136,11 +136,22 @@ if (isDeploy) {
 
     await buildObjectsForEnvironment(targetEnvName);
 
+    /**
+     * Objects need to be migrated in a specific order for reference sake. That order is:
+     * 1. Rules (Connector + Already Approved Cloud)
+     * 2. Transforms
+     * 3. Connector (Not supported at the moment)
+     * 4. Identity Object Config
+     * 5. Identity Profile
+     * 6. Lifecycle State
+     * 7. Workflow
+    */
+
     /*********************** TESTING *******************************/
     //const s = fs.readFileSync("./build/config/SOURCE/JAR TEST/JAR TEST.json");
     //await migrateSource(targetApiConfig, s);
-    //const w = fs.readFileSync("./build/config/WORKFLOW/Mover Certification New Deploy.json");
-    //await migrateWorkflow(targetApiConfig, w);
+    const w = fs.readFileSync("./build/config/WORKFLOW/Mover Certification New Deploy.json");
+    await migrateWorkflow(targetApiConfig, w);
     //const t = fs.readFileSync("./build/config/TRANSFORM/TestTransform.json");
     //await migrateTransform(targetApiConfig, t);
     //const t = fs.readFileSync("./build/config/NOTIFICATION_TEMPLATE/Non-Employee Account Upload Failed.json");
@@ -151,22 +162,8 @@ if (isDeploy) {
     //await migrateGovernanceGroup(targetApiConfig, a);
     //const i = fs.readFileSync("./build/config/IDENTITY_OBJECT_CONFIG/IDENTITY_OBJECT_CONFIG.json");
     //await migrateIdentityAttributeConfig(targetApiConfig, i);
-    const i = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
-    await migrateIdentityProfile(targetApiConfig, i);
-    
-    process.exit(0);
-
-    
-
-    //Convert to a Blob for the HTTP multipart form data
-    const jsonString = JSON.stringify(deployObj);
-    const blobPayload = new Blob([jsonString], {
-        type: 'application/json'
-    });
-
-    await runDeploy(targetApiConfig, blobPayload).then((result) => {
-        console.info(JSON.stringify(result, null, 4));
-    });
+    //const i = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
+    //await migrateIdentityProfile(targetApiConfig, i);
 }
 
 

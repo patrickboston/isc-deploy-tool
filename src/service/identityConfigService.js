@@ -1,12 +1,16 @@
 import clc from "cli-color";
 import _ from 'lodash';
-import { IdentityAttributesBetaApi, IdentityProfilesApi, SourcesApi } from "sailpoint-api-client";
+import * as fs from "fs";
+import { IdentityAttributesBetaApi, IdentityProfilesApi, LifecycleStatesApi, SourcesApi } from "sailpoint-api-client";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import { getAllRules } from "./ruleUtil.js";
+import { getSourceById } from "./sourceService.js";
+import { getAccessProfileById } from "./accessProfileUtil.js";
 import { writeConfigFile } from "../util.js";
 
 const IDENTITY_OBJECT_CONFIG = "IDENTITY_OBJECT_CONFIG";
 const IDENTITY_PROFILE = "IDENTITY_PROFILE";
+const LIFECYCLE_STATE = "LIFECYCLE_STATE";
 const existingAttributeToKeep = [
     "object.id", "self.id"
 ];
@@ -26,6 +30,7 @@ const exportIdentityAttributeConfig = async (apiConfig) => {
 const exportIdentityProfiles = async (apiConfig) => {
     console.info(clc.bgBlueBright("Performing Identity Profiles export"));
     const identityProfilesApi = new IdentityProfilesApi(apiConfig);
+    const lifecycleStatesApi = new LifecycleStatesApi(apiConfig);
     const identityProfiles = await identityProfilesApi.exportIdentityProfiles();
     for (let profile of identityProfiles.data) {
         //Update owner to alias for lookup when migrating, default IDN Admin won't have owner
@@ -34,8 +39,40 @@ const exportIdentityProfiles = async (apiConfig) => {
             profile.object.owner.name = owner.alias;
         }
 
+        //Lifecycle states are attached to Identity Profiles so let's grab them
+        const lifecycleStatesResponse = await lifecycleStatesApi.listLifecycleStates({
+            identityProfileId: profile.self.id
+        });
+        if (lifecycleStatesResponse.data) {
+            for (let lifecycleState of lifecycleStatesResponse.data) {
+                //TODO: Replace IDs of sources to enable/disable with source names AND accessProfileIds
+                if (lifecycleState.accountActions) {
+                    for (let accountAction of lifecycleState.accountActions) {
+                        let sourceNames = [];
+                        for (const sourceId of accountAction.sourceIds) {
+                            const source = await getSourceById(apiConfig, sourceId);
+                            sourceNames.push(source.name);
+                        }
+                        accountAction.sourceIds = sourceNames;
+                    }
+                }
+
+                if (lifecycleState.accessProfileIds) {
+                    let accessProfileNames = [];
+                    for (const accessProfileId of lifecycleState.accessProfileIds) {
+                        const accessProfile = await getAccessProfileById(apiConfig, accessProfileId);
+                        accessProfileNames.push(accessProfile.name);
+                    }
+                    lifecycleState.accessProfileIds = accessProfileNames;
+                }
+
+                writeConfigFile(LIFECYCLE_STATE, lifecycleState.name, lifecycleState, `IDENTITY_PROFILE/${profile.self.name}/LIFECYCLE_STATE`);
+            }
+        }
+
+
         //This is basically using SP-Config in the backend so we need to reference self.name here
-        writeConfigFile(IDENTITY_PROFILE, profile.self.name, profile);
+        writeConfigFile(IDENTITY_PROFILE, profile.self.name, profile, `IDENTITY_PROFILE/${profile.self.name}`);
     }
 }
 
@@ -187,6 +224,18 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     //Since this is sp-config import, we need to check for errors manually in the body
     if (importResponse.data.errors.length > 0) {
         throw new Error(JSON.stringify(importResponse.data, null, 4));
+    }
+
+    //If the initial profile is created/updated OK, move onto lifecycle states tied to it
+    //Read directly from build directly for now instead of param passed in
+    const localLifecycleStateFileNames = walk(`./build/config/IDENTITY_PROFILE/${localIdentityProfile.name}/LIFECYCLE_STATE`);
+    if (localLifecycleStateFileNames) {
+        const lifecycleStateApi = new LifecycleStatesApi(apiConfig);
+
+        for (const localLifecycleStateFileName of localLifecycleStateFileNames) {
+            let localLifecycleState = JSON.parse(fs.readFileSync(localLifecycleStateFileName, { encoding: "utf8" }));
+            //TODO: deploy each identity profile, will need to iterate each existing one since no filtering allowed
+        }
     }
 }
 

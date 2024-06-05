@@ -17,6 +17,34 @@ const ruleReferenceNames = [
     "accountCorrelationRule", "managerCorrelationRule", "beforeProvisioningRule"
 ];
 
+const getSourceByName = async (apiConfig, sourceName) => {
+    const sourcesApi = new SourcesApi(apiConfig);
+    const currentSourceResponse = await sourcesApi.listSources({
+        filters: `name eq "${sourceName}"`,
+        limit: 1
+    });
+
+    const currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
+
+    //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
+    if (!currentTartgetSource) throw new Error(`Could not find source by name [${sourceName}] in tenant: ${apiConfig.basePath}`);
+    return currentTartgetSource;
+}
+
+const getSourceById = async (apiConfig, sourceId) => {
+    const sourcesApi = new SourcesApi(apiConfig);
+    const currentSourceResponse = await sourcesApi.listSources({
+        filters: `id eq "${sourceId}"`,
+        limit: 1
+    });
+
+    const currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
+
+    //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
+    if (!currentTartgetSource) throw new Error(`Could not find source by id [${sourceId}] in tenant: ${apiConfig.basePath}`);
+    return currentTartgetSource;
+}
+
 /**
 * Gets all sources via v3/sources and write appropriate 
 * Source files and referenced objects
@@ -266,6 +294,8 @@ const migrateSource = async (apiConfig, sourceJson) => {
 }
 
 export {
+    getSourceByName,
+    getSourceById,
     exportSources,
     migrateSource
 };
