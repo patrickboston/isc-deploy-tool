@@ -100,6 +100,10 @@ To perform tokenization and deploy/import into a specific target environment bas
 npm run deploy:win -target-env=<env>
 ```
 
+
+
+
+
 ## Configuration Object Special Considerations
 ### Owner References
 There are many objects throughout IDN that have owner references which point to an identity that have created an object, modified an object, etc. It is very important that owners are properly set up in exported configuration objects.
@@ -129,10 +133,21 @@ The following object types have owner references that will need to be considered
 - SOURCE
 - WORKFLOW
 
+### Lifecycle States
+When lifecycle states are exported, access profile and source ID references will be replaced with the names of the object. This allows us to perform a lookup of the objects by name and dynamically populate the IDs from the target environment. **Make sure names are consistent across environments for this reason**.
+
+### Workflows
+When workflows are being updated via the deployment process, if they are enabled, they will be temporarily disabled (1-2s) to perform the update, and then the enabled status defined in the workflow in the repository will be the final state the workflow ends up in. It will not be automatically enabled after update just because it was already enabled before we updated it with the pipeline.
+
 ### Deleting Objects
 There are two scenarios to consider when deleting objects:
 - When objects are deleted directly inside of a tenant, they must also be removed in your build directory/repository because the export process does not consider cleaning up objects that may have been deleted in a tenant. If not cleaned up, they may be re-deployed inadvertently
 - When objects are deleted from your build directory/repository, they will not automatically be cleaned up during the next build deployment. You must also delete objects directly in the tenant if you are removing them from your build repository
+
+
+
+
+
 
 ## Known Issues/Limitations
 - Identity Profiles which reference transforms use a key named `id` with a value of the transform name. Because of this, some actual `id` references are not omitted from Identity Profile objects. It will not harm the migration/deployment process at all as those `id` references would be replaced with the proper target `id` anyways. A future enhancement could make this better
