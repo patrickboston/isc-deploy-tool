@@ -1,18 +1,21 @@
 import clc from "cli-color";
-import _ from 'lodash';
 import * as fs from "fs";
+import _ from 'lodash';
 import { IdentityAttributesBetaApi, IdentityProfilesApi, LifecycleStatesApi, SourcesApi } from "sailpoint-api-client";
+import { writeConfigFile, walk } from "../util.js";
+import { getAccessProfileById, getAccessProfileByName } from "./accessProfileUtil.js";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import { getAllRules } from "./ruleUtil.js";
-import { getSourceById } from "./sourceService.js";
-import { getAccessProfileById } from "./accessProfileUtil.js";
-import { writeConfigFile } from "../util.js";
+import { getSourceById, getSourceByName } from "./sourceService.js";
 
 const IDENTITY_OBJECT_CONFIG = "IDENTITY_OBJECT_CONFIG";
 const IDENTITY_PROFILE = "IDENTITY_PROFILE";
 const LIFECYCLE_STATE = "LIFECYCLE_STATE";
-const existingAttributeToKeep = [
+const identityProfileExistingAttributeToKeep = [
     "object.id", "self.id"
+];
+const lifecycleStateExistingAttributeToKeep = [
+    "id"
 ];
 
 /**
@@ -150,8 +153,8 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     });
     let currentTargetIdentityProfile = currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
     if (currentTargetIdentityProfile) {
-        //Restore attributes from the currently deployed target transform into our template transform
-        for (const key of existingAttributeToKeep) {
+        //Restore attributes from the currently deployed target identity profile into our template transform
+        for (const key of identityProfileExistingAttributeToKeep) {
             _.set(localIdentityProfile, key, _.get(currentTargetIdentityProfile, key));
         }
     }
@@ -228,13 +231,146 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
 
     //If the initial profile is created/updated OK, move onto lifecycle states tied to it
     //Read directly from build directly for now instead of param passed in
-    const localLifecycleStateFileNames = walk(`./build/config/IDENTITY_PROFILE/${localIdentityProfile.name}/LIFECYCLE_STATE`);
+    const localLifecycleStateFileNames = walk(`./build/config/IDENTITY_PROFILE/${localIdentityProfile.self.name}/LIFECYCLE_STATE`);
     if (localLifecycleStateFileNames) {
         const lifecycleStateApi = new LifecycleStatesApi(apiConfig);
 
+        //Get current lifecycle states if any
+        const currentTargetLifecycleStatesResponse = await lifecycleStateApi.listLifecycleStates({
+            identityProfileId: currentTargetIdentityProfile.self.id
+        });
+
+        //Iterate each local, check if it exists in remote, and create/update accordingly
         for (const localLifecycleStateFileName of localLifecycleStateFileNames) {
             let localLifecycleState = JSON.parse(fs.readFileSync(localLifecycleStateFileName, { encoding: "utf8" }));
-            //TODO: deploy each identity profile, will need to iterate each existing one since no filtering allowed
+            console.log(`Checking local LCS: ${localLifecycleState.name}`);
+
+            /*
+            * Need to do a lookup on access profiles and sources if configured
+            * When they are exported, we replace IDs with names, so we will try
+            * to find the same object by name in the target environment and get it's id
+            */
+            let accessProfileIds = [];
+            if (localLifecycleState.accessProfileIds && localLifecycleState.accessProfileIds.length > 0) {
+                for (const accessProfileName of localLifecycleState.accessProfileIds) {
+                    const targetAccessProfile = await getAccessProfileByName(apiConfig, accessProfileName);
+                    accessProfileIds.push(targetAccessProfile.id);
+                }
+            }
+
+            let enableSourceIds = [];
+            let disableSourceIds = [];
+            if (localLifecycleState.accountActions && localLifecycleState.accountActions.length > 0) {
+                for (const accountAction of localLifecycleState.accountActions) {
+                    if (accountAction.action === "ENABLE") {
+                        for (const sourceName of accountAction.sourceIds) {
+                            const targetSource = await getSourceByName(apiConfig, sourceName);
+                            enableSourceIds.push(targetSource.id);
+                        }
+                    } else if (accountAction.action === "DISABLE") {
+                        for (const sourceName of accountAction.sourceIds) {
+                            const targetSource = await getSourceByName(apiConfig, sourceName);
+                            disableSourceIds.push(targetSource.id);
+                        }
+                    }
+                }
+            }
+
+            let existsInTarget = false;
+            if (currentTargetLifecycleStatesResponse.data) {
+                for (const currentTargetLifecycleState of currentTargetLifecycleStatesResponse.data) {
+                    if (currentTargetLifecycleState.name === localLifecycleState.name) {
+                        console.log(`Found a match in the target: ${currentTargetLifecycleState.name}`);
+                        existsInTarget = true;
+
+                        //Restore attributes from the currently deployed target lifecycle state into our template transform
+                        for (const key of lifecycleStateExistingAttributeToKeep) {
+                            _.set(localLifecycleState, key, _.get(currentTargetLifecycleState, key));
+                        }
+
+                        //Need to build carefully since it will not accept empty arrays, etc.
+                        //Initialize with emailNotificationOption, enabled, identityState
+                        const patchOperations = [
+                            {
+                                op: "replace",
+                                path: "/emailNotificationOption",
+                                value: localLifecycleState.emailNotificationOption
+                            },
+                            {
+                                op: "replace",
+                                path: "/enabled",
+                                value: localLifecycleState.enabled
+                            },
+                            {
+                                op: "replace",
+                                path: "/identityState",
+                                value: localLifecycleState.identityState
+                            }
+                        ];
+
+                        if (localLifecycleState.description) {
+                            patchOperations.push(
+                                {
+                                    op: "replace",
+                                    path: "/description",
+                                    value: localLifecycleState.description
+                                }
+                            )
+                        }
+
+                        if (accessProfileIds.length > 0) {
+                            patchOperations.push(
+                                {
+                                    op: "replace",
+                                    path: "/accessProfileIds",
+                                    value: accessProfileIds
+                                }
+                            )
+                        }
+
+                        if (enableSourceIds.length > 0 || disableSourceIds.length > 0) {
+                            let accountOperations = [];
+                            if (enableSourceIds.length > 0) {
+                                accountOperations.push(
+                                    {
+                                        "action": "ENABLE",
+                                        "sourceIds": enableSourceIds
+                                    }
+                                )
+                            }
+                            if (disableSourceIds.length > 0) {
+                                accountOperations.push(
+                                    {
+                                        "action": "DISABLE",
+                                        "sourceIds": disableSourceIds
+                                    }
+                                )
+                            }
+                            patchOperations.push(
+                                {
+                                    op: "replace",
+                                    path: "/accountActions",
+                                    value: accountOperations
+                                }
+                            );
+                        }
+
+                        console.log(JSON.stringify(patchOperations, null, 4));
+
+                        //Update lifecycle state
+                        await lifecycleStateApi.updateLifecycleStates({
+                            identityProfileId: currentTargetIdentityProfile.self.id,
+                            lifecycleStateId: currentTargetLifecycleState.id,
+                            jsonPatchOperation: patchOperations
+                        });
+                    }
+                }
+            }
+            if (!existsInTarget) {
+                console.log("creating");
+            } else {
+                console.log("Already existed and updated, no need to create");
+            }
         }
     }
 }

@@ -15,15 +15,15 @@ const getAccessProfileById = async (apiConfig, accessProfileId) => {
 
 const getAccessProfileByName = async (apiConfig, accessProfileName) => {
     const accessProfilesApi = new AccessProfilesApi(apiConfig);
-    const accessProfile = await accessProfilesApi.listAccessProfiles({
-        filters: `name eq "${accessProfileName}"`
+    const accessProfileResponse = await accessProfilesApi.listAccessProfiles({
+        filters: `name eq "${accessProfileName}"`,
+        limit: 1
     });
 
-    if (!accessProfile.data) {
-        throw new Error(`Could not find an Access Profile for name [${accessProfileName}] in tenant: ${apiConfig.basePath}`)
-    }
+    const accessProfile = accessProfileResponse.data.length == 1 ? accessProfileResponse.data[0] : null;
 
-    return accessProfile.data;
+    if (!accessProfile) throw new Error(`Could not find access profile by name [${accessProfileName}] in tenant: ${apiConfig.basePath}`);
+    return accessProfile
 }
 
 export {

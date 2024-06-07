@@ -25,8 +25,7 @@ const getSourceByName = async (apiConfig, sourceName) => {
     });
 
     const currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
-
-    //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
+    
     if (!currentTartgetSource) throw new Error(`Could not find source by name [${sourceName}] in tenant: ${apiConfig.basePath}`);
     return currentTartgetSource;
 }

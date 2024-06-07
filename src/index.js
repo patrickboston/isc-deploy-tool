@@ -150,8 +150,8 @@ if (isDeploy) {
     /*********************** TESTING *******************************/
     //const s = fs.readFileSync("./build/config/SOURCE/JAR TEST/JAR TEST.json");
     //await migrateSource(targetApiConfig, s);
-    const w = fs.readFileSync("./build/config/WORKFLOW/Mover Certification New Deploy.json");
-    await migrateWorkflow(targetApiConfig, w);
+    //const w = fs.readFileSync("./build/config/WORKFLOW/Mover Certification New Deploy.json");
+    //await migrateWorkflow(targetApiConfig, w);
     //const t = fs.readFileSync("./build/config/TRANSFORM/TestTransform.json");
     //await migrateTransform(targetApiConfig, t);
     //const t = fs.readFileSync("./build/config/NOTIFICATION_TEMPLATE/Non-Employee Account Upload Failed.json");
@@ -162,8 +162,8 @@ if (isDeploy) {
     //await migrateGovernanceGroup(targetApiConfig, a);
     //const i = fs.readFileSync("./build/config/IDENTITY_OBJECT_CONFIG/IDENTITY_OBJECT_CONFIG.json");
     //await migrateIdentityAttributeConfig(targetApiConfig, i);
-    //const i = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
-    //await migrateIdentityProfile(targetApiConfig, i);
+    const i = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
+    await migrateIdentityProfile(targetApiConfig, i);
 }
 
 
