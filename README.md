@@ -137,7 +137,8 @@ The following object types have owner references that will need to be considered
 When lifecycle states are exported, access profile and source ID references will be replaced with the names of the object. This allows us to perform a lookup of the objects by name and dynamically populate the IDs from the target environment. **Make sure names are consistent across environments for this reason**.
 
 ### Workflows
-When workflows are being updated via the deployment process, if they are enabled, they will be temporarily disabled (1-2s) to perform the update, and then the enabled status defined in the workflow in the repository will be the final state the workflow ends up in. It will not be automatically enabled after update just because it was already enabled before we updated it with the pipeline.
+- When workflows are being updated via the deployment process, if they are enabled, they will be temporarily disabled (1-2s) to perform the update, and then the enabled status defined in the workflow in the repository will be the final state the workflow ends up in. It will not be automatically enabled after update just because it was already enabled before we updated it with the pipeline.
+- If your workflow has any secrets stored in it such as OAuth client secrets, when the workflow is saved via the UI, those secrets are encrypted and referenced via a special syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`). If you tokenize the actual secret values in your token files to be deployed, when you run the workflow it will error our saying the secret is not stored in the correct format as the secret with no be converted over to the other special encrypted format mentioned above until the workflow is saved from the UI again. To circumvent this, tokenize the special encrypted secret syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`), or after deployments you must go save the workflow in the UI again.
 
 ### Deleting Objects
 There are two scenarios to consider when deleting objects:
@@ -148,7 +149,7 @@ There are two scenarios to consider when deleting objects:
 
 
 
-
 ## Known Issues/Limitations
 - Identity Profiles which reference transforms use a key named `id` with a value of the transform name. Because of this, some actual `id` references are not omitted from Identity Profile objects. It will not harm the migration/deployment process at all as those `id` references would be replaced with the proper target `id` anyways. A future enhancement could make this better
 - When objects are exported and save to a file, the file name becomes the name of the object. Any special characters not allowed in file names will be replaced with a dash (`-`)
+- Workflow secrets such as OAuth client secrets cannot be converted to the proper encrypted secrets as the endpoint requires a browser JWT token
