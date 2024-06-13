@@ -1,6 +1,6 @@
-import { runExport } from "./../util.js";
-import { writeConfigFile } from "../util.js";
 import * as fs from "fs";
+import { writeConfigFile } from "../util.js";
+import { runExport } from "./../util.js";
 
 const RULE = "RULE";
 
@@ -32,6 +32,5 @@ const exportRules = async (apiConfig) => {
 }
 
 export {
-    getAllRules,
-    exportRules
+    exportRules, getAllRules
 };

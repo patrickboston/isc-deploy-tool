@@ -405,8 +405,6 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                 } catch (error) {
                     await handleHttpException(error);
                 }
-            } else {
-                console.log("Already existed and updated, no need to create");
             }
         }
     }
