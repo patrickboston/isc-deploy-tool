@@ -2,7 +2,7 @@ import clc from "cli-color";
 import * as fs from "fs";
 import _ from 'lodash';
 import { IdentityAttributesBetaApi, IdentityProfilesApi, LifecycleStatesApi, SourcesApi } from "sailpoint-api-client";
-import { writeConfigFile, walk } from "../util.js";
+import { handleHttpException, walk, writeConfigFile } from "../util.js";
 import { getAccessProfileById, getAccessProfileByName } from "./accessProfileUtil.js";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import { getAllRules } from "./ruleUtil.js";
@@ -103,36 +103,44 @@ const migrateIdentityAttributeConfig = async (apiConfig, identityAttrConfigJson)
 
         if (!currentTargetIdentityAttribute) {
             console.log(clc.bgBlueBright(`Creating new Identity Attribute for: ${localIdentityAttribute.name}`));
-            const createIdentityAttributeResponse = await identityAttributesApi.createIdentityAttribute({
-                identityAttributeBeta: {
-                    name: localIdentityAttribute.name,
-                    displayName: localIdentityAttribute.displayName,
-                    multi: localIdentityAttribute.multi,
-                    searchable: localIdentityAttribute.searchable,
-                    sources: localIdentityAttribute.sources,
-                    standard: localIdentityAttribute.standard,
-                    system: localIdentityAttribute.system,
-                    type: localIdentityAttribute.type
-                }
-            });
-            currentTargetIdentityAttribute = createIdentityAttributeResponse.data;
+            try {
+                const createIdentityAttributeResponse = await identityAttributesApi.createIdentityAttribute({
+                    identityAttributeBeta: {
+                        name: localIdentityAttribute.name,
+                        displayName: localIdentityAttribute.displayName,
+                        multi: localIdentityAttribute.multi,
+                        searchable: localIdentityAttribute.searchable,
+                        sources: localIdentityAttribute.sources,
+                        standard: localIdentityAttribute.standard,
+                        system: localIdentityAttribute.system,
+                        type: localIdentityAttribute.type
+                    }
+                });
+                currentTargetIdentityAttribute = createIdentityAttributeResponse.data;
+            } catch (error) {
+                await handleHttpException(error);
+            }
         } else {
             console.log(`Found existing Identity Attribute Config in target environment: ${currentTargetIdentityAttribute.name}`)
 
             //Update the identity attribute with all config, references, etc.
-            await identityAttributesApi.putIdentityAttribute({
-                name: localIdentityAttribute.name,
-                identityAttributeBeta: {
+            try {
+                await identityAttributesApi.putIdentityAttribute({
                     name: localIdentityAttribute.name,
-                    displayName: localIdentityAttribute.displayName,
-                    multi: localIdentityAttribute.multi,
-                    searchable: localIdentityAttribute.searchable,
-                    sources: localIdentityAttribute.sources,
-                    standard: localIdentityAttribute.standard,
-                    system: localIdentityAttribute.system,
-                    type: localIdentityAttribute.type
-                }
-            });
+                    identityAttributeBeta: {
+                        name: localIdentityAttribute.name,
+                        displayName: localIdentityAttribute.displayName,
+                        multi: localIdentityAttribute.multi,
+                        searchable: localIdentityAttribute.searchable,
+                        sources: localIdentityAttribute.sources,
+                        standard: localIdentityAttribute.standard,
+                        system: localIdentityAttribute.system,
+                        type: localIdentityAttribute.type
+                    }
+                });
+            } catch (error) {
+                await handleHttpException(error);
+            }
         }
     }
 }
@@ -218,15 +226,20 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
      * endpoint based on the format of the exported/imported objects. This is also why the input body below
      * is wrapped in an array containing the identity profile (since sp-config import expects this)
     */
-    const importResponse = await identityProfilesApi.importIdentityProfiles({
-        identityProfileExportedObject: [
-            localIdentityProfile
-        ]
-    });
+    let importResponse;
+    try {
+        importResponse = await identityProfilesApi.importIdentityProfiles({
+            identityProfileExportedObject: [
+                localIdentityProfile
+            ]
+        });
+    } catch (error) {
+        await handleHttpException(error);
+    }
 
     //Since this is sp-config import, we need to check for errors manually in the body
     if (importResponse.data.errors.length > 0) {
-        throw new Error(JSON.stringify(importResponse.data, null, 4));
+        console.error(clc.red(JSON.stringify(importResponse.data, null, 4)));
     }
 
     //If the initial profile is created/updated OK, move onto lifecycle states tied to it
@@ -256,24 +269,39 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                     const targetAccessProfile = await getAccessProfileByName(apiConfig, accessProfileName);
                     accessProfileIds.push(targetAccessProfile.id);
                 }
+                localLifecycleState.accessProfileIds = accessProfileIds;
             }
 
             let enableSourceIds = [];
             let disableSourceIds = [];
             if (localLifecycleState.accountActions && localLifecycleState.accountActions.length > 0) {
+                let actions = [];
                 for (const accountAction of localLifecycleState.accountActions) {
                     if (accountAction.action === "ENABLE") {
                         for (const sourceName of accountAction.sourceIds) {
                             const targetSource = await getSourceByName(apiConfig, sourceName);
                             enableSourceIds.push(targetSource.id);
                         }
+                        actions.push(
+                            {
+                                "action": "ENABLE",
+                                "sourceIds": enableSourceIds
+                            }
+                        )
                     } else if (accountAction.action === "DISABLE") {
                         for (const sourceName of accountAction.sourceIds) {
                             const targetSource = await getSourceByName(apiConfig, sourceName);
                             disableSourceIds.push(targetSource.id);
                         }
+                        actions.push(
+                            {
+                                "action": "DISABLE",
+                                "sourceIds": disableSourceIds
+                            }
+                        )
                     }
                 }
+                localLifecycleState.accountActions = actions;
             }
 
             let existsInTarget = false;
@@ -355,19 +383,28 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                             );
                         }
 
-                        console.log(JSON.stringify(patchOperations, null, 4));
-
                         //Update lifecycle state
-                        await lifecycleStateApi.updateLifecycleStates({
-                            identityProfileId: currentTargetIdentityProfile.self.id,
-                            lifecycleStateId: currentTargetLifecycleState.id,
-                            jsonPatchOperation: patchOperations
-                        });
+                        try {
+                            await lifecycleStateApi.updateLifecycleStates({
+                                identityProfileId: currentTargetIdentityProfile.self.id,
+                                lifecycleStateId: currentTargetLifecycleState.id,
+                                jsonPatchOperation: patchOperations
+                            });
+                        } catch (error) {
+                            await handleHttpException(error);
+                        }
                     }
                 }
             }
             if (!existsInTarget) {
-                console.log("creating");
+                try {
+                    await lifecycleStateApi.createLifecycleState({
+                        identityProfileId: currentTargetIdentityProfile.self.id,
+                        lifecycleState: localLifecycleState
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
+                }
             } else {
                 console.log("Already existed and updated, no need to create");
             }
@@ -381,3 +418,4 @@ export {
     migrateIdentityAttributeConfig,
     migrateIdentityProfile
 };
+

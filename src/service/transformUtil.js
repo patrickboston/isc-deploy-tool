@@ -1,7 +1,7 @@
-import { Paginator, TransformsApi } from "sailpoint-api-client";
-import { writeConfigFile } from "../util.js";
 import clc from "cli-color";
 import _ from 'lodash';
+import { Paginator, TransformsApi } from "sailpoint-api-client";
+import { handleHttpException, writeConfigFile } from "../util.js";
 
 const TRANSFORM = "TRANSFORM";
 const existingAttributeToKeep = [
@@ -30,10 +30,14 @@ const migrateTransform = async (apiConfig, transformJson) => {
 
     if (!currentTargetTransform) {
         console.log(`Creating new transform for: ${localTransform.name}`);
-        const createTransformResponse = await transformApi.createTransform({
-            transform: localTransform
-        });
-        currentTargetTransform = createTransformResponse.data;
+        try {
+            const createTransformResponse = await transformApi.createTransform({
+                transform: localTransform
+            });
+            currentTargetTransform = createTransformResponse.data;
+        } catch (error) {
+            await handleHttpException(error);
+        }
     } else {
         console.log(`Found existing transform in target environment: ${currentTargetTransform.name} (${currentTargetTransform.id})`)
 
@@ -43,10 +47,14 @@ const migrateTransform = async (apiConfig, transformJson) => {
         }
 
         //Update the transform with all config, references, etc.
-        await transformApi.updateTransform({
-            id: currentTargetTransform.id,
-            transform: localTransform
-        });
+        try {
+            await transformApi.updateTransform({
+                id: currentTargetTransform.id,
+                transform: localTransform
+            });
+        } catch (error) {
+            await handleHttpException(error);
+        }
     }
 }
 

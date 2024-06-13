@@ -1,8 +1,8 @@
 import clc from "cli-color";
-import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
-import { writeConfigFile, sleep } from "../util.js";
-import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import _ from 'lodash';
+import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
+import { sleep, writeConfigFile, handleHttpException } from "../util.js";
+import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 
 const WORKFLOW = "WORKFLOW";
 const existingAttributeToKeep = [
@@ -61,17 +61,21 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
 
     if (!currentTargetWorkflow) {
         console.log(`Creating new workflow for: ${localWorkflow.name}`);
-        const createWorkflowResponse = await workflowsApi.createWorkflow({
-            createWorkflowRequestBeta: {
-                name: localWorkflow.name,
-                owner: localWorkflow.owner,
-                definition: localWorkflow.definition,
-                description: localWorkflow.description,
-                enabled: localWorkflow.enabled,
-                trigger: localWorkflow.trigger
-            }
-        });
-        currentTargetWorkflow = createWorkflowResponse.data;
+        try {
+            const createWorkflowResponse = await workflowsApi.createWorkflow({
+                createWorkflowRequestBeta: {
+                    name: localWorkflow.name,
+                    owner: localWorkflow.owner,
+                    definition: localWorkflow.definition,
+                    description: localWorkflow.description,
+                    enabled: localWorkflow.enabled,
+                    trigger: localWorkflow.trigger
+                }
+            });
+            currentTargetWorkflow = createWorkflowResponse.data;
+        } catch (error) {
+            await handleHttpException(error);
+        }
     } else {
         console.log(`Found existing workflow in target environment: ${currentTargetWorkflow.name} (${currentTargetWorkflow.id})`)
 
@@ -84,16 +88,20 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         if (currentTargetWorkflow.enabled) {
             console.log("Workflow was enabled, disabling it to allow modification");
             //Patch workflow to disable so we can update
-            workflowsApi.patchWorkflow({
-                id: currentTargetWorkflow.id,
-                jsonPatchOperationBeta: [
-                    {
-                        op: "replace",
-                        path: "/enabled",
-                        value: false
-                    }
-                ]
-            });
+            try {
+                workflowsApi.patchWorkflow({
+                    id: currentTargetWorkflow.id,
+                    jsonPatchOperationBeta: [
+                        {
+                            op: "replace",
+                            path: "/enabled",
+                            value: false
+                        }
+                    ]
+                });
+            } catch (error) {
+                await handleHttpException(error);
+            }
 
             //Let the patch bake in for a second or else might throw an error that it's still enabled
             await sleep(1000);
@@ -105,10 +113,14 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         }
 
         //Update the workflow with all config, references, etc.
-        await workflowsApi.updateWorkflow({
-            id: localWorkflow.id,
-            workflowBodyBeta: localWorkflow
-        });
+        try {
+            await workflowsApi.updateWorkflow({
+                id: localWorkflow.id,
+                workflowBodyBeta: localWorkflow
+            });
+        } catch (error) {
+            await handleHttpException(error);
+        }
     }
 }
 

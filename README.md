@@ -100,6 +100,8 @@ To perform tokenization and deploy/import into a specific target environment bas
 npm run deploy:win -target-env=<env>
 ```
 
+> [!NOTE]
+> The deploy/import execution process will continue on errors. Errors will be recorded in the terminal if encountered
 
 
 

@@ -1,13 +1,24 @@
+import clc from "cli-color";
+import * as fs from "fs";
+import { JSONPath } from "jsonpath-plus";
+import _ from 'lodash';
+import { SPConfigBetaApi } from "sailpoint-api-client";
 import { default as defaultExportConfig } from "./../export-config.js";
 import { default as reverseTokens } from "./../reverse.target.js";
-import * as fs from "fs";
-import _ from 'lodash';
-import clc from "cli-color";
-import { JSONPath } from "jsonpath-plus";
-import { SPConfigBetaApi } from "sailpoint-api-client";
 
 const sleep = (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+* @param {Error} e
+*/
+const handleHttpException = async (e) => {
+    if (e.response) {
+        console.error(clc.red(`Error while executing request:\nPath: ${e.request.path}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+    } else {
+        console.error(clc.red(`Generic while executing request:\n${e.request.path}\n${e.message}`));
+    }
 }
 
 function walk(dir, files = []) {
@@ -268,13 +279,5 @@ const runDeploy = async (apiConfig, importData) => {
 }
 
 export {
-    buildObjectsForEnvironment,
-    buildDeploymentFile,
-    runExport,
-    runDeploy,
-    reverseTokenize,
-    writeConfigFile,
-    deepOmit,
-    walk,
-    sleep
+    buildDeploymentFile, buildObjectsForEnvironment, deepOmit, handleHttpException, reverseTokenize, runDeploy, runExport, sleep, walk, writeConfigFile
 };

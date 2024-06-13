@@ -1,8 +1,6 @@
 import { AccessRequestsApi } from "sailpoint-api-client";
-import { writeConfigFile } from "../util.js";
-import { getIdentityByAlias, getIdentityById, getGovGroupByName, getGovGroupById } from "./identityUtil.js";
-import clc from "cli-color";
-import _ from 'lodash';
+import { handleHttpException, writeConfigFile } from "../util.js";
+import { getGovGroupById, getGovGroupByName, getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 
 const ACCESS_REQUEST_CONFIG = "ACCESS_REQUEST_CONFIG";
 
@@ -59,9 +57,13 @@ const updateAccessRequestConfig = async (apiConfig, newAccessRequestConfig) => {
         localAccessRequestConfig.entitlementRequestConfig.grantRequestApprovalSchemes = grantRequestApprovalSchemes;
     }
 
-    const accessRequestConfigResponse = await accessRequestApi.setAccessRequestConfig({
-        accessRequestConfig: localAccessRequestConfig
-    });
+    try {
+        const accessRequestConfigResponse = await accessRequestApi.setAccessRequestConfig({
+            accessRequestConfig: localAccessRequestConfig
+        });
+    } catch (error) {
+        await handleHttpException(error);
+    }
 }
 
 export {

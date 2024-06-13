@@ -1,11 +1,11 @@
 import clc from "cli-color";
-import { SourcesApi, Paginator, SourcesBetaApi } from "sailpoint-api-client";
-import { writeConfigFile, walk } from "../util.js";
-import { getAllClusters } from "./clusterUtil.js"
-import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
-import { getAllRules } from "./ruleUtil.js";
 import * as fs from "fs";
 import _ from 'lodash';
+import { Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
+import { walk, writeConfigFile } from "../util.js";
+import { getAllClusters } from "./clusterUtil.js";
+import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
+import { getAllRules } from "./ruleUtil.js";
 
 const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
@@ -25,7 +25,7 @@ const getSourceByName = async (apiConfig, sourceName) => {
     });
 
     const currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
-    
+
     if (!currentTartgetSource) throw new Error(`Could not find source by name [${sourceName}] in tenant: ${apiConfig.basePath}`);
     return currentTartgetSource;
 }
@@ -76,7 +76,7 @@ const exportSources = async (apiConfig) => {
 
         //Attribute Sync Config
         const betaSourcesApi = new SourcesBetaApi(apiConfig);
-        const attrSyncConfigResponse = await betaSourcesApi.getSourceAttrSyncConfig({id: source.id});
+        const attrSyncConfigResponse = await betaSourcesApi.getSourceAttrSyncConfig({ id: source.id });
         if (attrSyncConfigResponse.data) {
             const attrSyncFileName = sourceName + "_ATTR_SYNC";
             writeConfigFile(ATTR_SYNC_SOURCE_CONFIG, attrSyncFileName, attrSyncConfigResponse.data, `SOURCE/${sourceName}/${ATTR_SYNC_SOURCE_CONFIG}`);
@@ -123,17 +123,21 @@ const migrateSource = async (apiConfig, sourceJson) => {
     if (!currentTartgetSource) {
         console.log(`Creating new source for: ${localSource.name}`);
         const csvSource = localSource.type === "Delimited File";
-        const createSourceResponse = await sourcesApi.createSource({
-            source: localSource,
-            provisionAsCsv: csvSource
-        });
+        try {
+            const createSourceResponse = await sourcesApi.createSource({
+                source: localSource,
+                provisionAsCsv: csvSource
+            });
 
-        currentTartgetSource = createSourceResponse.data;
+            currentTartgetSource = createSourceResponse.data;
+        } catch (error) {
+            await handleHttpException(error);
+        }
     } else {
         console.log(`Found existing source in target environment: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
     }
 
-    //Correlaton Config needs to be updated from target source if exists
+    //Correlation Config needs to be updated from target source if exists
     if (localSource.accountCorrelationConfig && currentTartgetSource.accountCorrelationConfig) {
         localSource.accountCorrelationConfig = currentTartgetSource.accountCorrelationConfig;
     } else {
@@ -150,10 +154,14 @@ const migrateSource = async (apiConfig, sourceJson) => {
         let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
         _.set(attrSyncCopy, "source.name", currentTartgetSource.id);
 
-        betaSourcesApi.putSourceAttrSyncConfig({
-            id: currentTartgetSource.id,
-            attrSyncSourceConfigBeta: attrSyncCopy
-        })
+        try {
+            await betaSourcesApi.putSourceAttrSyncConfig({
+                id: currentTartgetSource.id,
+                attrSyncSourceConfigBeta: attrSyncCopy
+            });
+        } catch (error) {
+            await handleHttpException(error);
+        }
     }
 
     //Update all rule references
@@ -192,11 +200,15 @@ const migrateSource = async (apiConfig, sourceJson) => {
                 //Need to compare the names tlll we find a match
                 if (currentPolicy.name === policyCopy.name && currentPolicy.usageType === policyCopy.usageType) {
                     //Update policy itself
-                    await sourcesApi.putProvisioningPolicy({
-                        sourceId: currentTartgetSource.id,
-                        usageType: currentPolicy.usageType,
-                        provisioningPolicyDto: policyCopy
-                    });
+                    try {
+                        await sourcesApi.putProvisioningPolicy({
+                            sourceId: currentTartgetSource.id,
+                            usageType: currentPolicy.usageType,
+                            provisioningPolicyDto: policyCopy
+                        });
+                    } catch (error) {
+                        await handleHttpException(error);
+                    }
 
                     //Schema exists already in target, set flag
                     createPolicy = false;
@@ -207,10 +219,14 @@ const migrateSource = async (apiConfig, sourceJson) => {
 
         //Only create if it wasn't found in the target
         if (createPolicy) {
-            const createPolicyResponse = await sourcesApi.createProvisioningPolicy({
-                sourceId: currentTartgetSource.id,
-                provisioningPolicyDto: policyCopy
-            });
+            try {
+                await sourcesApi.createProvisioningPolicy({
+                    sourceId: currentTartgetSource.id,
+                    provisioningPolicyDto: policyCopy
+                });
+            } catch (error) {
+                await handleHttpException(error);
+            }
         }
     }
 
@@ -237,18 +253,21 @@ const migrateSource = async (apiConfig, sourceJson) => {
                 if (currentSchema.name === schemaCopy.name) {
                     //Update schema itself
                     schemaCopy.id = currentSchema.id;
-                    //console.log(`Updated schema:\n ${JSON.stringify(schemaCopy, null, 4)}`)
-                    await sourcesApi.putSourceSchema({
-                        schema: schemaCopy,
-                        schemaId: currentSchema.id,
-                        sourceId: currentTartgetSource.id
-                    });
+                    try {
+                        await sourcesApi.putSourceSchema({
+                            schema: schemaCopy,
+                            schemaId: currentSchema.id,
+                            sourceId: currentTartgetSource.id
+                        });
 
-                    //Update schema reference on source
-                    for (let schemaReference of localSource.schemas) {
-                        if (schemaReference.name === schemaCopy.name) {
-                            schemaReference.id = currentSchema.id;
+                        //Update schema reference on source
+                        for (let schemaReference of localSource.schemas) {
+                            if (schemaReference.name === schemaCopy.name) {
+                                schemaReference.id = currentSchema.id;
+                            }
                         }
+                    } catch (error) {
+                        await handleHttpException(error);
                     }
 
                     //Schema exists already in target, set flag
@@ -261,21 +280,25 @@ const migrateSource = async (apiConfig, sourceJson) => {
         //Only create if it wasn't found in the target
         if (createSchema) {
             console.log(`Schema being created for source ${localSource.name}`)
-            const createSchemaResponse = await sourcesApi.createSourceSchema({
-                schema: schemaCopy,
-                sourceId: currentTartgetSource.id
-            });
+            try {
+                const createSchemaResponse = await sourcesApi.createSourceSchema({
+                    schema: schemaCopy,
+                    sourceId: currentTartgetSource.id
+                });
 
-            //Add schema reference on source for new schema
-            const schemaRef = {
-                type: CONNECTOR_SCHEMA,
-                name: schemaCopy.name,
-                id: createSchemaResponse.data.id
-            };
+                //Add schema reference on source for new schema
+                const schemaRef = {
+                    type: CONNECTOR_SCHEMA,
+                    name: schemaCopy.name,
+                    id: createSchemaResponse.data.id
+                };
 
-            let currentSchemas = localSource.schemas;
-            currentSchemas.push(schemaRef);
-            localSource.schemas = currentSchemas;
+                let currentSchemas = localSource.schemas;
+                currentSchemas.push(schemaRef);
+                localSource.schemas = currentSchemas;
+            } catch (error) {
+                await handleHttpException(error);
+            }
         }
     }
 
@@ -286,15 +309,17 @@ const migrateSource = async (apiConfig, sourceJson) => {
 
     //Update the source with all config, references, etc.
     console.log(`Source JSON to be deployed:\n ${JSON.stringify(localSource, null, 4)}`);
-    await sourcesApi.putSource({
-        id: localSource.id,
-        source: localSource
-    });
+    try {
+        await sourcesApi.putSource({
+            id: localSource.id,
+            source: localSource
+        });
+    } catch (error) {
+        await handleHttpException(error);
+    }
 }
 
 export {
-    getSourceByName,
-    getSourceById,
-    exportSources,
-    migrateSource
+    exportSources, getSourceById, getSourceByName, migrateSource
 };
+

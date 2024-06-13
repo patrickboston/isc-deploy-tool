@@ -1,7 +1,7 @@
-import { Paginator, NotificationsBetaApi } from "sailpoint-api-client";
-import { writeConfigFile } from "../util.js";
 import clc from "cli-color";
 import _ from 'lodash';
+import { NotificationsBetaApi, Paginator } from "sailpoint-api-client";
+import { writeConfigFile } from "../util.js";
 
 const NOTIFICATION_TEMPLATE = "NOTIFICATION_TEMPLATE";
 const existingAttributeToKeep = [
@@ -30,20 +30,24 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
 
     if (!currentTargetTemplate) {
         console.log(`Creating new notification template for: ${localTemplate.name}`);
-        const createTemplateResponse = await notificationsBetaApi.createNotificationTemplate({
-            templateDtoBeta: {
-                key: localTemplate.key,
-                locale: localTemplate.locale,
-                medium: localTemplate.medium,
-                body: localTemplate.body,
-                description: localTemplate.description,
-                from: localTemplate.from,
-                name: localTemplate.name,
-                replyTo: localTemplate.replyTo,
-                subject: localTemplate.subject
-            }
-        });
-        currentTargetTemplate = createTemplateResponse.data;
+        try {
+            const createTemplateResponse = await notificationsBetaApi.createNotificationTemplate({
+                templateDtoBeta: {
+                    key: localTemplate.key,
+                    locale: localTemplate.locale,
+                    medium: localTemplate.medium,
+                    body: localTemplate.body,
+                    description: localTemplate.description,
+                    from: localTemplate.from,
+                    name: localTemplate.name,
+                    replyTo: localTemplate.replyTo,
+                    subject: localTemplate.subject
+                }
+            });
+            currentTargetTemplate = createTemplateResponse.data;
+        } catch (error) {
+            await handleHttpException(error);
+        }
     } else {
         console.log(`Found existing notification template in target environment: ${currentTargetTemplate.name} (${currentTargetTemplate.id})`)
 
@@ -54,20 +58,24 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
 
         //Update the template with all config, references, etc.
         //Create endpoint also updates templates
-        await notificationsBetaApi.createNotificationTemplate({
-            templateDtoBeta: {
-                id: currentTargetTemplate.id,
-                key: localTemplate.key,
-                locale: localTemplate.locale,
-                medium: localTemplate.medium,
-                body: localTemplate.body,
-                description: localTemplate.description,
-                from: localTemplate.from,
-                name: localTemplate.name,
-                replyTo: localTemplate.replyTo,
-                subject: localTemplate.subject
-            }
-        });
+        try {
+            await notificationsBetaApi.createNotificationTemplate({
+                templateDtoBeta: {
+                    id: currentTargetTemplate.id,
+                    key: localTemplate.key,
+                    locale: localTemplate.locale,
+                    medium: localTemplate.medium,
+                    body: localTemplate.body,
+                    description: localTemplate.description,
+                    from: localTemplate.from,
+                    name: localTemplate.name,
+                    replyTo: localTemplate.replyTo,
+                    subject: localTemplate.subject
+                }
+            });
+        } catch (error) {
+            await handleHttpException(error);
+        }
     }
 }
 

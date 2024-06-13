@@ -8,6 +8,7 @@ const existingAttributeToKeep = [
     "id"
 ];
 
+//TODO: Try to store in cache variable and re-reference everytime to see if already fetched??? Saves calls
 const getIdentityByAlias = async (apiConfig, identityAlias) => {
     const identityApi = new IdentitiesBetaApi(apiConfig);
     const identityResponse = await identityApi.listIdentities({
