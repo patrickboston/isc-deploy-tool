@@ -7,7 +7,7 @@ import { exportAccessRequestConfig } from "./service/accessRequestUtil.js";
 import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityProfile } from "./service/identityConfigService.js";
 import { exportGovernanceGroups } from "./service/identityUtil.js";
 import { exportNotificationTemplates } from "./service/notificationUtil.js";
-import { exportSources } from "./service/sourceService.js";
+import { exportSources, migrateSource } from "./service/sourceService.js";
 import { exportTransforms } from "./service/transformUtil.js";
 import { exportWorkflows } from "./service/workflowUtil.js";
 import { buildObjectsForEnvironment, reverseTokenize, runExport } from "./util.js";
@@ -147,8 +147,10 @@ if (isDeploy) {
     */
 
     /*********************** TESTING *******************************/
-    //const s = fs.readFileSync("./build/config/SOURCE/JAR TEST/JAR TEST.json");
-    //await migrateSource(targetApiConfig, s);
+    const s = fs.readFileSync("./build/config/SOURCE/JAR TEST/JAR TEST.json");
+    await migrateSource(targetApiConfig, s);
+    const ss = fs.readFileSync("./build/config/SOURCE/DevDays JDBC/DevDays JDBC.json");
+    await migrateSource(targetApiConfig, ss);
     //const w = fs.readFileSync("./build/config/WORKFLOW/Mover Certification New Deploy.json");
     //await migrateWorkflow(targetApiConfig, w);
     //const t = fs.readFileSync("./build/config/TRANSFORM/TestTransform.json");
@@ -161,8 +163,8 @@ if (isDeploy) {
     //await migrateGovernanceGroup(targetApiConfig, a);
     //const i = fs.readFileSync("./build/config/IDENTITY_OBJECT_CONFIG/IDENTITY_OBJECT_CONFIG.json");
     //await migrateIdentityAttributeConfig(targetApiConfig, i);
-    const i = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
-    await migrateIdentityProfile(targetApiConfig, i);
+    //const i = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
+    //await migrateIdentityProfile(targetApiConfig, i);
 }
 
 

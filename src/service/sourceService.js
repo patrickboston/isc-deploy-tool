@@ -16,8 +16,11 @@ const existingAttributeToKeep = [
 const ruleReferenceNames = [
     "accountCorrelationRule", "managerCorrelationRule", "beforeProvisioningRule"
 ];
+let sourceCache = {};
 
 const getSourceByName = async (apiConfig, sourceName) => {
+    if (sourceCache[sourceName]) return sourceCache[sourceName];
+
     const sourcesApi = new SourcesApi(apiConfig);
     const currentSourceResponse = await sourcesApi.listSources({
         filters: `name eq "${sourceName}"`,
@@ -31,6 +34,8 @@ const getSourceByName = async (apiConfig, sourceName) => {
 }
 
 const getSourceById = async (apiConfig, sourceId) => {
+    if (sourceCache[sourceId]) return sourceCache[sourceId];
+
     const sourcesApi = new SourcesApi(apiConfig);
     const currentSourceResponse = await sourcesApi.listSources({
         filters: `id eq "${sourceId}"`,

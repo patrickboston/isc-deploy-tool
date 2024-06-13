@@ -8,8 +8,13 @@ const existingAttributeToKeep = [
     "id"
 ];
 
-//TODO: Try to store in cache variable and re-reference everytime to see if already fetched??? Saves calls
+//Cache of identities we fetch during imports
+let identityCache = {};
+let govGroupCache = {};
+
 const getIdentityByAlias = async (apiConfig, identityAlias) => {
+    if (identityCache[identityAlias]) return identityCache[identityAlias];
+    
     const identityApi = new IdentitiesBetaApi(apiConfig);
     const identityResponse = await identityApi.listIdentities({
         filters: `alias eq "${identityAlias}"`,
@@ -20,10 +25,13 @@ const getIdentityByAlias = async (apiConfig, identityAlias) => {
         throw new Error(`Could not find identity for alias [${identityAlias}] in tenant: ${apiConfig.basePath}`)
     }
 
+    identityCache[identityAlias] = identityResponse.data[0];
     return identityResponse.data[0];
 }
 
 const getIdentityById = async (apiConfig, identityId) => {
+    if (identityCache[identityId]) return identityCache[identityId];
+
     const identityApi = new IdentitiesBetaApi(apiConfig);
     const identityResponse = await identityApi.listIdentities({
         filters: `id eq "${identityId}"`,
@@ -38,6 +46,8 @@ const getIdentityById = async (apiConfig, identityId) => {
 }
 
 const getGovGroupByName = async (apiConfig, govGroupName) => {
+    if (govGroupCache[govGroupName]) return govGroupCache[govGroupName];
+
     const govGroupApi = new GovernanceGroupsBetaApi(apiConfig);
     const govGroupResponse = await govGroupApi.listWorkgroups({
         filters: `name eq "${govGroupName}"`
@@ -51,6 +61,8 @@ const getGovGroupByName = async (apiConfig, govGroupName) => {
 }
 
 const getGovGroupById = async (apiConfig, govGroupId) => {
+    if (govGroupCache[govGroupId]) return govGroupCache[govGroupId];
+
     const govGroupApi = new GovernanceGroupsBetaApi(apiConfig);
     const govGroupResponse = await govGroupApi.getWorkgroup({
         id: govGroupId
