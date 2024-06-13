@@ -2,7 +2,7 @@ import clc from "cli-color";
 import * as fs from "fs";
 import _ from 'lodash';
 import { Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
-import { walk, writeConfigFile } from "../util.js";
+import { walk, writeConfigFile, handleHttpException } from "../util.js";
 import { getAllClusters } from "./clusterUtil.js";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import { getAllRules } from "./ruleUtil.js";
@@ -154,13 +154,16 @@ const migrateSource = async (apiConfig, sourceJson) => {
         let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
         _.set(attrSyncCopy, "source.name", currentTartgetSource.id);
 
-        try {
-            await betaSourcesApi.putSourceAttrSyncConfig({
-                id: currentTartgetSource.id,
-                attrSyncSourceConfigBeta: attrSyncCopy
-            });
-        } catch (error) {
-            await handleHttpException(error);
+        //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
+        if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
+            try {
+                await betaSourcesApi.putSourceAttrSyncConfig({
+                    id: currentTartgetSource.id,
+                    attrSyncSourceConfigBeta: attrSyncCopy
+                });
+            } catch (error) {
+                await handleHttpException(error);
+            }
         }
     }
 
