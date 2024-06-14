@@ -1,7 +1,7 @@
 import clc from "cli-color";
 import _ from 'lodash';
 import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
-import { sleep, writeConfigFile, handleHttpException } from "../util.js";
+import { handleHttpException, sleep, writeConfigFile } from "../util.js";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 
 const WORKFLOW = "WORKFLOW";
@@ -61,6 +61,26 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
 
     if (!currentTargetWorkflow) {
         console.log(`Creating new workflow for: ${localWorkflow.name}`);
+
+        //TODO: Subscription error???
+        /*
+        Create completed and local workflow was marked as enabled, enabling it in target
+        Error while executing request:
+        Path: /beta/workflows/1d1f6a54-4241-4489-a784-529867d45586
+        Status Code: 500
+        Response Data: {
+            "detailCode": "Internal Server Error",
+            "trackingId": "529bdf59d9504632b7d05bf06f813394",
+            "messages": [
+                {
+                    "locale": "en-US",
+                    "localeOrigin": "DEFAULT",
+                    "text": "failed to enable workflow due to missing subscription"
+                }
+            ]
+        }
+        */
+
         try {
             const createWorkflowResponse = await workflowsApi.createWorkflow({
                 createWorkflowRequestBeta: {
@@ -68,11 +88,35 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
                     owner: localWorkflow.owner,
                     definition: localWorkflow.definition,
                     description: localWorkflow.description,
-                    enabled: localWorkflow.enabled,
+                    enabled: false, //Workflows cannot be created in an enabled state, so we have to create it disabled
                     trigger: localWorkflow.trigger
                 }
             });
             currentTargetWorkflow = createWorkflowResponse.data;
+
+            //If the local workflow was enabled, we will enable it now with a PATCH
+            if (localWorkflow.enabled) {
+                console.log("Create completed and local workflow was marked as enabled, enabling it in target");
+                await sleep(1000);
+                //Patch workflow to disable so we can update
+                try {
+                    await workflowsApi.patchWorkflow({
+                        id: currentTargetWorkflow.id,
+                        jsonPatchOperationBeta: [
+                            {
+                                op: "replace",
+                                path: "/enabled",
+                                value: true
+                            }
+                        ]
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
+                }
+
+                //Let the patch bake in for a second or else might throw an error that it's still enabled
+                await sleep(1000);
+            }
         } catch (error) {
             await handleHttpException(error);
         }
@@ -89,7 +133,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
             console.log("Workflow was enabled, disabling it to allow modification");
             //Patch workflow to disable so we can update
             try {
-                workflowsApi.patchWorkflow({
+                await workflowsApi.patchWorkflow({
                     id: currentTargetWorkflow.id,
                     jsonPatchOperationBeta: [
                         {
@@ -128,3 +172,4 @@ export {
     exportWorkflows,
     migrateWorkflow
 };
+
