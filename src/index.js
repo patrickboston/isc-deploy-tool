@@ -3,13 +3,13 @@ import axiosRetry from "axios-retry";
 import clc from "cli-color";
 import * as fs from "fs";
 import { Configuration } from "sailpoint-api-client";
-import { exportAccessRequestConfig } from "./service/accessRequestUtil.js";
-import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityProfile } from "./service/identityConfigService.js";
-import { exportGovernanceGroups } from "./service/identityUtil.js";
-import { exportNotificationTemplates } from "./service/notificationUtil.js";
+import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestUtil.js";
+import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfile } from "./service/identityConfigService.js";
+import { exportGovernanceGroups, migrateGovernanceGroup } from "./service/identityUtil.js";
+import { exportNotificationTemplates, migrateNotificationTemplate } from "./service/notificationUtil.js";
 import { exportSources, migrateSource } from "./service/sourceService.js";
-import { exportTransforms } from "./service/transformUtil.js";
-import { exportWorkflows } from "./service/workflowUtil.js";
+import { exportTransforms, migrateTransform } from "./service/transformUtil.js";
+import { exportWorkflows, migrateWorkflow } from "./service/workflowUtil.js";
 import { buildObjectsForEnvironment, reverseTokenize, runExport } from "./util.js";
 
 console.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
@@ -151,20 +151,20 @@ if (isDeploy) {
     await migrateSource(targetApiConfig, s);
     const ss = fs.readFileSync("./build/config/SOURCE/DevDays JDBC/DevDays JDBC.json");
     await migrateSource(targetApiConfig, ss);
-    //const w = fs.readFileSync("./build/config/WORKFLOW/Mover Certification New Deploy.json");
-    //await migrateWorkflow(targetApiConfig, w);
-    //const t = fs.readFileSync("./build/config/TRANSFORM/TestTransform.json");
-    //await migrateTransform(targetApiConfig, t);
-    //const t = fs.readFileSync("./build/config/NOTIFICATION_TEMPLATE/Non-Employee Account Upload Failed.json");
-    //await migrateNotificationTemplate(targetApiConfig, t);
-    //const a = fs.readFileSync("./build/config/ACCESS_REQUEST_CONFIG/ACCESS_REQUEST_CONFIG.json");
-    //await updateAccessRequestConfig(targetApiConfig, a);
-    //const a = fs.readFileSync("./build/config/GOVERNANCE_GROUP/Test Deploy.json");
-    //await migrateGovernanceGroup(targetApiConfig, a);
-    //const i = fs.readFileSync("./build/config/IDENTITY_OBJECT_CONFIG/IDENTITY_OBJECT_CONFIG.json");
-    //await migrateIdentityAttributeConfig(targetApiConfig, i);
-    //const i = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
-    //await migrateIdentityProfile(targetApiConfig, i);
+    const w = fs.readFileSync("./build/config/WORKFLOW/Mover Certification New Deploy.json");
+    await migrateWorkflow(targetApiConfig, w);
+    const t = fs.readFileSync("./build/config/TRANSFORM/TestTransform.json");
+    await migrateTransform(targetApiConfig, t);
+    const n = fs.readFileSync("./build/config/NOTIFICATION_TEMPLATE/Non-Employee Account Upload Failed.json");
+    await migrateNotificationTemplate(targetApiConfig, n);
+    const a = fs.readFileSync("./build/config/ACCESS_REQUEST_CONFIG/ACCESS_REQUEST_CONFIG.json");
+    await updateAccessRequestConfig(targetApiConfig, a);
+    const g = fs.readFileSync("./build/config/GOVERNANCE_GROUP/Test Deploy.json");
+    await migrateGovernanceGroup(targetApiConfig, g);
+    const i = fs.readFileSync("./build/config/IDENTITY_OBJECT_CONFIG/IDENTITY_OBJECT_CONFIG.json");
+    await migrateIdentityAttributeConfig(targetApiConfig, i);
+    const ip = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
+    await migrateIdentityProfile(targetApiConfig, ip);
 }
 
 

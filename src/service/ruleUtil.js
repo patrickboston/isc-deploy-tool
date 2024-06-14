@@ -3,8 +3,11 @@ import { writeConfigFile } from "../util.js";
 import { runExport } from "./../util.js";
 
 const RULE = "RULE";
+let ruleCache;
 
 const getAllRules = async (apiConfig) => {
+    if (ruleCache) return ruleCache;
+
     const ruleExportConfig = {
         "excludeTypes": [
         ],
@@ -16,6 +19,7 @@ const getAllRules = async (apiConfig) => {
     }
 
     const rulesResponse = await runExport(apiConfig, ruleExportConfig);
+    ruleCache = rulesResponse;
     return rulesResponse;
 }
 

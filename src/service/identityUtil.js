@@ -114,7 +114,6 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
         currentTargetGovGroup = createGovGroupResponse.data;
     } else {
         console.log(`Found existing governance group/workgroup in target environment: ${currentTargetGovGroup.name} (${currentTargetGovGroup.id})`)
-
         //Restore attributes from the currently deployed target gov group into our template gov group
         for (const govGroupKey of existingAttributeToKeep) {
             _.set(localGovGroup, govGroupKey, _.get(currentTargetGovGroup, govGroupKey));
