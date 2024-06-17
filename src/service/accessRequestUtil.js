@@ -1,6 +1,7 @@
 import { AccessRequestsApi } from "sailpoint-api-client";
 import { handleHttpException, writeConfigFile } from "../util.js";
 import { getGovGroupById, getGovGroupByName, getIdentityByAlias, getIdentityById } from "./identityUtil.js";
+import winston from "winston";
 
 const ACCESS_REQUEST_CONFIG = "ACCESS_REQUEST_CONFIG";
 

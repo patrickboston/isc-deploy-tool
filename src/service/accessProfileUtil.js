@@ -1,4 +1,5 @@
 import { AccessProfilesApi } from "sailpoint-api-client";
+import winston from "winston";
 
 const getAccessProfileById = async (apiConfig, accessProfileId) => {
     const accessProfilesApi = new AccessProfilesApi(apiConfig);

@@ -78,32 +78,47 @@ node src/index.js --export --detokenize
 ```
 However, in the `package.json`, there are a number of scripts set up which make the commands slightly easier to run
 
-**NOTE: The example commands below all use `:win` variation of the commands. If you are on a Linux OS, omit the `:win` when running the command. There are different sets of commands because of how dynamic command line parameters are passed in NodeJS**
+> [!NOTE]
+> Ensure you put the double dash (`--`) after the command initial command and your arguments as documented below for each command
 
 ### Export
 To export objects from a specific environment and perform reverse-tokenization based on properties defined in your `reverse.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`. This process relies on the `export-config.js` file you have configured to determine which objects you want to export out of your source IdentityNow environment.
 
 **NOTE:** The export process will overwrite any manual changes made in your `/config/` directory. This is why it is crucial to set up your reverse tokenization properties if you wish to retain a neutral object state that can be deployed to any target environment.
 ```
-npm run export:win -src-env=<env>
+npm run export -- -src-env=<env>
 ```
 
 ### Build
 To perform tokenization and build objects locally for specific target environment based on tokens defined in your `<env>.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`. The built objects will reside in the `/build/config` directory
 ```
-npm run build:win -target-env=<env>
+npm run build -- -target-env=<env>
 ```
 
 ### Deploy/Import
 To perform tokenization and deploy/import into a specific target environment based on tokens defined in your `<env>.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`
 ```
-npm run deploy:win -target-env=<env>
+npm run deploy -- -target-env=<env>
 ```
 
 > [!NOTE]
 > The deploy/import execution process will continue on errors. Errors will be recorded in the terminal if encountered
 
 
+
+## Logging
+The commands above print out various logs by default. The default log priority is `info`. In order to print more verbose logs, pass the `--log_level` parameter. The following are valid log levels prioritized from highest to lowest:
+```
+error: 0
+warn: 1
+info: 2
+http: 3
+verbose: 4
+debug: 5
+silly: 6
+```
+
+Most of the more detailed logging (HTTP requests, etc. is available at the `debug` level).
 
 
 ## Configuration Object Special Considerations

@@ -1,6 +1,7 @@
 import clc from "cli-color";
 import _ from 'lodash';
 import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
+import winston from "winston";
 import { handleHttpException, sleep, writeConfigFile } from "../util.js";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 
@@ -35,7 +36,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     //Using /beta/workflows here because /v3 seems to fail for no reason
     const workflowsApi = new WorkflowsBetaApi(apiConfig);
     let localWorkflow = JSON.parse(workflowJson);
-    console.log(clc.bgBlueBright(`Migrating workflow: ${localWorkflow.name}`));
+    winston.info(clc.bgBlueBright(`Migrating workflow: ${localWorkflow.name}`));
 
     //Get corresponding owner by name and add id
     const owner = await getIdentityByAlias(apiConfig, localWorkflow.owner.name);
@@ -60,7 +61,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     }
 
     if (!currentTargetWorkflow) {
-        console.log(`Creating new workflow for: ${localWorkflow.name}`);
+        winston.info(`Creating new workflow for: ${localWorkflow.name}`);
 
         //TODO: Subscription error???
         /*
@@ -96,7 +97,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
 
             //If the local workflow was enabled, we will enable it now with a PATCH
             if (localWorkflow.enabled) {
-                console.log("Create completed and local workflow was marked as enabled, enabling it in target");
+                winston.info("Create completed and local workflow was marked as enabled, enabling it in target");
                 await sleep(1000);
                 //Patch workflow to disable so we can update
                 try {
@@ -121,7 +122,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
             await handleHttpException(error);
         }
     } else {
-        console.log(`Found existing workflow in target environment: ${currentTargetWorkflow.name} (${currentTargetWorkflow.id})`)
+        winston.info(`Found existing workflow in target environment: ${currentTargetWorkflow.name} (${currentTargetWorkflow.id})`)
 
         /*
          * If workflow is currently enabled, need to disable it before we can modify and then re-enable
@@ -130,7 +131,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
          * has it set as disabled
         */
         if (currentTargetWorkflow.enabled) {
-            console.log("Workflow was enabled, disabling it to allow modification");
+            winston.info("Workflow was enabled, disabling it to allow modification");
             //Patch workflow to disable so we can update
             try {
                 await workflowsApi.patchWorkflow({

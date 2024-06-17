@@ -2,6 +2,7 @@ import clc from "cli-color";
 import * as fs from "fs";
 import _ from 'lodash';
 import { IdentityAttributesBetaApi, IdentityProfilesApi, LifecycleStatesApi, SourcesApi } from "sailpoint-api-client";
+import winston from "winston";
 import { handleHttpException, walk, writeConfigFile } from "../util.js";
 import { getAccessProfileById, getAccessProfileByName } from "./accessProfileUtil.js";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
@@ -24,14 +25,14 @@ const lifecycleStateExistingAttributeToKeep = [
 * @param {Configuration} apiConfig
 */
 const exportIdentityAttributeConfig = async (apiConfig) => {
-    console.info(clc.bgBlueBright("Performing Identity Object Config export"));
+    winston.info(clc.bgBlueBright("Performing Identity Object Config export"));
     const identityAttributesApi = new IdentityAttributesBetaApi(apiConfig);
     const identityAttributeConfig = await identityAttributesApi.listIdentityAttributes();
     writeConfigFile(IDENTITY_OBJECT_CONFIG, IDENTITY_OBJECT_CONFIG, identityAttributeConfig.data);
 };
 
 const exportIdentityProfiles = async (apiConfig) => {
-    console.info(clc.bgBlueBright("Performing Identity Profiles export"));
+    winston.info(clc.bgBlueBright("Performing Identity Profiles export"));
     const identityProfilesApi = new IdentityProfilesApi(apiConfig);
     const lifecycleStatesApi = new LifecycleStatesApi(apiConfig);
     const identityProfiles = await identityProfilesApi.exportIdentityProfiles();
@@ -80,13 +81,13 @@ const exportIdentityProfiles = async (apiConfig) => {
 }
 
 const migrateIdentityAttributeConfig = async (apiConfig, identityAttrConfigJson) => {
-    console.log(clc.bgBlueBright(`Migrating Identity Attribute Configuration`));
+    winston.info(clc.bgBlueBright(`Migrating Identity Attribute Configuration`));
     const identityAttributesApi = new IdentityAttributesBetaApi(apiConfig);
 
     //Differs from other objects as we need to iterate each attribute in the array of attributes
     let localIdentityAttributeConfig = JSON.parse(identityAttrConfigJson);
     for (const localIdentityAttribute of localIdentityAttributeConfig) {
-        console.log(clc.bgBlueBright(`Updating Identity Attribute: ${localIdentityAttribute.name}`));
+        winston.info(clc.bgBlueBright(`Updating Identity Attribute: ${localIdentityAttribute.name}`));
 
         //Check and see if a identity attribute with this name already exists in the target environment
         let currentTargetIdentityAttribute;
@@ -97,12 +98,12 @@ const migrateIdentityAttributeConfig = async (apiConfig, identityAttrConfigJson)
             currentTargetIdentityAttribute = currentIdentityAttributeResponse.data;
         } catch (error) {
             if (error.response.status === 404) {
-                console.log(`Identity Attribute [${localIdentityAttribute.name}] does not exist yet`);
+                winston.info(`Identity Attribute [${localIdentityAttribute.name}] does not exist yet`);
             }
         }
 
         if (!currentTargetIdentityAttribute) {
-            console.log(clc.bgBlueBright(`Creating new Identity Attribute for: ${localIdentityAttribute.name}`));
+            winston.info(clc.bgBlueBright(`Creating new Identity Attribute for: ${localIdentityAttribute.name}`));
             try {
                 const createIdentityAttributeResponse = await identityAttributesApi.createIdentityAttribute({
                     identityAttributeBeta: {
@@ -121,7 +122,7 @@ const migrateIdentityAttributeConfig = async (apiConfig, identityAttrConfigJson)
                 await handleHttpException(error);
             }
         } else {
-            console.log(`Found existing Identity Attribute Config in target environment: ${currentTargetIdentityAttribute.name}`)
+            winston.info(`Found existing Identity Attribute Config in target environment: ${currentTargetIdentityAttribute.name}`)
 
             //Update the identity attribute with all config, references, etc.
             try {
@@ -150,7 +151,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     const sourcesApi = new SourcesApi(apiConfig);
 
     let localIdentityProfile = JSON.parse(identityProfileJson);
-    console.log(clc.bgBlueBright(`Migrating identity profile: ${localIdentityProfile.self.name}`));
+    winston.info(clc.bgBlueBright(`Migrating identity profile: ${localIdentityProfile.self.name}`));
 
     //Get all rules incase we need to perform a lookup
     const rules = await getAllRules(apiConfig);
@@ -239,7 +240,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
 
     //Since this is sp-config import, we need to check for errors manually in the body
     if (importResponse.data.errors.length > 0) {
-        console.error(clc.red(JSON.stringify(importResponse.data, null, 4)));
+        winston.error(clc.red(JSON.stringify(importResponse.data, null, 4)));
     }
 
     //If the initial profile is created/updated OK, move onto lifecycle states tied to it
@@ -256,7 +257,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
         //Iterate each local, check if it exists in remote, and create/update accordingly
         for (const localLifecycleStateFileName of localLifecycleStateFileNames) {
             let localLifecycleState = JSON.parse(fs.readFileSync(localLifecycleStateFileName, { encoding: "utf8" }));
-            console.log(`Checking local LCS: ${localLifecycleState.name}`);
+            winston.info(`Checking local LCS: ${localLifecycleState.name}`);
 
             /*
             * Need to do a lookup on access profiles and sources if configured
@@ -308,7 +309,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
             if (currentTargetLifecycleStatesResponse.data) {
                 for (const currentTargetLifecycleState of currentTargetLifecycleStatesResponse.data) {
                     if (currentTargetLifecycleState.name === localLifecycleState.name) {
-                        console.log(`Found a match in the target: ${currentTargetLifecycleState.name}`);
+                        winston.info(`Found a match in the target: ${currentTargetLifecycleState.name}`);
                         existsInTarget = true;
 
                         //Restore attributes from the currently deployed target lifecycle state into our template transform

@@ -1,4 +1,5 @@
 import { ManagedClustersBetaApi } from "sailpoint-api-client";
+import winston from "winston";
 
 const getAllClusters = async (apiConfig) => {
     const clusterApi = new ManagedClustersBetaApi(apiConfig);

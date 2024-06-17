@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import { writeConfigFile } from "../util.js";
 import { runExport } from "./../util.js";
+import winston from "winston";
 
 const RULE = "RULE";
 let ruleCache;

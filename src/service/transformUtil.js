@@ -1,6 +1,7 @@
 import clc from "cli-color";
 import _ from 'lodash';
 import { Paginator, TransformsApi } from "sailpoint-api-client";
+import winston from "winston";
 import { handleHttpException, writeConfigFile } from "../util.js";
 
 const TRANSFORM = "TRANSFORM";
@@ -20,7 +21,7 @@ const migrateTransform = async (apiConfig, transformJson) => {
     const transformApi = new TransformsApi(apiConfig);
 
     let localTransform = JSON.parse(transformJson);
-    console.log(clc.bgBlueBright(`Migrating transform: ${localTransform.name}`));
+    winston.info(clc.bgBlueBright(`Migrating transform: ${localTransform.name}`));
 
     //Check and see if a transform with this name already exists in the target environment
     const currentTransformResponse = await transformApi.listTransforms({
@@ -29,7 +30,7 @@ const migrateTransform = async (apiConfig, transformJson) => {
     let currentTargetTransform = currentTransformResponse.data.length == 1 ? currentTransformResponse.data[0] : null;
 
     if (!currentTargetTransform) {
-        console.log(`Creating new transform for: ${localTransform.name}`);
+        winston.info(`Creating new transform for: ${localTransform.name}`);
         try {
             const createTransformResponse = await transformApi.createTransform({
                 transform: localTransform
@@ -39,7 +40,7 @@ const migrateTransform = async (apiConfig, transformJson) => {
             await handleHttpException(error);
         }
     } else {
-        console.log(`Found existing transform in target environment: ${currentTargetTransform.name} (${currentTargetTransform.id})`)
+        winston.info(`Found existing transform in target environment: ${currentTargetTransform.name} (${currentTargetTransform.id})`)
 
         //Restore attributes from the currently deployed target transform into our template transform
         for (const transformKey of existingAttributeToKeep) {
@@ -62,3 +63,4 @@ export {
     exportTransforms,
     migrateTransform
 };
+

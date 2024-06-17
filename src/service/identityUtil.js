@@ -1,7 +1,8 @@
-import { GovernanceGroupsBetaApi, IdentitiesBetaApi, Paginator } from "sailpoint-api-client";
-import { writeConfigFile } from "../util.js";
-import _ from 'lodash';
 import clc from "cli-color";
+import _ from 'lodash';
+import { GovernanceGroupsBetaApi, IdentitiesBetaApi, Paginator } from "sailpoint-api-client";
+import winston from "winston";
+import { writeConfigFile } from "../util.js";
 
 const GOVERNANCE_GROUP_TYPE = "GOVERNANCE_GROUP";
 const existingAttributeToKeep = [
@@ -87,7 +88,7 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
     const govGroupApi = new GovernanceGroupsBetaApi(apiConfig);
 
     let localGovGroup = JSON.parse(govGroupJson);
-    console.log(clc.bgBlueBright(`Migrating governance group/workgroup: ${localGovGroup.name}`));
+    winston.info(clc.bgBlueBright(`Migrating governance group/workgroup: ${localGovGroup.name}`));
 
     //Looks up owner identity by tokenized alias
     const targetOwner = await getIdentityByAlias(apiConfig, localGovGroup.owner.name);
@@ -103,7 +104,7 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
     let currentTargetGovGroup = currentGovGroupResponse.data.length == 1 ? currentGovGroupResponse.data[0] : null;
 
     if (!currentTargetGovGroup) {
-        console.log(`Creating new governance group/workgroup for: ${localGovGroup.name}`);
+        winston.info(`Creating new governance group/workgroup for: ${localGovGroup.name}`);
         const createGovGroupResponse = await govGroupApi.createWorkgroup({
             workgroupDtoBeta: {
                 name: localGovGroup.name,
@@ -113,7 +114,7 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
         });
         currentTargetGovGroup = createGovGroupResponse.data;
     } else {
-        console.log(`Found existing governance group/workgroup in target environment: ${currentTargetGovGroup.name} (${currentTargetGovGroup.id})`)
+        winston.info(`Found existing governance group/workgroup in target environment: ${currentTargetGovGroup.name} (${currentTargetGovGroup.id})`)
         //Restore attributes from the currently deployed target gov group into our template gov group
         for (const govGroupKey of existingAttributeToKeep) {
             _.set(localGovGroup, govGroupKey, _.get(currentTargetGovGroup, govGroupKey));
@@ -134,10 +135,7 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
 }
 
 export {
-    getIdentityByAlias,
-    getIdentityById,
-    getGovGroupByName,
-    getGovGroupById,
-    exportGovernanceGroups,
-    migrateGovernanceGroup
+    exportGovernanceGroups, getGovGroupById, getGovGroupByName, getIdentityByAlias,
+    getIdentityById, migrateGovernanceGroup
 };
+

@@ -2,7 +2,8 @@ import clc from "cli-color";
 import * as fs from "fs";
 import _ from 'lodash';
 import { Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
-import { walk, writeConfigFile, handleHttpException } from "../util.js";
+import winston from "winston";
+import { handleHttpException, walk, writeConfigFile } from "../util.js";
 import { getAllClusters } from "./clusterUtil.js";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 import { getAllRules } from "./ruleUtil.js";
@@ -55,7 +56,7 @@ const getSourceById = async (apiConfig, sourceId) => {
 * @param {Configuration} apiConfig
 */
 const exportSources = async (apiConfig) => {
-    console.info(clc.bgBlueBright("Performing Source export"));
+    winston.info(clc.bgBlueBright("Performing Source export"));
     const sourcesApi = new SourcesApi(apiConfig);
 
     const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSources, { limit: 1000 }, 250);
@@ -64,7 +65,7 @@ const exportSources = async (apiConfig) => {
         let sourceClone = structuredClone(source);
 
         const sourceName = source.name;
-        console.log(clc.bgCyan(`Processing export for source: ${sourceName}`));
+        winston.info(clc.bgCyan(`Processing export for source: ${sourceName}`));
 
         //Get and write referenced schemas on source
         const sourceSchemas = await sourcesApi.listSourceSchemas({ sourceId: source.id });
@@ -100,7 +101,6 @@ const exportSources = async (apiConfig) => {
 const migrateSource = async (apiConfig, sourceJson) => {
     const sourcesApi = new SourcesApi(apiConfig);
     let localSource = JSON.parse(sourceJson);
-    console.log(clc.bgBlueBright(`Migrating source: ${localSource.name}`));
 
     //Get corresponding cluster by name and add id
     if (localSource.cluster) {
@@ -126,7 +126,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
 
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
     if (!currentTartgetSource) {
-        console.log(`Creating new source for: ${localSource.name}`);
+        winston.info(`Creating new source: ${localSource.name}`);
         const csvSource = localSource.type === "Delimited File";
         try {
             const createSourceResponse = await sourcesApi.createSource({
@@ -139,7 +139,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
             await handleHttpException(error);
         }
     } else {
-        console.log(`Found existing source in target environment: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
+        winston.info(`Updating existing source: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
     }
 
     //Correlation Config needs to be updated from target source if exists
@@ -151,6 +151,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
     }
 
     //TODO: Create correlation config once public API is available, uses /diana endpoint today
+    winston.warn(clc.yellow(`Correlation Config not supported as no public API is available, please set manually via UI`));
 
     //Attribute sync config
     const betaSourcesApi = new SourcesBetaApi(apiConfig);
@@ -162,6 +163,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
         //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
         if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
             try {
+                winston.info(`Updating source attribute sync config`)
                 await betaSourcesApi.putSourceAttrSyncConfig({
                     id: currentTartgetSource.id,
                     attrSyncSourceConfigBeta: attrSyncCopy
@@ -178,13 +180,13 @@ const migrateSource = async (apiConfig, sourceJson) => {
     for (const ruleReferenceName of ruleReferenceNames) {
         if (_.get(localSource, ruleReferenceName)) {
             let ruleRef = _.get(localSource, ruleReferenceName);
-            console.log(ruleRef);
+            winston.info(ruleRef);
 
             for (const rule of rules) {
                 if (rule.self.name === ruleRef.name) {
                     ruleRef.id = rule.self.id;
 
-                    console.log(ruleRef);
+                    winston.info(ruleRef);
                     _.set(localSource, ruleReferenceName, ruleRef);
                 }
             }
@@ -205,9 +207,10 @@ const migrateSource = async (apiConfig, sourceJson) => {
 
         if (currentTargetPolicyResponse) {
             for (const currentPolicy of currentTargetPolicyResponse.data) {
-                //Need to compare the names tlll we find a match
+                //Need to compare the names till we find a match
                 if (currentPolicy.name === policyCopy.name && currentPolicy.usageType === policyCopy.usageType) {
                     //Update policy itself
+                    winston.info(`Updating existing source provisioning policy: ${localSource.name} - ${policyCopy.name} (${currentPolicy.id})`)
                     try {
                         await sourcesApi.putProvisioningPolicy({
                             sourceId: currentTartgetSource.id,
@@ -227,6 +230,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
 
         //Only create if it wasn't found in the target
         if (createPolicy) {
+            winston.info(`Creating new source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
             try {
                 await sourcesApi.createProvisioningPolicy({
                     sourceId: currentTartgetSource.id,
@@ -262,6 +266,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
                     //Update schema itself
                     schemaCopy.id = currentSchema.id;
                     try {
+                        winston.info(`Updating existing source schema: ${localSource.name} - ${schemaCopy.name}`)
                         await sourcesApi.putSourceSchema({
                             schema: schemaCopy,
                             schemaId: currentSchema.id,
@@ -287,7 +292,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
 
         //Only create if it wasn't found in the target
         if (createSchema) {
-            console.log(`Schema being created for source ${localSource.name}`)
+            winston.info(`Creating new source schema: ${localSource.name} - ${schemaCopy.name}`)
             try {
                 const createSchemaResponse = await sourcesApi.createSourceSchema({
                     schema: schemaCopy,
@@ -316,7 +321,8 @@ const migrateSource = async (apiConfig, sourceJson) => {
     }
 
     //Update the source with all config, references, etc.
-    console.log(`Source JSON to be deployed:\n ${JSON.stringify(localSource, null, 4)}`);
+    winston.info(`Updating existing source: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
+    winston.debug(JSON.stringify(localSource, null, 4));
     try {
         await sourcesApi.putSource({
             id: localSource.id,

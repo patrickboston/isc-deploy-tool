@@ -1,6 +1,7 @@
 import clc from "cli-color";
 import _ from 'lodash';
 import { NotificationsBetaApi, Paginator } from "sailpoint-api-client";
+import winston from "winston";
 import { writeConfigFile } from "../util.js";
 
 const NOTIFICATION_TEMPLATE = "NOTIFICATION_TEMPLATE";
@@ -20,7 +21,7 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
     const notificationsBetaApi = new NotificationsBetaApi(apiConfig);
 
     let localTemplate = JSON.parse(templateJson);
-    console.log(clc.bgBlueBright(`Migrating notification template: ${localTemplate.name}`));
+    winston.info(clc.bgBlueBright(`Migrating notification template: ${localTemplate.name}`));
 
     //Check and see if a template with this name already exists in the target environment
     const currentTemplateResponse = await notificationsBetaApi.listNotificationTemplates({
@@ -29,7 +30,7 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
     let currentTargetTemplate = currentTemplateResponse.data.length == 1 ? currentTemplateResponse.data[0] : null;
 
     if (!currentTargetTemplate) {
-        console.log(`Creating new notification template for: ${localTemplate.name}`);
+        winston.info(`Creating new notification template for: ${localTemplate.name}`);
         try {
             const createTemplateResponse = await notificationsBetaApi.createNotificationTemplate({
                 templateDtoBeta: {
@@ -49,7 +50,7 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
             await handleHttpException(error);
         }
     } else {
-        console.log(`Found existing notification template in target environment: ${currentTargetTemplate.name} (${currentTargetTemplate.id})`)
+        winston.info(`Found existing notification template in target environment: ${currentTargetTemplate.name} (${currentTargetTemplate.id})`)
 
         //Restore attributes from the currently deployed target template into our template template
         for (const templateKey of existingAttributeToKeep) {
@@ -83,3 +84,4 @@ export {
     exportNotificationTemplates,
     migrateNotificationTemplate
 };
+

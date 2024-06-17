@@ -3,6 +3,7 @@ import * as fs from "fs";
 import { JSONPath } from "jsonpath-plus";
 import _ from 'lodash';
 import { SPConfigBetaApi } from "sailpoint-api-client";
+import winston from "winston";
 import { default as defaultExportConfig } from "./../export-config.js";
 import { default as reverseTokens } from "./../reverse.target.js";
 
@@ -15,9 +16,9 @@ const sleep = (ms) => {
 */
 const handleHttpException = async (e) => {
     if (e.response) {
-        console.error(clc.red(`Error while executing request:\nPath: ${e.request.path}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+        winston.error(clc.red(`Error while executing request:\nPath: ${e.request.path}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
     } else {
-        console.error(clc.red(`Generic while executing request:\n${e.request.path}\n${e.message}`));
+        winston.error(clc.red(`Generic while executing request:\n${e.request.path}\n${e.message}`));
     }
 }
 
@@ -86,13 +87,13 @@ const checkExportStatus = async (spConfigApi, jobId, timeout = 500) => {
             (async function wait() {
                 spConfigApi.getSpConfigExportStatus({ id: jobId }).then((response) => {
                     if (response.data.status == "COMPLETE") {
-                        console.info(clc.bgGreen("SP-Config export completed"));
+                        winston.info("SP-Config export completed");
                         resolve(response);
                     } else if (response.data.status == "IN_PROGRESS") {
-                        console.log(clc.green("Export job [" + jobId + "] still in progress..."));
+                        winston.info(clc.green("Export job [" + jobId + "] still in progress..."));
                         setTimeout(wait, timeout);
                     } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
-                        console.error(response.data);
+                        winston.error(response.data);
                         resolve("SP-Config Export job [" + jobId + "] has been cancelled or failed!");
                     }
                 })
@@ -127,7 +128,7 @@ const runExport = async (apiConfig, exportConfig) => {
 }
 
 const reverseTokenize = async () => {
-    console.info(clc.bgBlueBright("Performing reverse tokenization"));
+    winston.info(clc.bgBlueBright("Performing reverse tokenization"));
     return new Promise((resolve, reject) => {
         if (!reverseTokens) reject("No tokens to process")
 
@@ -142,7 +143,7 @@ const reverseTokenize = async () => {
                 //Iterate each token for a specific object/file
                 Object.entries(tokens).forEach((token) => {
                     const [jPath, tokenValue] = token;
-                    console.info(`Checking file [${fileName}] for JSONPath [${jPath}]`);
+                    winston.debug(`Checking file [${fileName}] for JSONPath [${jPath}]`);
 
                     let results = JSONPath({
                         path: jPath,
@@ -155,9 +156,9 @@ const reverseTokenize = async () => {
                         //Convert the JSONPath pointer to make it actual JavaScript dot notation
                         let correctPointer = results[0].pointer.replaceAll("/", ".").substring(1);
                         _.set(json, correctPointer, tokenValue);
-                        console.info(clc.bgGreen(`JSONPath match found, replacing value with token: ${tokenValue}`));
+                        winston.info(clc.bgGreen(`JSONPath match found, replacing value with token: ${tokenValue}`));
                     } else {
-                        console.warn(clc.yellow("Could not find JSON element for path: " + jPath));
+                        winston.warn(clc.yellow("Could not find JSON element for path: " + jPath));
                     }
                 });
 
@@ -165,19 +166,19 @@ const reverseTokenize = async () => {
                 fs.writeFileSync(fileLocation, JSON.stringify(json, null, 4));
             } catch (err) {
                 if (err.code === 'ENOENT') {
-                    console.info(clc.bgRed(`File not found defined in reverse.target.js: ${fileLocation}`));
+                    winston.info(clc.bgRed(`File not found defined in reverse.target.js: ${fileLocation}`));
                 } else {
                     throw err;
                 }
             }
         });
-        console.info(clc.bgGreenBright("Reverse tokenization complete"));
+        winston.info(clc.bgGreenBright("Reverse tokenization complete"));
         resolve("Reverse tokenization complete");
     })
 }
 
 const buildObjectsForEnvironment = async (env) => {
-    console.info(clc.bgBlueBright(`Tokenizing objects for target environment: ${env}`))
+    winston.info(clc.bgBlueBright(`Tokenizing objects for target environment: ${env}`))
     const envTokenFileName = "./../" + env + ".target.js";
     const { default: envTokens } = await import(envTokenFileName);
 
@@ -191,12 +192,12 @@ const buildObjectsForEnvironment = async (env) => {
     configFileNames.forEach((fileName) => {
         if (fileName.endsWith(".json")) {
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
-            console.info(`Checking file ${fileName} for token replacement`);
+            winston.debug(`Checking file ${fileName} for token replacement`);
             Object.entries(envTokens).forEach((token) => {
                 const [tokenName, tokenValue] = token;
                 const matches = fileSource.match(tokenName);
                 if (matches) {
-                    console.info(clc.bgGreen(`${matches.length} occurence(s) of token name [${tokenName}] found in file [${fileName}]`));
+                    winston.info(clc.bgGreen(`${matches.length} occurence(s) of token name [${tokenName}] found in file [${fileName}]`));
                 }
                 fileSource = fileSource.replaceAll(tokenName, tokenValue);
             });
@@ -223,7 +224,7 @@ const buildDeploymentFile = () => {
         const configFileNames = walk('./build/config');
         configFileNames.forEach((fileName) => {
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
-            console.info(`Including file ${fileName} for deployment`);
+            winston.info(`Including file ${fileName} for deployment`);
             const objectJson = JSON.parse(fileSource);
             objectArray.push(objectJson);
         });
@@ -243,10 +244,10 @@ const checkImportStatus = async (spConfigApi, jobId, timeout = 10000) => {
             (async function wait() {
                 spConfigApi.getSpConfigImportStatus({ id: jobId }).then((response) => {
                     if (response.data.status == "COMPLETE") {
-                        console.info(clc.bgGreen("SP-Config import completed"));
+                        winston.info("SP-Config import completed");
                         resolve(response);
                     } else if (response.data.status == "IN_PROGRESS") {
-                        console.log(clc.green("Import job [" + jobId + "] still in progress..."));
+                        winston.info(clc.green("Import job [" + jobId + "] still in progress..."));
                         setTimeout(wait, 100);
                     } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
                         resolve(clc.red("Import job [" + jobId + "] has been cancelled or failed!"));
@@ -268,7 +269,7 @@ const getImportResult = async (spConfigApi, jobId) => {
 
 const runDeploy = async (apiConfig, importData) => {
     return new Promise((resolve, reject) => {
-        console.info(clc.bgBlueBright("Performing tenant deployment"));
+        winston.info(clc.bgBlueBright("Performing tenant deployment"));
         let spConfigApi = new SPConfigBetaApi(apiConfig);
 
         spConfigApi.importSpConfig({ data: importData }).then((response) => {
@@ -283,3 +284,4 @@ const runDeploy = async (apiConfig, importData) => {
 export {
     buildDeploymentFile, buildObjectsForEnvironment, deepOmit, handleHttpException, reverseTokenize, runDeploy, runExport, sleep, walk, writeConfigFile
 };
+

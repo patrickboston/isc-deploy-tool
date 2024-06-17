@@ -3,6 +3,7 @@ import axiosRetry from "axios-retry";
 import clc from "cli-color";
 import * as fs from "fs";
 import { Configuration } from "sailpoint-api-client";
+import winston from "winston"
 import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestUtil.js";
 import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfile } from "./service/identityConfigService.js";
 import { exportGovernanceGroups, migrateGovernanceGroup } from "./service/identityUtil.js";
@@ -11,8 +12,6 @@ import { exportSources, migrateSource } from "./service/sourceService.js";
 import { exportTransforms, migrateTransform } from "./service/transformUtil.js";
 import { exportWorkflows, migrateWorkflow } from "./service/workflowUtil.js";
 import { buildObjectsForEnvironment, reverseTokenize, runExport } from "./util.js";
-
-console.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
 
 const results = [];
 const nodeArgs = (argList => {
@@ -49,35 +48,57 @@ let {
     deploy: isDeploy,
     detokenize: isDetokenize,
     src_env: srcEnvName,
-    target_env: targetEnvName
+    target_env: targetEnvName,
+    log_level: logLevel
 } = nodeArgs;
+
+//console.log(log_level);
+
+//Logger
+const logFormat = winston.format.printf(({ level, message, label, timestamp }) => {
+    return `${timestamp} [${level}]: ${message}`;
+});
+winston.configure({
+    level: logLevel || "info",
+    format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.cli(),
+        winston.format.timestamp({format: "YYYY-MM-DD HH:mm:ss"}),
+        logFormat
+    ),
+    transports: [
+        new winston.transports.Console()
+    ]
+});
 
 //Process args
 srcEnvName = srcEnvName && srcEnvName.toLowerCase();
 targetEnvName = targetEnvName && targetEnvName.toLowerCase();
 
+winston.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
+
 //Check export params
 if (isExport && (!srcEnvName || srcEnvName == "%npm_config_src_env%")) {
-    console.error(clc.bgRed("FAILED: --src_env argument is required for export but was not supplied, exiting"));
+    winston.error(clc.bgRed("FAILED: --src_env argument is required for export but was not supplied, exiting"));
     process.exit(1);
 } else {
-    console.info(clc.bgMagentaBright(`Running with src_env: ${srcEnvName}`));
+    winston.info(clc.bgMagentaBright(`Running with src_env: ${srcEnvName}`));
 }
 
 //Check build params
 if (isBuild && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
-    console.error(clc.bgRed("FAILED: --target_env argument is required for build but was not supplied, exiting"));
+    winston.error(clc.bgRed("FAILED: --target_env argument is required for build but was not supplied, exiting"));
     process.exit(1);
 } else {
-    console.info(clc.bgMagentaBright(`Running build with target_env: ${targetEnvName}`));
+    winston.info(clc.bgMagentaBright(`Running build with target_env: ${targetEnvName}`));
 }
 
 //Check deploy params
 if (isDeploy && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
-    console.error(clc.bgRed("FAILED: --target_env argument is required for deploy but was not supplied, exiting"));
+    winston.error(clc.bgRed("FAILED: --target_env argument is required for deploy but was not supplied, exiting"));
     process.exit(1);
 } else {
-    console.info(clc.bgMagentaBright(`Running deploy with target_env: ${targetEnvName}`));
+    winston.info(clc.bgMagentaBright(`Running deploy with target_env: ${targetEnvName}`));
 }
 
 //Perform export setup and process
@@ -90,12 +111,12 @@ if (isExport) {
         retries: 4,
         retryDelay: axiosRetry.exponentialDelay,
         onRetry(retryCount, error, requestConfig) {
-            console.log(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
+            winston.info(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
         }
     }
 
     if (isExport && isDetokenize) {
-        console.log(clc.bgMagentaBright("Running export and de-tokenization..."));
+        winston.info(clc.bgMagentaBright("Running export and de-tokenization..."));
 
         //await exportRules(srcApiConfig);
         await exportTransforms(srcApiConfig);
@@ -110,7 +131,7 @@ if (isExport) {
         await reverseTokenize();
 
     } else if (isExport && !isDetokenize) {
-        console.log(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
+        winston.info(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
         await runExport(srcApiConfig);
     }
 }
@@ -129,7 +150,7 @@ if (isDeploy) {
         retries: 4,
         retryDelay: axiosRetry.exponentialDelay,
         onRetry(retryCount, error, requestConfig) {
-            console.log(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
+            winston.warn(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
         }
     }
 
