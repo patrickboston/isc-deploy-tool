@@ -89,7 +89,6 @@ const exportSources = async (apiConfig) => {
         }
 
         //Update source owner to alias for lookup when migrating
-        //TODO: Cache owners as we iterate so we don't hit up the API every time
         const owner = await getIdentityById(apiConfig, source.owner.id);
         sourceClone.owner.name = owner.alias;
 

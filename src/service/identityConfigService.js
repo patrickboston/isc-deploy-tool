@@ -49,7 +49,6 @@ const exportIdentityProfiles = async (apiConfig) => {
         });
         if (lifecycleStatesResponse.data) {
             for (let lifecycleState of lifecycleStatesResponse.data) {
-                //TODO: Replace IDs of sources to enable/disable with source names AND accessProfileIds
                 if (lifecycleState.accountActions) {
                     for (let accountAction of lifecycleState.accountActions) {
                         let sourceNames = [];
