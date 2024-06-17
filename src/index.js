@@ -78,7 +78,7 @@ targetEnvName = targetEnvName && targetEnvName.toLowerCase();
 winston.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
 
 //Check export params
-if (isExport && (!srcEnvName || srcEnvName == "%npm_config_src_env%")) {
+if (isExport && (!srcEnvName)) {
     winston.error(clc.bgRed("FAILED: --src_env argument is required for export but was not supplied, exiting"));
     process.exit(1);
 } else {
@@ -86,7 +86,7 @@ if (isExport && (!srcEnvName || srcEnvName == "%npm_config_src_env%")) {
 }
 
 //Check build params
-if (isBuild && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
+if (isBuild && (!targetEnvName)) {
     winston.error(clc.bgRed("FAILED: --target_env argument is required for build but was not supplied, exiting"));
     process.exit(1);
 } else {
@@ -94,7 +94,7 @@ if (isBuild && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
 }
 
 //Check deploy params
-if (isDeploy && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
+if (isDeploy && (!targetEnvName)) {
     winston.error(clc.bgRed("FAILED: --target_env argument is required for deploy but was not supplied, exiting"));
     process.exit(1);
 } else {

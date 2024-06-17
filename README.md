@@ -86,19 +86,19 @@ To export objects from a specific environment and perform reverse-tokenization b
 
 **NOTE:** The export process will overwrite any manual changes made in your `/config/` directory. This is why it is crucial to set up your reverse tokenization properties if you wish to retain a neutral object state that can be deployed to any target environment.
 ```
-npm run export -- -src-env=<env>
+npm run export -- --src-env=<env>
 ```
 
 ### Build
 To perform tokenization and build objects locally for specific target environment based on tokens defined in your `<env>.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`. The built objects will reside in the `/build/config` directory
 ```
-npm run build -- -target-env=<env>
+npm run build -- --target-env=<env>
 ```
 
 ### Deploy/Import
 To perform tokenization and deploy/import into a specific target environment based on tokens defined in your `<env>.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`
 ```
-npm run deploy -- -target-env=<env>
+npm run deploy -- --target-env=<env>
 ```
 
 > [!NOTE]
