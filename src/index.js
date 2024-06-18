@@ -8,7 +8,7 @@ import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/
 import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfile } from "./service/identityConfigService.js";
 import { exportGovernanceGroups, migrateGovernanceGroup } from "./service/identityUtil.js";
 import { exportNotificationTemplates, migrateNotificationTemplate } from "./service/notificationUtil.js";
-import { exportSources, migrateSource } from "./service/sourceService.js";
+import { exportSources, migrateSources } from "./service/sourceService.js";
 import { exportTransforms, migrateTransform } from "./service/transformUtil.js";
 import { exportWorkflows, migrateWorkflow } from "./service/workflowUtil.js";
 import { buildObjectsForEnvironment, reverseTokenize, runExport } from "./util.js";
@@ -108,7 +108,7 @@ if (isExport) {
 
     let srcApiConfig = new Configuration(srcEnvParams);
     srcApiConfig.retriesConfig = {
-        retries: 4,
+        retries: 2,
         retryDelay: axiosRetry.exponentialDelay,
         onRetry(retryCount, error, requestConfig) {
             winston.info(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
@@ -118,7 +118,7 @@ if (isExport) {
     if (isExport && isDetokenize) {
         winston.info(clc.bgMagentaBright("Running export and de-tokenization..."));
 
-        //await exportRules(srcApiConfig);
+        await exportRules(srcApiConfig);
         await exportTransforms(srcApiConfig);
         await exportSources(srcApiConfig);
         await exportIdentityAttributeConfig(srcApiConfig);
@@ -128,6 +128,7 @@ if (isExport) {
         await exportWorkflows(srcApiConfig);
         await exportGovernanceGroups(srcApiConfig);
 
+        //Perform reverse tokenization on all exported files
         await reverseTokenize();
 
     } else if (isExport && !isDetokenize) {
@@ -147,13 +148,13 @@ if (isDeploy) {
 
     let targetApiConfig = new Configuration(targetEnvParams);
     targetApiConfig.retriesConfig = {
-        retries: 4,
+        retries: 2,
         retryDelay: axiosRetry.exponentialDelay,
         onRetry(retryCount, error, requestConfig) {
             winston.warn(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
         }
     }
-
+    
     await buildObjectsForEnvironment(targetEnvName);
 
     /**
@@ -167,7 +168,10 @@ if (isDeploy) {
      * 7. Workflow
     */
 
+    await migrateSources(targetApiConfig);
+
     /*********************** TESTING *******************************/
+    /*
     const s = fs.readFileSync("./build/config/SOURCE/JAR TEST/JAR TEST.json");
     await migrateSource(targetApiConfig, s);
     const ss = fs.readFileSync("./build/config/SOURCE/DevDays JDBC/DevDays JDBC.json");
@@ -186,6 +190,8 @@ if (isDeploy) {
     await migrateIdentityAttributeConfig(targetApiConfig, i);
     const ip = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
     await migrateIdentityProfile(targetApiConfig, ip);
+    */
+    /*********************** TESTING *******************************/
 }
 
 

@@ -209,7 +209,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
                 //Need to compare the names till we find a match
                 if (currentPolicy.name === policyCopy.name && currentPolicy.usageType === policyCopy.usageType) {
                     //Update policy itself
-                    winston.info(`Updating existing source provisioning policy: ${localSource.name} - ${policyCopy.name} (${currentPolicy.id})`)
+                    winston.info(`Updating existing source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
                     try {
                         await sourcesApi.putProvisioningPolicy({
                             sourceId: currentTartgetSource.id,
@@ -253,39 +253,56 @@ const migrateSource = async (apiConfig, sourceJson) => {
         let createSchema = true;
 
         //Get all schemas from current target source, no way to filter on specific schemas by type/name
-        let currentTargetSchemaResponse;
-        currentTargetSchemaResponse = await sourcesApi.listSourceSchemas({
+        let currentTargetSchemasResponse;
+        currentTargetSchemasResponse = await sourcesApi.listSourceSchemas({
             sourceId: currentTartgetSource.id,
         });
 
-        if (currentTargetSchemaResponse) {
-            for (const currentSchema of currentTargetSchemaResponse.data) {
-                //Need to compare the names tlll we find a match
-                if (currentSchema.name === schemaCopy.name) {
-                    //Update schema itself
-                    schemaCopy.id = currentSchema.id;
-                    try {
-                        winston.info(`Updating existing source schema: ${localSource.name} - ${schemaCopy.name}`)
-                        await sourcesApi.putSourceSchema({
-                            schema: schemaCopy,
-                            schemaId: currentSchema.id,
-                            sourceId: currentTartgetSource.id
-                        });
+        if (currentTargetSchemasResponse.data) {
+            let schemaReferences = {};
+            for (const currentSchema of currentTargetSchemasResponse.data) {
+                schemaReferences[currentSchema.name] = currentSchema;
+            }
 
-                        //Update schema reference on source
-                        for (let schemaReference of localSource.schemas) {
-                            if (schemaReference.name === schemaCopy.name) {
-                                schemaReference.id = currentSchema.id;
+            //Check our references to see if we have a matching existing schema by name (type)
+            if (schemaReferences[schemaCopy.name]) {
+                //Update schema itself
+                const currentSchema = schemaReferences[schemaCopy.name];
+                schemaCopy.id = currentSchema.id;
+
+                //Any attribute schema references need to be updated as well with id
+                if (schemaCopy.attributes) {
+                    for (let schemaAttribute of schemaCopy.attributes) {
+                        if (schemaAttribute.schema) {
+                            if (schemaReferences[schemaAttribute.schema.name]) {
+                                const refSchema = schemaReferences[schemaAttribute.schema.name];
+                                schemaAttribute.schema.id = refSchema.id;
                             }
                         }
-                    } catch (error) {
-                        await handleHttpException(error);
                     }
-
-                    //Schema exists already in target, set flag
-                    createSchema = false;
-                    break;
                 }
+
+                try {
+                    winston.info(`Updating existing source schema: ${localSource.name} - ${schemaCopy.name}`)
+                    await sourcesApi.putSourceSchema({
+                        schema: schemaCopy,
+                        schemaId: currentSchema.id,
+                        sourceId: currentTartgetSource.id
+                    });
+
+                    //Update schema reference on source
+                    for (let schemaReference of localSource.schemas) {
+                        if (schemaReference.name === schemaCopy.name) {
+                            schemaReference.id = currentSchema.id;
+                        }
+                    }
+                } catch (error) {
+                    await handleHttpException(error);
+                }
+
+                //Schema exists already in target, set flag
+                createSchema = false;
+                break;
             }
         }
 
@@ -332,7 +349,18 @@ const migrateSource = async (apiConfig, sourceJson) => {
     }
 }
 
+const migrateSources = async (apiConfig) => {
+    //Only read one directory down where main source files are
+    const sourceFilePaths = walk("./build/config/SOURCE", 1);
+
+    //Iterate each source and pass it to migrateSource
+    for (const sourceFilePath of sourceFilePaths) {
+        const source = fs.readFileSync(sourceFilePath);
+        await migrateSource(apiConfig, source);
+    }
+}
+
 export {
-    exportSources, getSourceById, getSourceByName, migrateSource
+    exportSources, getSourceById, getSourceByName, migrateSource, migrateSources
 };
 
