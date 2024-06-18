@@ -18,7 +18,7 @@ const handleHttpException = async (e) => {
     if (e.response) {
         winston.error(clc.red(`Error while executing request:\nPath: ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
     } else {
-        winston.error(clc.red(`Generic while executing request:\n${e.request.path}\n${e.message}`));
+        winston.error(clc.red(`Generic while executing request: ${e.message}`));
     }
 }
 
@@ -94,7 +94,7 @@ const checkExportStatus = async (spConfigApi, jobId, timeout = 500) => {
                         winston.info("SP-Config export completed");
                         resolve(response);
                     } else if (response.data.status == "IN_PROGRESS") {
-                        winston.info(clc.green("Export job [" + jobId + "] still in progress..."));
+                        winston.info("SP-Config Export job [" + jobId + "] still in progress...");
                         setTimeout(wait, timeout);
                     } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
                         winston.error(response.data);

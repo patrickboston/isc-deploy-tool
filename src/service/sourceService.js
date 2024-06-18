@@ -127,6 +127,10 @@ const migrateSource = async (apiConfig, sourceJson) => {
     if (!currentTartgetSource) {
         winston.info(`Creating new source: ${localSource.name}`);
         const csvSource = localSource.type === "Delimited File";
+
+        //Remove accountCorrelationConfig on create since we have no way of finding the reference
+        _.unset(localSource, "accountCorrelationConfig");
+
         try {
             const createSourceResponse = await sourcesApi.createSource({
                 source: localSource,
@@ -141,213 +145,240 @@ const migrateSource = async (apiConfig, sourceJson) => {
         winston.info(`Updating existing source: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
     }
 
-    //Correlation Config needs to be updated from target source if exists
-    if (localSource.accountCorrelationConfig && currentTartgetSource.accountCorrelationConfig) {
-        localSource.accountCorrelationConfig = currentTartgetSource.accountCorrelationConfig;
-    } else {
-        //If current source does not have correlation config set, null out on local
-        _.unset(localSource, "accountCorrelationConfig");
-    }
-
-    //TODO: Create correlation config once public API is available, uses /diana endpoint today
-    winston.warn(clc.yellow(`Correlation Config not supported as no public API is available, please set manually via UI`));
-
-    //Attribute sync config
-    const betaSourcesApi = new SourcesBetaApi(apiConfig);
-    const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
-    for (const localAttrSyncFile of localAttrSyncFiles) {
-        let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
-        _.set(attrSyncCopy, "source.name", currentTartgetSource.id);
-
-        //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
-        if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
-            try {
-                winston.info(`Updating source attribute sync config`)
-                await betaSourcesApi.putSourceAttrSyncConfig({
-                    id: currentTartgetSource.id,
-                    attrSyncSourceConfigBeta: attrSyncCopy
-                });
-            } catch (error) {
-                await handleHttpException(error);
-            }
-        }
-    }
-
-    //Update all rule references
-    const rules = await getAllRules(apiConfig);
-
-    for (const ruleReferenceName of ruleReferenceNames) {
-        if (_.get(localSource, ruleReferenceName)) {
-            let ruleRef = _.get(localSource, ruleReferenceName);
-            winston.info(ruleRef);
-
-            for (const rule of rules) {
-                if (rule.self.name === ruleRef.name) {
-                    ruleRef.id = rule.self.id;
-
-                    winston.info(ruleRef);
-                    _.set(localSource, ruleReferenceName, ruleRef);
-                }
-            }
-        }
-    }
-
-    //Create/Update all Provisioning Policies
-    const localPolicyFiles = walk(`./build/config/SOURCE/${localSource.name}/PROVISIONING_POLICY`);
-    for (const localPolicyFile of localPolicyFiles) {
-        let policyCopy = JSON.parse(fs.readFileSync(localPolicyFile, { encoding: "utf8" }));
-        let createPolicy = true;
-
-        //Get all policies from current target source
-        let currentTargetPolicyResponse;
-        currentTargetPolicyResponse = await sourcesApi.listProvisioningPolicies({
-            sourceId: currentTartgetSource.id,
-        });
-
-        if (currentTargetPolicyResponse) {
-            for (const currentPolicy of currentTargetPolicyResponse.data) {
-                //Need to compare the names till we find a match
-                if (currentPolicy.name === policyCopy.name && currentPolicy.usageType === policyCopy.usageType) {
-                    //Update policy itself
-                    winston.info(`Updating existing source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
-                    try {
-                        await sourcesApi.putProvisioningPolicy({
-                            sourceId: currentTartgetSource.id,
-                            usageType: currentPolicy.usageType,
-                            provisioningPolicyDto: policyCopy
-                        });
-                    } catch (error) {
-                        await handleHttpException(error);
-                    }
-
-                    //Schema exists already in target, set flag
-                    createPolicy = false;
-                    break;
-                }
-            }
+    //A source needs to exist to perform all the updates properly
+    if (currentTartgetSource) {
+        //Correlation Config needs to be updated from target source if exists
+        if (localSource.accountCorrelationConfig && currentTartgetSource.accountCorrelationConfig) {
+            localSource.accountCorrelationConfig = currentTartgetSource.accountCorrelationConfig;
+        } else {
+            //If current source does not have correlation config set, null out on local
+            _.unset(localSource, "accountCorrelationConfig");
         }
 
-        //Only create if it wasn't found in the target
-        if (createPolicy) {
-            winston.info(`Creating new source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
-            try {
-                await sourcesApi.createProvisioningPolicy({
-                    sourceId: currentTartgetSource.id,
-                    provisioningPolicyDto: policyCopy
-                });
-            } catch (error) {
-                await handleHttpException(error);
-            }
-        }
-    }
+        //TODO: Create correlation config once public API is available, uses /diana endpoint today
+        winston.warn(clc.yellow(`Correlation Config not supported as no public API is available, please set manually via UI`));
 
-    /*
-     * Get all local schema templates and iterate them, check and see if there is a matching current
-     * schema in the deployed target source. If found, update it with a PUT, if not found, create a new
-     * schema. Also need to update the schema reference ID in the source itself as we update the referenced
-     * schema object
-    */
-    const localSchemaFiles = walk(`./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
-    for (const localSchemaFile of localSchemaFiles) {
-        let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
-        let createSchema = true;
+        //Attribute sync config
+        const betaSourcesApi = new SourcesBetaApi(apiConfig);
+        const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
+        for (const localAttrSyncFile of localAttrSyncFiles) {
+            let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
+            _.set(attrSyncCopy, "source.name", currentTartgetSource.id);
 
-        //Get all schemas from current target source, no way to filter on specific schemas by type/name
-        let currentTargetSchemasResponse;
-        currentTargetSchemasResponse = await sourcesApi.listSourceSchemas({
-            sourceId: currentTartgetSource.id,
-        });
-
-        if (currentTargetSchemasResponse.data) {
-            let schemaReferences = {};
-            for (const currentSchema of currentTargetSchemasResponse.data) {
-                schemaReferences[currentSchema.name] = currentSchema;
-            }
-
-            //Check our references to see if we have a matching existing schema by name (type)
-            if (schemaReferences[schemaCopy.name]) {
-                //Update schema itself
-                const currentSchema = schemaReferences[schemaCopy.name];
-                schemaCopy.id = currentSchema.id;
-
-                //Any attribute schema references need to be updated as well with id
-                if (schemaCopy.attributes) {
-                    for (let schemaAttribute of schemaCopy.attributes) {
-                        if (schemaAttribute.schema) {
-                            if (schemaReferences[schemaAttribute.schema.name]) {
-                                const refSchema = schemaReferences[schemaAttribute.schema.name];
-                                schemaAttribute.schema.id = refSchema.id;
-                            }
-                        }
-                    }
-                }
-
+            //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
+            if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
                 try {
-                    winston.info(`Updating existing source schema: ${localSource.name} - ${schemaCopy.name}`)
-                    await sourcesApi.putSourceSchema({
-                        schema: schemaCopy,
-                        schemaId: currentSchema.id,
-                        sourceId: currentTartgetSource.id
+                    winston.info(`Updating source attribute sync config`)
+                    await betaSourcesApi.putSourceAttrSyncConfig({
+                        id: currentTartgetSource.id,
+                        attrSyncSourceConfigBeta: attrSyncCopy
                     });
-
-                    //Update schema reference on source
-                    for (let schemaReference of localSource.schemas) {
-                        if (schemaReference.name === schemaCopy.name) {
-                            schemaReference.id = currentSchema.id;
-                        }
-                    }
                 } catch (error) {
                     await handleHttpException(error);
                 }
-
-                //Schema exists already in target, set flag
-                createSchema = false;
-                break;
             }
         }
 
-        //Only create if it wasn't found in the target
-        if (createSchema) {
-            winston.info(`Creating new source schema: ${localSource.name} - ${schemaCopy.name}`)
-            try {
-                const createSchemaResponse = await sourcesApi.createSourceSchema({
-                    schema: schemaCopy,
-                    sourceId: currentTartgetSource.id
-                });
+        //Update all rule references
+        const rules = await getAllRules(apiConfig);
 
-                //Add schema reference on source for new schema
-                const schemaRef = {
-                    type: CONNECTOR_SCHEMA,
-                    name: schemaCopy.name,
-                    id: createSchemaResponse.data.id
-                };
+        for (const ruleReferenceName of ruleReferenceNames) {
+            if (_.get(localSource, ruleReferenceName)) {
+                let ruleRef = _.get(localSource, ruleReferenceName);
+                winston.info(ruleRef);
 
-                let currentSchemas = localSource.schemas;
-                currentSchemas.push(schemaRef);
-                localSource.schemas = currentSchemas;
-            } catch (error) {
-                await handleHttpException(error);
+                for (const rule of rules) {
+                    if (rule.self.name === ruleRef.name) {
+                        ruleRef.id = rule.self.id;
+
+                        winston.info(ruleRef);
+                        _.set(localSource, ruleReferenceName, ruleRef);
+                    }
+                }
             }
         }
-    }
 
-    //Restore attributes from the currently deployed target source into our template source
-    for (const sourceKey of existingAttributeToKeep) {
-        _.set(localSource, sourceKey, _.get(currentTartgetSource, sourceKey));
-    }
+        //Create/Update all Provisioning Policies
+        const localPolicyFiles = walk(`./build/config/SOURCE/${localSource.name}/PROVISIONING_POLICY`);
+        for (const localPolicyFile of localPolicyFiles) {
+            let policyCopy = JSON.parse(fs.readFileSync(localPolicyFile, { encoding: "utf8" }));
+            let createPolicy = true;
 
-    //Update the source with all config, references, etc.
-    winston.info(`Updating existing source: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
-    winston.debug(JSON.stringify(localSource, null, 4));
-    try {
-        await sourcesApi.putSource({
-            id: localSource.id,
-            source: localSource
-        });
-    } catch (error) {
-        await handleHttpException(error);
+            //Get all policies from current target source
+            let currentTargetPolicyResponse;
+            currentTargetPolicyResponse = await sourcesApi.listProvisioningPolicies({
+                sourceId: currentTartgetSource.id,
+            });
+
+            if (currentTargetPolicyResponse) {
+                for (const currentPolicy of currentTargetPolicyResponse.data) {
+                    //Need to compare the names till we find a match
+                    if (currentPolicy.name === policyCopy.name && currentPolicy.usageType === policyCopy.usageType) {
+                        //Update policy itself
+                        winston.info(`Updating existing source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
+                        try {
+                            await sourcesApi.putProvisioningPolicy({
+                                sourceId: currentTartgetSource.id,
+                                usageType: currentPolicy.usageType,
+                                provisioningPolicyDto: policyCopy
+                            });
+                        } catch (error) {
+                            await handleHttpException(error);
+                        }
+
+                        //Schema exists already in target, set flag
+                        createPolicy = false;
+                        break;
+                    }
+                }
+            }
+
+            //Only create if it wasn't found in the target
+            if (createPolicy) {
+                winston.info(`Creating new source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
+                try {
+                    await sourcesApi.createProvisioningPolicy({
+                        sourceId: currentTartgetSource.id,
+                        provisioningPolicyDto: policyCopy
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
+                }
+            }
+        }
+
+        /*
+         * Get all local schema templates and iterate them, check and see if there is a matching current
+         * schema in the deployed target source. If found, update it with a PUT, if not found, create a new
+         * schema. Also need to update the schema reference ID in the source itself as we update the referenced
+         * schema object
+        */
+        //TODO: if a schema attribute has a reference to another schema, skip that and import others and come back to ones with references
+        const localSchemaFiles = walk(`./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
+        if (localSchemaFiles) {
+            let schemaFilesToProcessLater = [];
+
+            // Get all schemas from current target source
+            let currentTargetSchemasResponse = await sourcesApi.listSourceSchemas({
+                sourceId: currentTartgetSource.id,
+            });
+
+            let schemaReferences = {};
+            if (currentTargetSchemasResponse.data) {
+                for (const currentSchema of currentTargetSchemasResponse.data) {
+                    schemaReferences[currentSchema.name] = currentSchema;
+                }
+            }
+
+            // First pass: Process schemas without references
+            for (const localSchemaFile of localSchemaFiles) {
+                let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
+                if (schemaCopy.attributes && schemaCopy.attributes.some(attr => attr.schema)) {
+                    schemaFilesToProcessLater.push(localSchemaFile);
+                } else {
+                    const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
+                    //If there was a schema created, it will return it here to update schema refs
+                    if (res) {
+                        schemaReferences[res.name] = res;
+                    }
+                }
+            }
+
+            // Second pass: Process schemas with references
+            for (const localSchemaFile of schemaFilesToProcessLater) {
+                const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
+                //If there was a schema created, it will return it here to update schema refs
+                if (res) {
+                    schemaReferences[res.name] = res;
+                }
+            }
+        }
+
+        //Restore attributes from the currently deployed target source into our template source
+        for (const sourceKey of existingAttributeToKeep) {
+            _.set(localSource, sourceKey, _.get(currentTartgetSource, sourceKey));
+        }
+
+        //Update the source with all config, references, etc.
+        winston.info(`Updating existing source: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
+        winston.debug(JSON.stringify(localSource, null, 4));
+        try {
+            await sourcesApi.putSource({
+                id: localSource.id,
+                source: localSource
+            });
+        } catch (error) {
+            await handleHttpException(error);
+        }
+    } else {
+        winston.error(`Source [${localSource.name}] does not exist and did not get created properly in the target tenant. Schemas, policies, etc. cannot be processed`)
     }
 }
+
+
+const processSchema = async (api, localSource, currentTartgetSource, localSchemaFile, schemaReferences) => {
+    let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
+    let createSchema = true;
+
+    if (schemaReferences[schemaCopy.name]) {
+        const currentSchema = schemaReferences[schemaCopy.name];
+        schemaCopy.id = currentSchema.id;
+
+        if (schemaCopy.attributes) {
+            for (let schemaAttribute of schemaCopy.attributes) {
+                if (schemaAttribute.schema) {
+                    if (schemaReferences[schemaAttribute.schema.name]) {
+                        const refSchema = schemaReferences[schemaAttribute.schema.name];
+                        schemaAttribute.schema.id = refSchema.id;
+                    }
+                }
+            }
+        }
+
+        winston.info(`Updating existing source schema: ${localSource.name} - ${schemaCopy.name}`);
+        try {
+            await api.putSourceSchema({
+                schema: schemaCopy,
+                schemaId: currentSchema.id,
+                sourceId: currentTartgetSource.id
+            });
+
+            for (let schemaReference of localSource.schemas) {
+                if (schemaReference.name === schemaCopy.name) {
+                    schemaReference.id = currentSchema.id;
+                }
+            }
+        } catch (error) {
+            await handleHttpException(error);
+        }
+
+        createSchema = false;
+    }
+
+    if (createSchema) {
+        winston.info(`Creating new source schema: ${localSource.name} - ${schemaCopy.name}`);
+        try {
+            const createSchemaResponse = await api.createSourceSchema({
+                schema: schemaCopy,
+                sourceId: currentTartgetSource.id
+            });
+
+            const schemaRef = {
+                type: CONNECTOR_SCHEMA,
+                name: schemaCopy.name,
+                id: createSchemaResponse.data.id
+            };
+
+            let currentSchemas = localSource.schemas;
+            currentSchemas.push(schemaRef);
+            localSource.schemas = currentSchemas;
+            return createSchemaResponse.data;
+        } catch (error) {
+            await handleHttpException(error);
+        }
+    }
+}
+
 
 const migrateSources = async (apiConfig) => {
     //Only read one directory down where main source files are

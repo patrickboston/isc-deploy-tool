@@ -52,8 +52,6 @@ let {
     log_level: logLevel
 } = nodeArgs;
 
-//console.log(log_level);
-
 //Logger
 const logFormat = winston.format.printf(({ level, message, label, timestamp }) => {
     return `${timestamp} [${level}]: ${message}`;
