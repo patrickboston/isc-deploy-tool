@@ -9,7 +9,7 @@ import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityA
 import { exportGovernanceGroups, migrateGovernanceGroup } from "./service/identityUtil.js";
 import { exportNotificationTemplates, migrateNotificationTemplate } from "./service/notificationUtil.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
-import { exportTransforms, migrateTransform } from "./service/transformUtil.js";
+import { exportTransforms, migrateTransforms } from "./service/transformUtil.js";
 import { exportWorkflows, migrateWorkflow } from "./service/workflowUtil.js";
 import { buildObjectsForEnvironment, reverseTokenize, runExport } from "./util.js";
 
@@ -166,6 +166,7 @@ if (isDeploy) {
      * 7. Workflow
     */
 
+    await migrateTransforms(targetApiConfig);
     await migrateSources(targetApiConfig);
 
     /*********************** TESTING *******************************/

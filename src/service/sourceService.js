@@ -378,6 +378,7 @@ const processSchema = async (api, localSource, currentTartgetSource, localSchema
 
 
 const migrateSources = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Source Deployment"));
     //Only read one directory down where main source files are
     const sourceFilePaths = walk("./build/config/SOURCE", 1);
 
