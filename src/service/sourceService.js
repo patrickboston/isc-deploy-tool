@@ -185,13 +185,10 @@ const migrateSource = async (apiConfig, sourceJson) => {
         for (const ruleReferenceName of ruleReferenceNames) {
             if (_.get(localSource, ruleReferenceName)) {
                 let ruleRef = _.get(localSource, ruleReferenceName);
-                winston.info(ruleRef);
 
                 for (const rule of rules) {
                     if (rule.self.name === ruleRef.name) {
                         ruleRef.id = rule.self.id;
-
-                        winston.info(ruleRef);
                         _.set(localSource, ruleReferenceName, ruleRef);
                     }
                 }
