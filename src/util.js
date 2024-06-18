@@ -16,13 +16,13 @@ const sleep = (ms) => {
 */
 const handleHttpException = async (e) => {
     if (e.response) {
-        winston.error(clc.red(`Error while executing request:\nPath: ${e.request.path}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+        winston.error(clc.red(`Error while executing request:\nPath: ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
     } else {
         winston.error(clc.red(`Generic while executing request:\n${e.request.path}\n${e.message}`));
     }
 }
 
-function walk(dir, files = []) {
+function walk(dir, maxDepth = -1, currentDepth = 0, files = []) {
     // Get an array of all files and directories in the passed directory using fs.readdirSync
     if (fs.existsSync(dir)) {
         const fileList = fs.readdirSync(dir);
@@ -31,13 +31,17 @@ function walk(dir, files = []) {
             const name = `${dir}/${file}`;
             // Check if the current file/directory is a directory using fs.statSync
             if (fs.statSync(name).isDirectory()) {
-                // If it is a directory, recursively call the getFiles function with the directory path and the files array
-                walk(name, files);
+                if (maxDepth === -1 || currentDepth < maxDepth) {
+                    // If it is a directory and we haven't reached max depth, recursively call the walk function
+                    walk(name, maxDepth, currentDepth + 1, files);
+                }
             } else {
                 // If it is a file, push the full path to the files array
                 files.push(name);
             }
         }
+    } else {
+        winston.warn(clc.yellow(`Directory [${dir}] does not exist`));
     }
     return files;
 }
