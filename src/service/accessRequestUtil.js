@@ -1,11 +1,13 @@
+import clc from "cli-color";
 import { AccessRequestsApi } from "sailpoint-api-client";
+import winston from "winston";
 import { handleHttpException, writeConfigFile } from "../util.js";
 import { getGovGroupById, getGovGroupByName, getIdentityByAlias, getIdentityById } from "./identityUtil.js";
-import winston from "winston";
 
 const ACCESS_REQUEST_CONFIG = "ACCESS_REQUEST_CONFIG";
 
 const exportAccessRequestConfig = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Access Request Configuration Export"));
     const accessRequestApi = new AccessRequestsApi(apiConfig);
     const accessRequestConfigResponse = await accessRequestApi.getAccessRequestConfig();
     let accessRequestConfig = accessRequestConfigResponse.data;
@@ -71,3 +73,4 @@ export {
     exportAccessRequestConfig,
     updateAccessRequestConfig
 };
+

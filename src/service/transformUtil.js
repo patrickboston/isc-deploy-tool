@@ -11,10 +11,15 @@ const existingAttributeToKeep = [
 ];
 
 const exportTransforms = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Transform Export"));
     const transformsApi = new TransformsApi(apiConfig);
-    const transforms = await Paginator.paginate(transformsApi, transformsApi.listTransforms({ filters: "internal eq false" }), { limit: 1000 }, 250);
+    const transforms = await Paginator.paginate(transformsApi, transformsApi.listTransforms, { limit: 1000 }, 250);
     for (const transform of transforms.data) {
-        writeConfigFile(TRANSFORM, transform.name, transform);
+        //Doesn't seem to be a way to provide filters to paginated call, so doing this for now
+        if (!transform.internal) {
+            winston.info(`Exporting Transform: ${transform.name} (${transform.id})`);
+            writeConfigFile(TRANSFORM, transform.name, transform);
+        }
     }
 }
 

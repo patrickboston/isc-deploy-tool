@@ -25,18 +25,19 @@ const lifecycleStateExistingAttributeToKeep = [
 * @param {Configuration} apiConfig
 */
 const exportIdentityAttributeConfig = async (apiConfig) => {
-    winston.info(clc.bgBlueBright("Performing Identity Object Config export"));
+    winston.info(clc.bgBlueBright("Starting Identity Attribute Configuration Export"));
     const identityAttributesApi = new IdentityAttributesBetaApi(apiConfig);
     const identityAttributeConfig = await identityAttributesApi.listIdentityAttributes();
     writeConfigFile(IDENTITY_OBJECT_CONFIG, IDENTITY_OBJECT_CONFIG, identityAttributeConfig.data);
 };
 
 const exportIdentityProfiles = async (apiConfig) => {
-    winston.info(clc.bgBlueBright("Performing Identity Profiles export"));
+    winston.info(clc.bgBlueBright("Starting Identity Profile Export"));
     const identityProfilesApi = new IdentityProfilesApi(apiConfig);
     const lifecycleStatesApi = new LifecycleStatesApi(apiConfig);
     const identityProfiles = await identityProfilesApi.exportIdentityProfiles();
     for (let profile of identityProfiles.data) {
+        winston.info(`Exporting Identity Profile: ${profile.self.name} (${profile.self.id})`);
         //Update owner to alias for lookup when migrating, default IDN Admin won't have owner
         if (profile.object.owner) {
             const owner = await getIdentityById(apiConfig, profile.object.owner.id);

@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 import axiosRetry from "axios-retry";
 import clc from "cli-color";
-import * as fs from "fs";
 import { Configuration } from "sailpoint-api-client";
-import winston from "winston"
-import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestUtil.js";
-import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfile } from "./service/identityConfigService.js";
-import { exportGovernanceGroups, migrateGovernanceGroup } from "./service/identityUtil.js";
-import { exportNotificationTemplates, migrateNotificationTemplate } from "./service/notificationUtil.js";
+import winston from "winston";
+import { exportAccessRequestConfig } from "./service/accessRequestUtil.js";
+import { exportIdentityAttributeConfig, exportIdentityProfiles } from "./service/identityConfigService.js";
+import { exportGovernanceGroups } from "./service/identityUtil.js";
+import { exportNotificationTemplates } from "./service/notificationUtil.js";
+import { exportRules } from "./service/ruleUtil.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
 import { exportTransforms, migrateTransforms } from "./service/transformUtil.js";
-import { exportWorkflows, migrateWorkflow } from "./service/workflowUtil.js";
+import { exportWorkflows } from "./service/workflowUtil.js";
 import { buildObjectsForEnvironment, reverseTokenize, runExport } from "./util.js";
 
 const results = [];
@@ -76,18 +76,18 @@ targetEnvName = targetEnvName && targetEnvName.toLowerCase();
 winston.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
 
 //Check export params
-if (isExport && (!srcEnvName)) {
+if (isExport && !srcEnvName) {
     winston.error(clc.bgRed("FAILED: --src_env argument is required for export but was not supplied, exiting"));
     process.exit(1);
-} else {
+} else if (isExport) {
     winston.info(clc.bgMagentaBright(`Running with src_env: ${srcEnvName}`));
 }
 
 //Check build params
-if (isBuild && (!targetEnvName)) {
+if (isBuild && !targetEnvName) {
     winston.error(clc.bgRed("FAILED: --target_env argument is required for build but was not supplied, exiting"));
     process.exit(1);
-} else {
+} else if (isBuild) {
     winston.info(clc.bgMagentaBright(`Running build with target_env: ${targetEnvName}`));
 }
 
@@ -95,7 +95,7 @@ if (isBuild && (!targetEnvName)) {
 if (isDeploy && (!targetEnvName)) {
     winston.error(clc.bgRed("FAILED: --target_env argument is required for deploy but was not supplied, exiting"));
     process.exit(1);
-} else {
+} else if (isDeploy) {
     winston.info(clc.bgMagentaBright(`Running deploy with target_env: ${targetEnvName}`));
 }
 

@@ -1,7 +1,8 @@
+import clc from "cli-color";
 import * as fs from "fs";
+import winston from "winston";
 import { writeConfigFile } from "../util.js";
 import { runExport } from "./../util.js";
-import winston from "winston";
 
 const RULE = "RULE";
 let ruleCache;
@@ -25,8 +26,10 @@ const getAllRules = async (apiConfig) => {
 }
 
 const exportRules = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Rule Export"));
     const rules = await getAllRules(apiConfig);
     for (const rule of rules) {
+        winston.info(`Exporting Rule: ${rule.self.name} (${rule.self.id})`);
         writeConfigFile(RULE, rule.self.name, rule);
 
         //Write separate txt file with source code for easy reference
@@ -39,3 +42,4 @@ const exportRules = async (apiConfig) => {
 export {
     exportRules, getAllRules
 };
+

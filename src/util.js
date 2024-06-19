@@ -132,7 +132,7 @@ const runExport = async (apiConfig, exportConfig) => {
 }
 
 const reverseTokenize = async () => {
-    winston.info(clc.bgBlueBright("Performing reverse tokenization"));
+    winston.info(clc.bgBlueBright("Starting Reverse Tokenization"));
     return new Promise((resolve, reject) => {
         if (!reverseTokens) reject("No tokens to process")
 
@@ -160,9 +160,9 @@ const reverseTokenize = async () => {
                         //Convert the JSONPath pointer to make it actual JavaScript dot notation
                         let correctPointer = results[0].pointer.replaceAll("/", ".").substring(1);
                         _.set(json, correctPointer, tokenValue);
-                        winston.info(clc.bgGreen(`JSONPath match found, replacing value with token: ${tokenValue}`));
+                        winston.info(clc.green(`JSONPath match found in file [${fileLocation}], replacing environment value with token: ${tokenValue}`));
                     } else {
-                        winston.warn(clc.yellow("Could not find JSON element for path: " + jPath));
+                        winston.warn(clc.yellow(`Could not find JSON element in file [${fileLocation}] for path: ` + jPath));
                     }
                 });
 
@@ -176,7 +176,6 @@ const reverseTokenize = async () => {
                 }
             }
         });
-        winston.info(clc.bgGreenBright("Reverse tokenization complete"));
         resolve("Reverse tokenization complete");
     })
 }
@@ -273,7 +272,7 @@ const getImportResult = async (spConfigApi, jobId) => {
 
 const runDeploy = async (apiConfig, importData) => {
     return new Promise((resolve, reject) => {
-        winston.info(clc.bgBlueBright("Performing tenant deployment"));
+        winston.info(clc.bgBlueBright("Starting SP-Config Import"));
         let spConfigApi = new SPConfigBetaApi(apiConfig);
 
         spConfigApi.importSpConfig({ data: importData }).then((response) => {

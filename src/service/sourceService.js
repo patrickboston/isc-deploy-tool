@@ -56,20 +56,20 @@ const getSourceById = async (apiConfig, sourceId) => {
 * @param {Configuration} apiConfig
 */
 const exportSources = async (apiConfig) => {
-    winston.info(clc.bgBlueBright("Performing Source export"));
+    winston.info(clc.bgBlueBright("Starting Source Export"));
     const sourcesApi = new SourcesApi(apiConfig);
 
     const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSources, { limit: 1000 }, 250);
     for (const source of sources.data) {
         //Clone for modifications
         let sourceClone = structuredClone(source);
-
         const sourceName = source.name;
-        winston.info(clc.bgCyan(`Processing export for source: ${sourceName}`));
+        winston.info(`Exporting Source: ${source.name} (${source.id})`);
 
         //Get and write referenced schemas on source
         const sourceSchemas = await sourcesApi.listSourceSchemas({ sourceId: source.id });
         for (const schema of sourceSchemas.data) {
+            winston.info(`Exporting schema for source: ${sourceName} - ${schema.name}`);
             writeConfigFile(CONNECTOR_SCHEMA, schema.name, schema, `SOURCE/${sourceName}/CONNECTOR_SCHEMA`);
         }
 
@@ -77,6 +77,7 @@ const exportSources = async (apiConfig) => {
         const sourcePolicies = await sourcesApi.listProvisioningPolicies({ sourceId: source.id });
         for (const policy of sourcePolicies.data) {
             const policyFileName = policy.name + "_" + policy.usageType;
+            winston.info(`Exporting policy for source: ${sourceName} - ${policy.name} (${policy.usageType})`);
             writeConfigFile(PROVISIONING_POLICY, policyFileName, policy, `SOURCE/${sourceName}/PROVISIONING_POLICY`);
         }
 
@@ -84,6 +85,7 @@ const exportSources = async (apiConfig) => {
         const betaSourcesApi = new SourcesBetaApi(apiConfig);
         const attrSyncConfigResponse = await betaSourcesApi.getSourceAttrSyncConfig({ id: source.id });
         if (attrSyncConfigResponse.data) {
+            winston.info(`Exporting attribute sync config for source: ${sourceName}`);
             const attrSyncFileName = sourceName + "_ATTR_SYNC";
             writeConfigFile(ATTR_SYNC_SOURCE_CONFIG, attrSyncFileName, attrSyncConfigResponse.data, `SOURCE/${sourceName}/${ATTR_SYNC_SOURCE_CONFIG}`);
         }
