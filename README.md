@@ -157,6 +157,10 @@ When lifecycle states are exported, access profile and source ID references will
 - When workflows are being updated via the deployment process, if they are enabled, they will be temporarily disabled (1-2s) to perform the update, and then the enabled status defined in the workflow in the repository will be the final state the workflow ends up in. It will not be automatically enabled after update just because it was already enabled before we updated it with the pipeline.
 - If your workflow has any secrets stored in it such as OAuth client secrets, when the workflow is saved via the UI, those secrets are encrypted and referenced via a special syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`). If you tokenize the actual secret values in your token files to be deployed, when you run the workflow it will error our saying the secret is not stored in the correct format as the secret with no be converted over to the other special encrypted format mentioned above until the workflow is saved from the UI again. To circumvent this, tokenize the special encrypted secret syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`), or after deployments you must go save the workflow in the UI again.
 
+### Transforms
+- During the export process, only non-internal (`"internal": false`) transforms are exported since internal transforms (maintained by SailPoint) cannot be changed
+- If you are changing the `type` of a transform where that transform is already deployed to a target environment, the import will fail indicating that you cannot change the type. You must delete the transform in the target environment before you can be deployed with the name type, or else create a new transform with a different name and update all references
+
 ### Deleting Objects
 There are two scenarios to consider when deleting objects:
 - When objects are deleted directly inside of a tenant, they must also be removed in your build directory/repository because the export process does not consider cleaning up objects that may have been deleted in a tenant. If not cleaned up, they may be re-deployed inadvertently
