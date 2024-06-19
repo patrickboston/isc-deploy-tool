@@ -20,9 +20,7 @@ const exportTransforms = async (apiConfig) => {
 
 const migrateTransform = async (apiConfig, transformJson) => {
     const transformApi = new TransformsApi(apiConfig);
-
     let localTransform = JSON.parse(transformJson);
-    winston.info((`Migrating transform: ${localTransform.name}`));
 
     //Check and see if a transform with this name already exists in the target environment
     const currentTransformResponse = await transformApi.listTransforms({
