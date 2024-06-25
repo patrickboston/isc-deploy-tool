@@ -81,7 +81,9 @@ const writeConfigFile = (objectType, objectName, object, overrideDir = null) => 
 
     //Write JSON file for object, replace characters not allowed in file names with dash
     let fileName = dir + "/" + objectName.replace(/[/\\?%*:|"<>]/g, '-') + ".json";
-    let omittedObj = deepOmit(object);
+
+    //Rule objects cannot be modified at all or else the signature validation fails, so don't omit from them
+    let omittedObj = objectType !== "RULE" ? deepOmit(object) : object;
     fs.writeFileSync(fileName, JSON.stringify(omittedObj, null, 4));
 }
 
@@ -181,7 +183,7 @@ const reverseTokenize = async () => {
 }
 
 const buildObjectsForEnvironment = async (env) => {
-    winston.info(clc.bgBlueBright(`Tokenizing objects for target environment: ${env}`))
+    winston.info(clc.bgBlueBright(`Starting object tokenization for target environment: ${env}`))
     const envTokenFileName = "./../" + env + ".target.js";
     const { default: envTokens } = await import(envTokenFileName);
 
@@ -200,7 +202,7 @@ const buildObjectsForEnvironment = async (env) => {
                 const [tokenName, tokenValue] = token;
                 const matches = fileSource.match(tokenName);
                 if (matches) {
-                    winston.info(clc.bgGreen(`${matches.length} occurence(s) of token name [${tokenName}] found in file [${fileName}]`));
+                    winston.info(clc.green(`${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`));
                 }
                 fileSource = fileSource.replaceAll(tokenName, tokenValue);
             });
@@ -217,74 +219,92 @@ const buildObjectsForEnvironment = async (env) => {
     });
 }
 
-const buildDeploymentFile = () => {
+const buildSpConfigDeploymentFile = async (directoryToBuildFrom = "./build/config/") => {
     try {
-        if (!fs.existsSync("./build/config/")) {
-            throw new Error("./build/config directory does not exist, no objects to deploy");
+        if (!fs.existsSync(directoryToBuildFrom)) {
+            throw new Error(`${directoryToBuildFrom} directory does not exist, no objects to deploy`);
         }
 
         let objectArray = [];
-        const configFileNames = walk('./build/config');
-        configFileNames.forEach((fileName) => {
+        const configFileNames = walk(directoryToBuildFrom);
+        for (const fileName of configFileNames) {
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
-            winston.info(`Including file ${fileName} for deployment`);
+            winston.debug(`Including file ${fileName} for SP-Config deployment file`);
             const objectJson = JSON.parse(fileSource);
             objectArray.push(objectJson);
-        });
+        }
         const deploymentObj = {
             objects: objectArray
         };
-        fs.writeFileSync("./build/deploy.json", JSON.stringify(deploymentObj, null, 4));
+        winston.debug(`Writing SP-Config import file to ${directoryToBuildFrom}`);
+        fs.writeFileSync(`${directoryToBuildFrom}/sp-config-deploy.json`, JSON.stringify(deploymentObj, null, 4));
         return deploymentObj;
     } catch (error) {
         throw new Error(error);
     }
 }
 
-const checkImportStatus = async (spConfigApi, jobId, timeout = 10000) => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            (async function wait() {
-                spConfigApi.getSpConfigImportStatus({ id: jobId }).then((response) => {
-                    if (response.data.status == "COMPLETE") {
-                        winston.info("SP-Config import completed");
-                        resolve(response);
-                    } else if (response.data.status == "IN_PROGRESS") {
-                        winston.info(clc.green("Import job [" + jobId + "] still in progress..."));
-                        setTimeout(wait, 100);
-                    } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
-                        resolve(clc.red("Import job [" + jobId + "] has been cancelled or failed!"));
-                    }
-                });
-            })();
-        }, 3000);
+const runSpConfigImport = async (apiConfig, importObj) => {
+    winston.info(clc.bgBlueBright("Starting SP-Config Import"));
+    let spConfigApi = new SPConfigBetaApi(apiConfig);
+
+    const jsonString = JSON.stringify(importObj);
+    const blobPayload = new Blob([jsonString], {
+        type: 'application/json'
     });
-}
 
-const getImportResult = async (spConfigApi, jobId) => {
-    return new Promise((resolve) => {
-        spConfigApi.getSpConfigImport({ id: jobId }).then((response) => {
-            const result = response.data;
-            resolve(result);
-        });
-    });
-}
+    let jobId;
+    try {
+        const startImportResponse = await spConfigApi.importSpConfig({ data: blobPayload });
+        jobId = startImportResponse.data.jobId;
+        winston.debug(`SP-Config jobId: ${jobId}`);
+    } catch (error) {
+        handleHttpException(error);
+        return; // Exit if the jobId cannot be retrieved
+    }
 
-const runDeploy = async (apiConfig, importData) => {
-    return new Promise((resolve, reject) => {
-        winston.info(clc.bgBlueBright("Starting SP-Config Import"));
-        let spConfigApi = new SPConfigBetaApi(apiConfig);
+    //Delay function to use with async/await
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        spConfigApi.importSpConfig({ data: importData }).then((response) => {
-            const jobId = response.data.jobId;
-            checkImportStatus(spConfigApi, jobId).then((response) => {
-                resolve(getImportResult(spConfigApi, jobId));
-            })
-        });
-    });
-}
+    //Function to repeatedly check the import status
+    const checkStatus = async () => {
+        while (true) {
+            try {
+                const currentStatusResponse = await spConfigApi.getSpConfigImportStatus({ id: jobId });
+                winston.debug(`Current SP-Config import status for jobId [${jobId}]:\n${JSON.stringify(currentStatusResponse.data, null, 4)}`);
+                if (currentStatusResponse.data.status === "COMPLETE") {
+                    winston.info(clc.green("SP-Config import completed"));
+                    break;
+                } else if (currentStatusResponse.data.status === "IN_PROGRESS") {
+                    winston.info(`SP-Config import job [${jobId}] still in progress...`);
+                    await delay(2000); // Wait before checking the status again
+                } else if (currentStatusResponse.data.status === "CANCELLED" || currentStatusResponse.data.status === "FAILED") {
+                    winston.error(clc.red(`SP-Config import job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`));
+                    return;
+                }
+            } catch (error) {
+                handleHttpException(error);
+                break;
+            }
+        }
+    };
 
-export {
-    buildDeploymentFile, buildObjectsForEnvironment, deepOmit, handleHttpException, reverseTokenize, runDeploy, runExport, sleep, walk, writeConfigFile
+    //Initial delay before starting to check the status
+    await delay(2000);
+    await checkStatus();
+
+    //Continue to get result if we actually have a jobId
+    if (jobId) {
+        try {
+            const importResponse = await spConfigApi.getSpConfigImport({ id: jobId });
+            winston.debug(`SP-Config full response:\n${JSON.stringify(importResponse.data, null, 4)}`);
+            return importResponse;
+        } catch (error) {
+            handleHttpException(error);
+        }
+    }
 };
+
+
+export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, handleHttpException, reverseTokenize, runExport, runSpConfigImport, sleep, walk, writeConfigFile };
 

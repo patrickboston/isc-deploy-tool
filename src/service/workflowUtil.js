@@ -1,8 +1,9 @@
 import clc from "cli-color";
+import * as fs from "fs";
 import _ from 'lodash';
 import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
 import winston from "winston";
-import { handleHttpException, sleep, writeConfigFile } from "../util.js";
+import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
 import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
 
 const WORKFLOW = "WORKFLOW";
@@ -38,7 +39,6 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     //Using /beta/workflows here because /v3 seems to fail for no reason
     const workflowsApi = new WorkflowsBetaApi(apiConfig);
     let localWorkflow = JSON.parse(workflowJson);
-    winston.info(clc.bgBlueBright(`Migrating workflow: ${localWorkflow.name}`));
 
     //Get corresponding owner by name and add id
     const owner = await getIdentityByAlias(apiConfig, localWorkflow.owner.name);
@@ -63,7 +63,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     }
 
     if (!currentTargetWorkflow) {
-        winston.info(`Creating new workflow for: ${localWorkflow.name}`);
+        winston.info(`Creating new workflow: ${localWorkflow.name}`);
 
         //TODO: Subscription error???
         /*
@@ -124,16 +124,15 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
             await handleHttpException(error);
         }
     } else {
-        winston.info(`Found existing workflow in target environment: ${currentTargetWorkflow.name} (${currentTargetWorkflow.id})`)
-
         /*
          * If workflow is currently enabled, need to disable it before we can modify and then re-enable
          * Additionally, the repo is authoritative for whether the workflow stays enabled or not after
          * it's been modified, so we won't re-enable it if it was enabled in the target, but the repo
          * has it set as disabled
         */
+        winston.info(`Updating existing workflow: ${currentTargetWorkflow.name} (${currentTargetWorkflow.id})`)
         if (currentTargetWorkflow.enabled) {
-            winston.info("Workflow was enabled, disabling it to allow modification");
+            winston.warn("Workflow is enabled, disabling it to allow modification");
             //Patch workflow to disable so we can update
             try {
                 await workflowsApi.patchWorkflow({
@@ -171,8 +170,21 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     }
 }
 
+const migrateWorkflows = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Workflow Deployment"));
+    //Only read one directory down where main source files are
+    const workflowFilePaths = walk("./build/config/WORKFLOW");
+
+    //Iterate each workflow and pass it to migrateSource
+    for (const workflowFilePath of workflowFilePaths) {
+        const workflow = fs.readFileSync(workflowFilePath);
+        await migrateWorkflow(apiConfig, workflow);
+    }
+}
+
 export {
     exportWorkflows,
-    migrateWorkflow
+    migrateWorkflow,
+    migrateWorkflows
 };
 

@@ -1,8 +1,8 @@
 import clc from "cli-color";
 import * as fs from "fs";
 import winston from "winston";
-import { writeConfigFile } from "../util.js";
-import { runExport } from "./../util.js";
+import { runSpConfigImport, writeConfigFile } from "../util.js";
+import { runExport, walk } from "./../util.js";
 
 const RULE = "RULE";
 let ruleCache;
@@ -39,7 +39,28 @@ const exportRules = async (apiConfig) => {
     }
 }
 
+const migrateRules = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Rule Deployment"));
+
+    let rulesToDeploy = [];
+    const targetRules = await getAllRules(apiConfig);
+    const ruleFilePaths = walk("./build/config/RULE");
+
+    //Iterate each rule and look it up against all fetched rules from target env
+    for (const ruleFilePath of ruleFilePaths) {
+        let localRule = JSON.parse(fs.readFileSync(ruleFilePath));
+        rulesToDeploy.push(localRule);
+    }
+    const spConfigImportObject = {
+        objects: rulesToDeploy
+    };
+    const ruleImportResponse = await runSpConfigImport(apiConfig, spConfigImportObject);
+    if (ruleImportResponse.data && ruleImportResponse.data.results.RULE.errors.length > 0) {
+        winston.error(clc.red(`Error import rules via SP-Config:\n${JSON.stringify(ruleImportResponse.data.results.RULE.errors, null, 4)}`))
+    }
+}
+
 export {
-    exportRules, getAllRules
+    exportRules, getAllRules, migrateRules
 };
 

@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 import axiosRetry from "axios-retry";
 import clc from "cli-color";
+import * as fs from "fs";
 import { Configuration } from "sailpoint-api-client";
 import winston from "winston";
 import { exportAccessRequestConfig } from "./service/accessRequestUtil.js";
-import { exportIdentityAttributeConfig, exportIdentityProfiles } from "./service/identityConfigService.js";
+import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfiles } from "./service/identityConfigService.js";
 import { exportGovernanceGroups } from "./service/identityUtil.js";
 import { exportNotificationTemplates } from "./service/notificationUtil.js";
-import { exportRules } from "./service/ruleUtil.js";
+import { exportRules, migrateRules } from "./service/ruleUtil.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
 import { exportTransforms, migrateTransforms } from "./service/transformUtil.js";
-import { exportWorkflows } from "./service/workflowUtil.js";
+import { exportWorkflows, migrateWorkflows } from "./service/workflowUtil.js";
 import { buildObjectsForEnvironment, reverseTokenize, runExport } from "./util.js";
 
 const results = [];
@@ -99,6 +100,9 @@ if (isDeploy && (!targetEnvName)) {
     winston.info(clc.bgMagentaBright(`Running deploy with target_env: ${targetEnvName}`));
 }
 
+//Cleanup build directory
+fs.rmSync("./build", { recursive: true, force: true });
+
 //Perform export setup and process
 if (isExport) {
     //Set up config based on envirnments
@@ -147,12 +151,20 @@ if (isDeploy) {
     let targetApiConfig = new Configuration(targetEnvParams);
     targetApiConfig.retriesConfig = {
         retries: 2,
-        retryDelay: axiosRetry.exponentialDelay,
+        retryDelay: (retryCount) => {
+            console.log(`retry attempt: ${retryCount}`);
+            return retryCount * 20000;
+        },
         onRetry(retryCount, error, requestConfig) {
             winston.warn(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
-        }
+        },
+        retryCondition: (error) => {
+            // here is your mistake. check for error config you want to retry
+            return error.response.status === 429;
+        },
     }
     
+    //Perform tokenization
     await buildObjectsForEnvironment(targetEnvName);
 
     /**
@@ -166,8 +178,12 @@ if (isDeploy) {
      * 7. Workflow
     */
 
+    await migrateRules(targetApiConfig);
     await migrateTransforms(targetApiConfig);
+    await migrateIdentityAttributeConfig(targetApiConfig);
+    await migrateIdentityProfiles(targetApiConfig);
     await migrateSources(targetApiConfig);
+    await migrateWorkflows(targetApiConfig);
 
     /*********************** TESTING *******************************/
     /*
