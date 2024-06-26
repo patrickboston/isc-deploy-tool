@@ -252,7 +252,6 @@ const migrateSource = async (apiConfig, sourceJson) => {
          * schema. Also need to update the schema reference ID in the source itself as we update the referenced
          * schema object
         */
-        //TODO: if a schema attribute has a reference to another schema, skip that and import others and come back to ones with references
         const localSchemaFiles = walk(`./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
         if (localSchemaFiles) {
             let schemaFilesToProcessLater = [];
