@@ -101,6 +101,7 @@ const exportSources = async (apiConfig) => {
 
 const migrateSource = async (apiConfig, sourceJson) => {
     const sourcesApi = new SourcesApi(apiConfig);
+    const sourcesBetaApi = new SourcesBetaApi(apiConfig);
     let localSource = JSON.parse(sourceJson);
 
     //Get corresponding cluster by name and add id
@@ -158,6 +159,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
         }
 
         //TODO: Create correlation config once public API is available, uses /diana endpoint today
+        sourcesBetaApi
         winston.warn(clc.yellow(`Correlation Config not supported as no public API is available, please set manually via UI`));
 
         //Attribute sync config
