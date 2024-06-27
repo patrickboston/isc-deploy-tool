@@ -1,7 +1,7 @@
 import clc from "cli-color";
 import * as fs from "fs";
 import _ from 'lodash';
-import { Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
+import { Configuration, Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, walk, writeConfigFile } from "../util.js";
 import { getAllClusters } from "./clusterUtil.js";
@@ -11,6 +11,7 @@ import { getAllRules } from "./ruleUtil.js";
 const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
 const ATTR_SYNC_SOURCE_CONFIG = "ATTR_SYNC_SOURCE_CONFIG";
+const CORRELATION_CONFIG = "CORRELATION_CONFIG";
 const existingAttributeToKeep = [
     "id", "authoritative", "connectorAttributes.cloudExternalId", "passwordPolicies", "connectorAttributes.healthy", "healthy"
 ];
@@ -66,8 +67,20 @@ const exportSources = async (apiConfig) => {
         const sourceName = source.name;
         winston.info(`Exporting Source: ${source.name} (${source.id})`);
 
+        //Get and write referenced correlation config on source (non-sdk at the moment)
+        const sourceCorrelationConfigResponse = await fetch(`${apiConfig.basePath}/beta/sources/${source.id}/correlation-config`, {
+            headers: {
+                "Authorization": `Bearer ${await apiConfig.accessToken}`
+            }
+        })
+        const sourceCorrelationConfig = await sourceCorrelationConfigResponse.json();
+        if (sourceCorrelationConfig && sourceCorrelationConfig.name) {
+            winston.info(`Exporting correlation config for source: ${sourceName}`);
+            writeConfigFile(CORRELATION_CONFIG, sourceCorrelationConfig.name, sourceCorrelationConfig, `SOURCE/${sourceName}/CORRELATION_CONFIG`);
+        }
+
         //Get and write referenced schemas on source
-        const sourceSchemas = await sourcesApi.listSourceSchemas({ sourceId: source.id });
+        const sourceSchemas = await sourcesApi.getSourceSchemas({ sourceId: source.id });
         for (const schema of sourceSchemas.data) {
             winston.info(`Exporting schema for source: ${sourceName} - ${schema.name}`);
             writeConfigFile(CONNECTOR_SCHEMA, schema.name, schema, `SOURCE/${sourceName}/CONNECTOR_SCHEMA`);
@@ -99,9 +112,14 @@ const exportSources = async (apiConfig) => {
     }
 };
 
+/**
+* Creates or updates a source in the target tenant
+* @param {Configuration} apiConfig  SailPoint API Config
+* @param {string} sourceJson        Raw JSON String of source to be deployed
+*/
 const migrateSource = async (apiConfig, sourceJson) => {
     const sourcesApi = new SourcesApi(apiConfig);
-    const sourcesBetaApi = new SourcesBetaApi(apiConfig);
+    const betaSourcesApi = new SourcesBetaApi(apiConfig);
     let localSource = JSON.parse(sourceJson);
 
     //Get corresponding cluster by name and add id
@@ -151,23 +169,45 @@ const migrateSource = async (apiConfig, sourceJson) => {
     //A source needs to exist to perform all the updates properly
     if (currentTartgetSource) {
         //Correlation Config needs to be updated from target source if exists
+        /*
         if (localSource.accountCorrelationConfig && currentTartgetSource.accountCorrelationConfig) {
             localSource.accountCorrelationConfig = currentTartgetSource.accountCorrelationConfig;
         } else {
             //If current source does not have correlation config set, null out on local
             _.unset(localSource, "accountCorrelationConfig");
         }
+        winston.warn(clc.yellow(`Correlation Config not supported as no public API is available, please set manually via UI`));
+        */
 
         //TODO: Create correlation config once public API is available, uses /diana endpoint today
-        sourcesBetaApi
-        winston.warn(clc.yellow(`Correlation Config not supported as no public API is available, please set manually via UI`));
+        const localCorrelationConfigFiles = walk(`./build/config/SOURCE/${localSource.name}/${CORRELATION_CONFIG}`);
+        for (const localCorrelationConfigFile of localCorrelationConfigFiles) {
+            let correlationConfigCopy = JSON.parse(fs.readFileSync(localCorrelationConfigFile, { encoding: "utf8" }));
+
+            winston.info(`Updating source correlation configuration`)
+            const sourceCorrelationConfigResponse = await fetch(`${apiConfig.basePath}/beta/sources/${currentTartgetSource.id}/correlation-config`, {
+                method: "PUT",
+                headers: {
+                    "Authorization": `Bearer ${await apiConfig.accessToken}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(correlationConfigCopy)
+            });
+            if (sourceCorrelationConfigResponse.ok) {
+                const sourceCorrelationConfig = await sourceCorrelationConfigResponse.json();
+                localSource.accountCorrelationConfig.id = sourceCorrelationConfig.id;
+            } else {
+                //Make sure we still update the correlation reference if there was a failure or else the source will fail to update
+                localSource.accountCorrelationConfig.id = currentTartgetSource.accountCorrelationConfig.id;
+                winston.error(clc.red(`Error while executing request:\nPath: ${apiConfig.basePath}/beta/sources/${currentTartgetSource.id}/correlation-config\n${JSON.stringify(correlationConfigCopy), null, 4}\nStatus Code: ${sourceCorrelationConfigResponse.status}\nResponse Data: ${JSON.stringify(await sourceCorrelationConfigResponse.json(), null, 4)}`));
+            }
+        }
 
         //Attribute sync config
-        const betaSourcesApi = new SourcesBetaApi(apiConfig);
         const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
         for (const localAttrSyncFile of localAttrSyncFiles) {
             let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
-            _.set(attrSyncCopy, "source.name", currentTartgetSource.id);
+            _.set(attrSyncCopy, "source.id", currentTartgetSource.id);
 
             //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
             if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
@@ -259,7 +299,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
             let schemaFilesToProcessLater = [];
 
             // Get all schemas from current target source
-            let currentTargetSchemasResponse = await sourcesApi.listSourceSchemas({
+            let currentTargetSchemasResponse = await sourcesApi.getSourceSchemas({
                 sourceId: currentTartgetSource.id,
             });
 

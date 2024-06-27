@@ -171,42 +171,18 @@ if (isDeploy) {
      * Objects need to be migrated in a specific order for reference sake. That order is:
      * 1. Rules (Connector + Already Approved Cloud)
      * 2. Transforms
-     * 3. Connector (Not supported at the moment)
+     * 3. Sources
      * 4. Identity Object Config
-     * 5. Identity Profile
-     * 6. Lifecycle State
-     * 7. Workflow
+     * 5. Identity Profile (including Lifecycle States)
+     * 6. Workflow
     */
 
-    await migrateRules(targetApiConfig);
-    await migrateTransforms(targetApiConfig);
+    //await migrateRules(targetApiConfig);
+    //await migrateTransforms(targetApiConfig);
+    await migrateSources(targetApiConfig);
     await migrateIdentityAttributeConfig(targetApiConfig);
     await migrateIdentityProfiles(targetApiConfig);
-    await migrateSources(targetApiConfig);
     await migrateWorkflows(targetApiConfig);
-
-    /*********************** TESTING *******************************/
-    /*
-    const s = fs.readFileSync("./build/config/SOURCE/JAR TEST/JAR TEST.json");
-    await migrateSource(targetApiConfig, s);
-    const ss = fs.readFileSync("./build/config/SOURCE/DevDays JDBC/DevDays JDBC.json");
-    await migrateSource(targetApiConfig, ss);
-    const w = fs.readFileSync("./build/config/WORKFLOW/Mover Certification New Deploy.json");
-    await migrateWorkflow(targetApiConfig, w);
-    const t = fs.readFileSync("./build/config/TRANSFORM/TestTransform.json");
-    await migrateTransform(targetApiConfig, t);
-    const n = fs.readFileSync("./build/config/NOTIFICATION_TEMPLATE/Non-Employee Account Upload Failed.json");
-    await migrateNotificationTemplate(targetApiConfig, n);
-    const a = fs.readFileSync("./build/config/ACCESS_REQUEST_CONFIG/ACCESS_REQUEST_CONFIG.json");
-    await updateAccessRequestConfig(targetApiConfig, a);
-    const g = fs.readFileSync("./build/config/GOVERNANCE_GROUP/Test Deploy.json");
-    await migrateGovernanceGroup(targetApiConfig, g);
-    const i = fs.readFileSync("./build/config/IDENTITY_OBJECT_CONFIG/IDENTITY_OBJECT_CONFIG.json");
-    await migrateIdentityAttributeConfig(targetApiConfig, i);
-    const ip = fs.readFileSync("./build/config/IDENTITY_PROFILE/Aking Users.json");
-    await migrateIdentityProfile(targetApiConfig, ip);
-    */
-    /*********************** TESTING *******************************/
 }
 
 

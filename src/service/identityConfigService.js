@@ -45,7 +45,7 @@ const exportIdentityProfiles = async (apiConfig) => {
         }
 
         //Lifecycle states are attached to Identity Profiles so let's grab them
-        const lifecycleStatesResponse = await lifecycleStatesApi.listLifecycleStates({
+        const lifecycleStatesResponse = await lifecycleStatesApi.getLifecycleStates({
             identityProfileId: profile.self.id
         });
         if (lifecycleStatesResponse.data) {
@@ -256,7 +256,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
         const lifecycleStateApi = new LifecycleStatesApi(apiConfig);
 
         //Get current lifecycle states if any
-        const currentTargetLifecycleStatesResponse = await lifecycleStateApi.listLifecycleStates({
+        const currentTargetLifecycleStatesResponse = await lifecycleStateApi.getLifecycleStates({
             identityProfileId: currentTargetIdentityProfile.self.id
         });
 
