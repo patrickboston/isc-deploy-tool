@@ -177,8 +177,8 @@ if (isDeploy) {
      * 6. Workflow
     */
 
-    //await migrateRules(targetApiConfig);
-    //await migrateTransforms(targetApiConfig);
+    await migrateRules(targetApiConfig);
+    await migrateTransforms(targetApiConfig);
     await migrateSources(targetApiConfig);
     await migrateIdentityAttributeConfig(targetApiConfig);
     await migrateIdentityProfiles(targetApiConfig);

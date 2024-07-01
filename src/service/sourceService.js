@@ -59,6 +59,7 @@ const getSourceById = async (apiConfig, sourceId) => {
 const exportSources = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Source Export"));
     const sourcesApi = new SourcesApi(apiConfig);
+    const sourcesApiBeta = new SourcesBetaApi(apiConfig);
 
     const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSources, { limit: 1000 }, 250);
     for (const source of sources.data) {
@@ -68,12 +69,11 @@ const exportSources = async (apiConfig) => {
         winston.info(`Exporting Source: ${source.name} (${source.id})`);
 
         //Get and write referenced correlation config on source (non-sdk at the moment)
-        const sourceCorrelationConfigResponse = await fetch(`${apiConfig.basePath}/beta/sources/${source.id}/correlation-config`, {
-            headers: {
-                "Authorization": `Bearer ${await apiConfig.accessToken}`
-            }
-        })
-        const sourceCorrelationConfig = await sourceCorrelationConfigResponse.json();
+        const sourceCorrelationConfigResponse = await sourcesApiBeta.getCorrelationConfig({
+            id: source.id
+        });
+
+        const sourceCorrelationConfig = sourceCorrelationConfigResponse.data;
         if (sourceCorrelationConfig && sourceCorrelationConfig.name) {
             winston.info(`Exporting correlation config for source: ${sourceName}`);
             writeConfigFile(CORRELATION_CONFIG, sourceCorrelationConfig.name, sourceCorrelationConfig, `SOURCE/${sourceName}/CORRELATION_CONFIG`);
@@ -169,37 +169,24 @@ const migrateSource = async (apiConfig, sourceJson) => {
     //A source needs to exist to perform all the updates properly
     if (currentTartgetSource) {
         //Correlation Config needs to be updated from target source if exists
-        /*
-        if (localSource.accountCorrelationConfig && currentTartgetSource.accountCorrelationConfig) {
-            localSource.accountCorrelationConfig = currentTartgetSource.accountCorrelationConfig;
-        } else {
-            //If current source does not have correlation config set, null out on local
-            _.unset(localSource, "accountCorrelationConfig");
-        }
-        winston.warn(clc.yellow(`Correlation Config not supported as no public API is available, please set manually via UI`));
-        */
-
-        //TODO: Create correlation config once public API is available, uses /diana endpoint today
         const localCorrelationConfigFiles = walk(`./build/config/SOURCE/${localSource.name}/${CORRELATION_CONFIG}`);
         for (const localCorrelationConfigFile of localCorrelationConfigFiles) {
             let correlationConfigCopy = JSON.parse(fs.readFileSync(localCorrelationConfigFile, { encoding: "utf8" }));
 
-            winston.info(`Updating source correlation configuration`)
-            const sourceCorrelationConfigResponse = await fetch(`${apiConfig.basePath}/beta/sources/${currentTartgetSource.id}/correlation-config`, {
-                method: "PUT",
-                headers: {
-                    "Authorization": `Bearer ${await apiConfig.accessToken}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(correlationConfigCopy)
-            });
-            if (sourceCorrelationConfigResponse.ok) {
-                const sourceCorrelationConfig = await sourceCorrelationConfigResponse.json();
+            winston.info(`Updating source correlation configuration`);
+            try {
+                const sourceCorrelationConfigResponse = await betaSourcesApi.putCorrelationConfig({
+                    id: currentTartgetSource.id,
+                    correlationConfigBeta: correlationConfigCopy
+                });
+
+                const sourceCorrelationConfig = await sourceCorrelationConfigResponse.data;
                 localSource.accountCorrelationConfig.id = sourceCorrelationConfig.id;
-            } else {
+            } catch (error) {
+                handleHttpException(error);
+
                 //Make sure we still update the correlation reference if there was a failure or else the source will fail to update
                 localSource.accountCorrelationConfig.id = currentTartgetSource.accountCorrelationConfig.id;
-                winston.error(clc.red(`Error while executing request:\nPath: ${apiConfig.basePath}/beta/sources/${currentTartgetSource.id}/correlation-config\n${JSON.stringify(correlationConfigCopy), null, 4}\nStatus Code: ${sourceCorrelationConfigResponse.status}\nResponse Data: ${JSON.stringify(await sourceCorrelationConfigResponse.json(), null, 4)}`));
             }
         }
 
@@ -344,7 +331,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
         winston.debug(JSON.stringify(localSource, null, 4));
         try {
             await sourcesApi.putSource({
-                id: localSource.id,
+                id: currentTartgetSource.id,
                 source: localSource
             });
         } catch (error) {
