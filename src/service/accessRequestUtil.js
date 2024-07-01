@@ -1,4 +1,5 @@
 import clc from "cli-color";
+import * as fs from "fs";
 import { AccessRequestsApi } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, writeConfigFile } from "../util.js";
@@ -31,10 +32,10 @@ const exportAccessRequestConfig = async (apiConfig) => {
     writeConfigFile(ACCESS_REQUEST_CONFIG, ACCESS_REQUEST_CONFIG, accessRequestConfigResponse.data);
 }
 
-const updateAccessRequestConfig = async (apiConfig, newAccessRequestConfig) => {
-    let localAccessRequestConfig = JSON.parse(newAccessRequestConfig);
+const updateAccessRequestConfig = async (apiConfig) => {
+    const accessRequestConfigSource = fs.readFileSync("./build/config/ACCESS_REQUEST_CONFIG/ACCESS_REQUEST_CONFIG.json");
+    let localAccessRequestConfig = JSON.parse(accessRequestConfigSource);
     const accessRequestApi = new AccessRequestsApi(apiConfig);
-    //const currentTargetAccessRequestConfig = await accessRequestApi.getAccessRequestConfig();
 
     //If fallback approver exists, perform lookup
     let fallBackApproverRef = localAccessRequestConfig.approvalReminderAndEscalationConfig.fallbackApproverRef;

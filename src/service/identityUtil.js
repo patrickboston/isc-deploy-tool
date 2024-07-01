@@ -1,8 +1,9 @@
 import clc from "cli-color";
+import * as fs from "fs";
 import _ from 'lodash';
 import { GovernanceGroupsBetaApi, IdentitiesBetaApi, Paginator } from "sailpoint-api-client";
 import winston from "winston";
-import { writeConfigFile } from "../util.js";
+import { walk, writeConfigFile } from "../util.js";
 
 const GOVERNANCE_GROUP_TYPE = "GOVERNANCE_GROUP";
 const existingAttributeToKeep = [
@@ -15,7 +16,7 @@ let govGroupCache = {};
 
 const getIdentityByAlias = async (apiConfig, identityAlias) => {
     if (identityCache[identityAlias]) return identityCache[identityAlias];
-    
+
     const identityApi = new IdentitiesBetaApi(apiConfig);
     const identityResponse = await identityApi.listIdentities({
         filters: `alias eq "${identityAlias}"`,
@@ -136,8 +137,19 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
     }
 }
 
+const migrateGovernanceGroups = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Governance Group Deployment"));
+    const governanceGroupsPaths = walk("./build/config/GOVERNANCE_GROUP");
+
+    //Iterate each transform and pass it to migrateTransform
+    for (const governanceGroupsPath of governanceGroupsPaths) {
+        const governanceGroup = fs.readFileSync(governanceGroupsPath);
+        await migrateGovernanceGroup(apiConfig, governanceGroup);
+    }
+}
+
 export {
     exportGovernanceGroups, getGovGroupById, getGovGroupByName, getIdentityByAlias,
-    getIdentityById, migrateGovernanceGroup
+    getIdentityById, migrateGovernanceGroup, migrateGovernanceGroups
 };
 

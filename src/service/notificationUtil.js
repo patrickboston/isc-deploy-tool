@@ -1,8 +1,9 @@
 import clc from "cli-color";
+import * as fs from "fs";
 import _ from 'lodash';
 import { NotificationsBetaApi, Paginator } from "sailpoint-api-client";
 import winston from "winston";
-import { writeConfigFile } from "../util.js";
+import { walk, writeConfigFile } from "../util.js";
 
 const NOTIFICATION_TEMPLATE = "NOTIFICATION_TEMPLATE";
 const existingAttributeToKeep = [
@@ -82,8 +83,20 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
     }
 }
 
+const migrateNotificationTemplates = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Notification Template Deployment"));
+    const notificationTemplateFilePaths = walk("./build/config/NOTIFICATION_TEMPLATE");
+
+    //Iterate each transform and pass it to migrateTransform
+    for (const notificationTemplateFilePath of notificationTemplateFilePaths) {
+        const notificationTemplate = fs.readFileSync(notificationTemplateFilePath);
+        await migrateNotificationTemplate(apiConfig, notificationTemplate);
+    }
+}
+
 export {
     exportNotificationTemplates,
-    migrateNotificationTemplate
+    migrateNotificationTemplate,
+    migrateNotificationTemplates
 };
 

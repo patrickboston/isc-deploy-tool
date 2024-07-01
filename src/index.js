@@ -1,18 +1,19 @@
 #!/usr/bin/env node
-import axiosRetry from "axios-retry";
 import clc from "cli-color";
 import * as fs from "fs";
 import { Configuration } from "sailpoint-api-client";
 import winston from "winston";
-import { exportAccessRequestConfig } from "./service/accessRequestUtil.js";
+import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestUtil.js";
 import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfiles } from "./service/identityConfigService.js";
-import { exportGovernanceGroups } from "./service/identityUtil.js";
-import { exportNotificationTemplates } from "./service/notificationUtil.js";
+import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityUtil.js";
+import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationUtil.js";
 import { exportRules, migrateRules } from "./service/ruleUtil.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
 import { exportTransforms, migrateTransforms } from "./service/transformUtil.js";
 import { exportWorkflows, migrateWorkflows } from "./service/workflowUtil.js";
 import { buildObjectsForEnvironment, reverseTokenize, runExport } from "./util.js";
+
+const start = Date.now();
 
 const results = [];
 const nodeArgs = (argList => {
@@ -62,13 +63,27 @@ winston.configure({
     format: winston.format.combine(
         winston.format.colorize(),
         winston.format.cli(),
-        winston.format.timestamp({format: "YYYY-MM-DD HH:mm:ss"}),
+        winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
         logFormat
     ),
     transports: [
         new winston.transports.Console()
     ]
 });
+
+const globalRetryConfig = {
+    retries: 2,
+    retryDelay: (retryCount) => {
+        console.log(`retry attempt: ${retryCount}`);
+        return retryCount * 20000;
+    },
+    onRetry(retryCount, error, requestConfig) {
+        winston.warn(clc.yellow(`Rate limit reached, sleeping and retrying... ${error.response.status}, try number ${retryCount}`));
+    },
+    retryCondition: (error) => {
+        return error.response.status === 429;
+    }
+};
 
 //Process args
 srcEnvName = srcEnvName && srcEnvName.toLowerCase();
@@ -109,35 +124,30 @@ if (isExport) {
     const { default: srcEnvParams } = await import("./../" + srcEnvName + ".env.js");
 
     let srcApiConfig = new Configuration(srcEnvParams);
-    srcApiConfig.retriesConfig = {
-        retries: 2,
-        retryDelay: axiosRetry.exponentialDelay,
-        onRetry(retryCount, error, requestConfig) {
-            winston.info(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
-        }
-    }
-
-    if (isExport && isDetokenize) {
-        winston.info(clc.bgMagentaBright("Running export and de-tokenization..."));
-
-        await exportRules(srcApiConfig);
-        await exportTransforms(srcApiConfig);
-        await exportSources(srcApiConfig);
-        await exportIdentityAttributeConfig(srcApiConfig);
-        await exportIdentityProfiles(srcApiConfig);
-        await exportAccessRequestConfig(srcApiConfig);
-        await exportNotificationTemplates(srcApiConfig);
-        await exportWorkflows(srcApiConfig);
-        await exportGovernanceGroups(srcApiConfig);
-
-        //Perform reverse tokenization on all exported files
-        await reverseTokenize();
-
-    } else if (isExport && !isDetokenize) {
-        winston.info(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
-        await runExport(srcApiConfig);
-    }
+    srcApiConfig.retriesConfig = globalRetryConfig;
 }
+
+if (isExport && isDetokenize) {
+    winston.info(clc.bgMagentaBright("Running export and de-tokenization..."));
+
+    await exportRules(srcApiConfig);
+    await exportTransforms(srcApiConfig);
+    await exportSources(srcApiConfig);
+    await exportIdentityAttributeConfig(srcApiConfig);
+    await exportIdentityProfiles(srcApiConfig);
+    await exportAccessRequestConfig(srcApiConfig);
+    await exportNotificationTemplates(srcApiConfig);
+    await exportWorkflows(srcApiConfig);
+    await exportGovernanceGroups(srcApiConfig);
+
+    //Perform reverse tokenization on all exported files
+    await reverseTokenize();
+
+} else if (isExport && !isDetokenize) {
+    winston.info(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
+    await runExport(srcApiConfig);
+}
+
 
 //Perform local build only
 if (isBuild) {
@@ -149,21 +159,8 @@ if (isDeploy) {
     const { default: targetEnvParams } = await import("./../" + targetEnvName + ".env.js");
 
     let targetApiConfig = new Configuration(targetEnvParams);
-    targetApiConfig.retriesConfig = {
-        retries: 2,
-        retryDelay: (retryCount) => {
-            console.log(`retry attempt: ${retryCount}`);
-            return retryCount * 20000;
-        },
-        onRetry(retryCount, error, requestConfig) {
-            winston.warn(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
-        },
-        retryCondition: (error) => {
-            // here is your mistake. check for error config you want to retry
-            return error.response.status === 429;
-        },
-    }
-    
+    targetApiConfig.retriesConfig = globalRetryConfig;
+
     //Perform tokenization
     await buildObjectsForEnvironment(targetEnvName);
 
@@ -174,7 +171,9 @@ if (isDeploy) {
      * 3. Sources
      * 4. Identity Object Config
      * 5. Identity Profile (including Lifecycle States)
-     * 6. Workflow
+     * 6. Access Request Config
+     * 7. Workflow
+     * 8. Governance Groups
     */
 
     await migrateRules(targetApiConfig);
@@ -182,8 +181,17 @@ if (isDeploy) {
     await migrateSources(targetApiConfig);
     await migrateIdentityAttributeConfig(targetApiConfig);
     await migrateIdentityProfiles(targetApiConfig);
+    await updateAccessRequestConfig(targetApiConfig);
     await migrateWorkflows(targetApiConfig);
+    await migrateNotificationTemplates(targetApiConfig);
+    await migrateGovernanceGroups(targetApiConfig);
 }
 
+const end = Date.now();
+const difference = end - start;
+const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+winston.info(clc.bgMagentaBright(`Execution time: ${hours}h ${minutes}m ${seconds}s`));
 
 process.exit(0);
