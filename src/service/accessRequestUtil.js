@@ -33,6 +33,7 @@ const exportAccessRequestConfig = async (apiConfig) => {
 }
 
 const updateAccessRequestConfig = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Access Request Configuration Deployment"));
     const accessRequestConfigSource = fs.readFileSync("./build/config/ACCESS_REQUEST_CONFIG/ACCESS_REQUEST_CONFIG.json");
     let localAccessRequestConfig = JSON.parse(accessRequestConfigSource);
     const accessRequestApi = new AccessRequestsApi(apiConfig);

@@ -22,9 +22,7 @@ const exportNotificationTemplates = async (apiConfig) => {
 
 const migrateNotificationTemplate = async (apiConfig, templateJson) => {
     const notificationsBetaApi = new NotificationsBetaApi(apiConfig);
-
     let localTemplate = JSON.parse(templateJson);
-    winston.info(clc.bgBlueBright(`Migrating notification template: ${localTemplate.name}`));
 
     //Check and see if a template with this name already exists in the target environment
     const currentTemplateResponse = await notificationsBetaApi.listNotificationTemplates({
@@ -33,7 +31,7 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
     let currentTargetTemplate = currentTemplateResponse.data.length == 1 ? currentTemplateResponse.data[0] : null;
 
     if (!currentTargetTemplate) {
-        winston.info(`Creating new notification template for: ${localTemplate.name}`);
+        winston.info(`Creating new notification template: ${localTemplate.name}`);
         try {
             const createTemplateResponse = await notificationsBetaApi.createNotificationTemplate({
                 templateDtoBeta: {
@@ -53,7 +51,7 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
             await handleHttpException(error);
         }
     } else {
-        winston.info(`Found existing notification template in target environment: ${currentTargetTemplate.name} (${currentTargetTemplate.id})`)
+        winston.info(`Updating existing notification template: ${currentTargetTemplate.name} (${currentTargetTemplate.id})`)
 
         //Restore attributes from the currently deployed target template into our template template
         for (const templateKey of existingAttributeToKeep) {

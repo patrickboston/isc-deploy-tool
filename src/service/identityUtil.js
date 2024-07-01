@@ -89,9 +89,7 @@ const exportGovernanceGroups = async (apiConfig) => {
 
 const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
     const govGroupApi = new GovernanceGroupsBetaApi(apiConfig);
-
     let localGovGroup = JSON.parse(govGroupJson);
-    winston.info(clc.bgBlueBright(`Migrating governance group/workgroup: ${localGovGroup.name}`));
 
     //Looks up owner identity by tokenized alias
     const targetOwner = await getIdentityByAlias(apiConfig, localGovGroup.owner.name);
@@ -107,7 +105,7 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
     let currentTargetGovGroup = currentGovGroupResponse.data.length == 1 ? currentGovGroupResponse.data[0] : null;
 
     if (!currentTargetGovGroup) {
-        winston.info(`Creating new governance group/workgroup for: ${localGovGroup.name}`);
+        winston.info(`Creating new governance group/workgroup: ${localGovGroup.name}`);
         const createGovGroupResponse = await govGroupApi.createWorkgroup({
             workgroupDtoBeta: {
                 name: localGovGroup.name,
@@ -117,7 +115,7 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
         });
         currentTargetGovGroup = createGovGroupResponse.data;
     } else {
-        winston.info(`Found existing governance group/workgroup in target environment: ${currentTargetGovGroup.name} (${currentTargetGovGroup.id})`)
+        winston.info(`Updating existing governance group/workgroup: ${currentTargetGovGroup.name} (${currentTargetGovGroup.id})`)
         //Restore attributes from the currently deployed target gov group into our template gov group
         for (const govGroupKey of existingAttributeToKeep) {
             _.set(localGovGroup, govGroupKey, _.get(currentTargetGovGroup, govGroupKey));

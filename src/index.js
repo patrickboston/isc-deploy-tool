@@ -172,8 +172,9 @@ if (isDeploy) {
      * 4. Identity Object Config
      * 5. Identity Profile (including Lifecycle States)
      * 6. Access Request Config
-     * 7. Workflow
-     * 8. Governance Groups
+     * 7. Notification Template
+     * 8. Workflow
+     * 9. Governance Groups
     */
 
     await migrateRules(targetApiConfig);
@@ -182,8 +183,8 @@ if (isDeploy) {
     await migrateIdentityAttributeConfig(targetApiConfig);
     await migrateIdentityProfiles(targetApiConfig);
     await updateAccessRequestConfig(targetApiConfig);
-    await migrateWorkflows(targetApiConfig);
     await migrateNotificationTemplates(targetApiConfig);
+    await migrateWorkflows(targetApiConfig);
     await migrateGovernanceGroups(targetApiConfig);
 }
 

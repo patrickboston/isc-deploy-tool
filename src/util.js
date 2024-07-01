@@ -93,7 +93,7 @@ const checkExportStatus = async (spConfigApi, jobId, timeout = 500) => {
             (async function wait() {
                 spConfigApi.getSpConfigExportStatus({ id: jobId }).then((response) => {
                     if (response.data.status == "COMPLETE") {
-                        winston.info("SP-Config export completed");
+                        winston.info(clc.green("SP-Config export completed"));
                         resolve(response);
                     } else if (response.data.status == "IN_PROGRESS") {
                         winston.info("SP-Config Export job [" + jobId + "] still in progress...");
@@ -114,6 +114,7 @@ const getExportResult = async (spConfigApi, jobId) => {
 }
 
 const runExport = async (apiConfig, exportConfig) => {
+    winston.info(clc.green("SP-Config export started"));
     return new Promise((resolve, reject) => {
         let spConfigApi = new SPConfigBetaApi(apiConfig);
 
@@ -245,7 +246,7 @@ const buildSpConfigDeploymentFile = async (directoryToBuildFrom = "./build/confi
 }
 
 const runSpConfigImport = async (apiConfig, importObj) => {
-    winston.info(clc.bgBlueBright("Starting SP-Config Import"));
+    winston.info(clc.green("SP-Config import started"));
     let spConfigApi = new SPConfigBetaApi(apiConfig);
 
     const jsonString = JSON.stringify(importObj);
@@ -303,6 +304,7 @@ const runSpConfigImport = async (apiConfig, importObj) => {
             handleHttpException(error);
         }
     }
+    winston.info(clc.green("SP-Config import completed"));
 };
 
 
