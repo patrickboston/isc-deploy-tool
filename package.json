@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "export": "node src/index.js --export --detokenize",
-    "exportRaw": "node src/index.js --export",
     "build": "node src/index.js --build",
     "deploy": "node src/index.js --deploy"
   },

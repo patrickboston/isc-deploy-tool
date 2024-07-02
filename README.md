@@ -2,7 +2,6 @@
 The IdentityNow Object Migration tool is a NodeJS command-line utility that allows you to export configuration objects such as Sources, Transforms, Rules, and more out of one IdentityNow environment and import/deploy them to other IdentityNow environments. It utilizes the [SP-Config API endpoints](https://developer.sailpoint.com/idn/api/beta/sp-config) to perform all export and import operations. One of the main benefits from using this tool is the ability to maintain single configuration objects that can be deploy to any environment via tokenization. This allows Source Code Management to actually make sense for IDN implementations and this process could easily be plugged into a CI/CD pipeline.
 
 It offers the following features:
-- Export objects as-is (raw) out of an environment
 - Export objects and perform reverse-tokenization via JSONPath which replaces actual setting values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any IdentityNow environment
 - Tokenize and build objects for a target IdentityNow environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual setting values which are needed for a specific environment (i.e. IQService host for an Active Directory Source)
 - Tokenize and deploy objects to a target IdentityNow environment
