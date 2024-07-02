@@ -2,7 +2,7 @@ import clc from "cli-color";
 import * as fs from "fs";
 import winston from "winston";
 import { runSpConfigImport, writeConfigFile } from "../util.js";
-import { runExport, walk } from "./../util.js";
+import { runSpConfigExport, walk } from "./../util.js";
 
 const RULE = "RULE";
 let ruleCache;
@@ -20,7 +20,7 @@ const getAllRules = async (apiConfig) => {
         }
     }
 
-    const rulesResponse = await runExport(apiConfig, ruleExportConfig);
+    const rulesResponse = await runSpConfigExport(apiConfig, ruleExportConfig);
     ruleCache = rulesResponse;
     return rulesResponse;
 }

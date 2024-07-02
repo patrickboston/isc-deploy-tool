@@ -11,7 +11,7 @@ import { exportRules, migrateRules } from "./service/ruleUtil.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
 import { exportTransforms, migrateTransforms } from "./service/transformUtil.js";
 import { exportWorkflows, migrateWorkflows } from "./service/workflowUtil.js";
-import { buildObjectsForEnvironment, reverseTokenize, runExport } from "./util.js";
+import { buildObjectsForEnvironment, reverseTokenize } from "./util.js";
 
 const start = Date.now();
 
@@ -78,7 +78,7 @@ const globalRetryConfig = {
         return retryCount * 20000;
     },
     onRetry(retryCount, error, requestConfig) {
-        winston.warn(clc.yellow(`Rate limit reached, sleeping and retrying... ${error.response.status}, try number ${retryCount}`));
+        winston.warn(clc.yellow(`ISC Rate limit reached, sleeping and retrying..., (retry number ${retryCount})`));
     },
     retryCondition: (error) => {
         return error.response.status === 429;
@@ -119,16 +119,13 @@ if (isDeploy && (!targetEnvName)) {
 fs.rmSync("./build", { recursive: true, force: true });
 
 //Perform export setup and process
-if (isExport) {
-    //Set up config based on envirnments
+if (isExport && isDetokenize) {
+    winston.info(clc.bgMagentaBright("Running export and de-tokenization..."));
+
     const { default: srcEnvParams } = await import("./../" + srcEnvName + ".env.js");
 
     let srcApiConfig = new Configuration(srcEnvParams);
     srcApiConfig.retriesConfig = globalRetryConfig;
-}
-
-if (isExport && isDetokenize) {
-    winston.info(clc.bgMagentaBright("Running export and de-tokenization..."));
 
     await exportRules(srcApiConfig);
     await exportTransforms(srcApiConfig);
@@ -142,10 +139,6 @@ if (isExport && isDetokenize) {
 
     //Perform reverse tokenization on all exported files
     await reverseTokenize();
-
-} else if (isExport && !isDetokenize) {
-    winston.info(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
-    await runExport(srcApiConfig);
 }
 
 

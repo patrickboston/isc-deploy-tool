@@ -127,27 +127,6 @@ const getExportResult = async (spConfigApi, jobId) => {
     return spConfigResponse.data.objects;
 }
 
-const runExport = async (apiConfig, exportConfig) => {
-    winston.info(clc.green("SP-Config export started"));
-    return new Promise((resolve, reject) => {
-        let spConfigApi = new SPConfigBetaApi(apiConfig);
-
-        //Check if we have an input, if not default to file
-        if (!exportConfig) exportConfig = defaultExportConfig;
-
-        let spConfigReq = {
-            exportPayloadBeta: JSON.stringify(exportConfig)
-        };
-
-        spConfigApi.exportSpConfig(spConfigReq).then((response) => {
-            const jobId = response.data.jobId;
-            checkExportStatus(spConfigApi, jobId).then((response) => {
-                resolve(getExportResult(spConfigApi, jobId));
-            });
-        });
-    })
-}
-
 const reverseTokenize = async () => {
     winston.info(clc.bgBlueBright("Starting Reverse Tokenization"));
     return new Promise((resolve, reject) => {
@@ -259,6 +238,64 @@ const buildSpConfigDeploymentFile = async (directoryToBuildFrom = "./build/confi
     }
 }
 
+const runSpConfigExport = async (apiConfig, exportConfig) => {
+    winston.info(clc.green("SP-Config export started"));
+    const spConfigApi = new SPConfigBetaApi(apiConfig);
+
+    let jobId;
+    try {
+        const startExportResponse = await spConfigApi.exportSpConfig({
+            exportPayloadBeta: JSON.stringify(exportConfig)
+        });
+        jobId = startExportResponse.data.jobId;
+        winston.debug(`SP-Config Export jobId: ${jobId}`);
+    } catch (error) {
+        handleHttpException(error);
+        return; // Exit if the jobId cannot be retrieved
+    }
+
+    //Delay function to use with async/await
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    //Function to repeatedly check the import status
+    const checkStatus = async () => {
+        while (true) {
+            try {
+                const currentStatusResponse = await spConfigApi.getSpConfigExportStatus({ id: jobId });
+                winston.debug(`Current SP-Config export status for jobId [${jobId}]:\n${JSON.stringify(currentStatusResponse.data, null, 4)}`);
+                if (currentStatusResponse.data.status === "COMPLETE") {
+                    winston.info(clc.green("SP-Config export completed"));
+                    break;
+                } else if (currentStatusResponse.data.status === "IN_PROGRESS") {
+                    winston.info(`SP-Config export job [${jobId}] still in progress...`);
+                    await delay(2000); // Wait before checking the status again
+                } else if (currentStatusResponse.data.status === "CANCELLED" || currentStatusResponse.data.status === "FAILED") {
+                    winston.error(clc.red(`SP-Config export job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`));
+                    return;
+                }
+            } catch (error) {
+                handleHttpException(error);
+                break;
+            }
+        }
+    };
+
+    //Initial delay before starting to check the status
+    await delay(2000);
+    await checkStatus();
+
+    //Continue to get result if we actually have a jobId
+    if (jobId) {
+        try {
+            const exportResponse = await spConfigApi.getSpConfigExport({ id: jobId });
+            winston.debug(`SP-Config export full response:\n${JSON.stringify(exportResponse.data, null, 4)}`);
+            return exportResponse.data.objects;
+        } catch (error) {
+            handleHttpException(error);
+        }
+    }
+}
+
 const runSpConfigImport = async (apiConfig, importObj) => {
     winston.info(clc.green("SP-Config import started"));
     let spConfigApi = new SPConfigBetaApi(apiConfig);
@@ -272,7 +309,7 @@ const runSpConfigImport = async (apiConfig, importObj) => {
     try {
         const startImportResponse = await spConfigApi.importSpConfig({ data: blobPayload });
         jobId = startImportResponse.data.jobId;
-        winston.debug(`SP-Config jobId: ${jobId}`);
+        winston.debug(`SP-Config import jobId: ${jobId}`);
     } catch (error) {
         handleHttpException(error);
         return; // Exit if the jobId cannot be retrieved
@@ -312,7 +349,7 @@ const runSpConfigImport = async (apiConfig, importObj) => {
     if (jobId) {
         try {
             const importResponse = await spConfigApi.getSpConfigImport({ id: jobId });
-            winston.debug(`SP-Config full response:\n${JSON.stringify(importResponse.data, null, 4)}`);
+            winston.debug(`SP-Config import full response:\n${JSON.stringify(importResponse.data, null, 4)}`);
             return importResponse;
         } catch (error) {
             handleHttpException(error);
@@ -322,5 +359,5 @@ const runSpConfigImport = async (apiConfig, importObj) => {
 };
 
 
-export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, handleHttpException, reverseTokenize, runExport, runSpConfigImport, sleep, walk, writeConfigFile };
+export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, handleHttpException, reverseTokenize, runSpConfigExport, runSpConfigImport, sleep, walk, writeConfigFile };
 
