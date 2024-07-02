@@ -7,12 +7,17 @@ import winston from "winston";
 import { default as defaultExportConfig } from "./../export-config.js";
 import { default as reverseTokens } from "./../reverse.target.js";
 
+/**
+* Sleeps for the specified number of milliseconds
+* @param {number} ms Time to sleep for in milliseconds
+*/
 const sleep = (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
-* @param {Error} e
+* Helper function to handle all of our HTTP requests via the SailPoint SDK
+* @param {Error} e The error which was caught
 */
 const handleHttpException = async (e) => {
     if (e.response) {
@@ -22,21 +27,27 @@ const handleHttpException = async (e) => {
     }
 }
 
+/**
+* Recursively iterates all files in a given directory and returns a list of their full paths
+* @param {string} dir The name of the directory to walk
+* @param {number} [maxDepth=-1] How many directories deep to look
+* @returns {Array} List of full file paths found
+*/
 function walk(dir, maxDepth = -1, currentDepth = 0, files = []) {
-    // Get an array of all files and directories in the passed directory using fs.readdirSync
+    //Get an array of all files and directories in the passed directory using fs.readdirSync
     if (fs.existsSync(dir)) {
         const fileList = fs.readdirSync(dir);
-        // Create the full path of the file/directory by concatenating the passed directory and file/directory name
+        //Create the full path of the file/directory by concatenating the passed directory and file/directory name
         for (const file of fileList) {
             const name = `${dir}/${file}`;
-            // Check if the current file/directory is a directory using fs.statSync
+            //Check if the current file/directory is a directory using fs.statSync
             if (fs.statSync(name).isDirectory()) {
                 if (maxDepth === -1 || currentDepth < maxDepth) {
-                    // If it is a directory and we haven't reached max depth, recursively call the walk function
+                    //If it is a directory and we haven't reached max depth, recursively call the walk function
                     walk(name, maxDepth, currentDepth + 1, files);
                 }
             } else {
-                // If it is a file, push the full path to the files array
+                //If it is a file, push the full path to the files array
                 files.push(name);
             }
         }
@@ -52,24 +63,27 @@ function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "c
         "transformDefinition" //This is very specific to identity profile transform references using key 'id'
     ];
 
-    function omitFromObject(obj) { // the inner function which will be called recursivley
+    function omitFromObject(obj) { //the inner function which will be called recursively
 
         return _.transform(obj, function (result, value, key) { // transform to a new object
-            if (key in keysToOmitIndex) { // if the key is in the index skip it
+            if (key in keysToOmitIndex) { //if the key is in the index skip it
                 return;
             }
 
             result[key] = _.isObject(value) && !keysToIgnore.includes(key) ? omitFromObject(value) : value;
         })
     }
-    return omitFromObject(obj); // return the inner function result
+    return omitFromObject(obj); //return the inner function result
 }
 
 /**
 * Writes a IDN Config file to the specified location
 * creating a directory if needed to hold the object
 * Also omits certain attributes by default
-* @param {Configuration} apiConfig
+* @param {string} objectType Used for directory name and other special checks
+* @param {string} objectName Used for file name
+* @param {Object} object The actual object to write in JSON format
+* @param {string} [overrideDir=null] Override default write directory built from this function
 */
 const writeConfigFile = (objectType, objectName, object, overrideDir = null) => {
     //TODO: Create export ignore properties to avoid writing certain config files
