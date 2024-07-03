@@ -1,5 +1,4 @@
 import { AccessProfilesApi } from "sailpoint-api-client";
-import winston from "winston";
 
 const getAccessProfileById = async (apiConfig, accessProfileId) => {
     const accessProfilesApi = new AccessProfilesApi(apiConfig);
@@ -24,7 +23,7 @@ const getAccessProfileByName = async (apiConfig, accessProfileName) => {
     const accessProfile = accessProfileResponse.data.length == 1 ? accessProfileResponse.data[0] : null;
 
     if (!accessProfile) throw new Error(`Could not find access profile by name [${accessProfileName}] in tenant: ${apiConfig.basePath}`);
-    return accessProfile
+    return accessProfile;
 }
 
 export {

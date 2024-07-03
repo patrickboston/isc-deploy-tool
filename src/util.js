@@ -101,32 +101,6 @@ const writeConfigFile = (objectType, objectName, object, overrideDir = null) => 
     fs.writeFileSync(fileName, JSON.stringify(omittedObj, null, 4));
 }
 
-const checkExportStatus = async (spConfigApi, jobId, timeout = 500) => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            (async function wait() {
-                spConfigApi.getSpConfigExportStatus({ id: jobId }).then((response) => {
-                    if (response.data.status == "COMPLETE") {
-                        winston.info(clc.green("SP-Config export completed"));
-                        resolve(response);
-                    } else if (response.data.status == "IN_PROGRESS") {
-                        winston.info("SP-Config Export job [" + jobId + "] still in progress...");
-                        setTimeout(wait, timeout);
-                    } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
-                        winston.error(response.data);
-                        resolve("SP-Config Export job [" + jobId + "] has been cancelled or failed!");
-                    }
-                })
-            })();
-        }, timeout);
-    });
-}
-
-const getExportResult = async (spConfigApi, jobId) => {
-    const spConfigResponse = await spConfigApi.getSpConfigExport({ id: jobId });
-    return spConfigResponse.data.objects;
-}
-
 const reverseTokenize = async () => {
     winston.info(clc.bgBlueBright("Starting Reverse Tokenization"));
     return new Promise((resolve, reject) => {

@@ -6,7 +6,7 @@ const getAllClusters = async (apiConfig) => {
     const clusterResponse = await clusterApi.getManagedClusters();
 
     if (!clusterResponse || clusterResponse.data.length === 0) {
-        throw new Error(`Could not find any VA Cluster for tenant: ${apiConfig.basePath}`)
+        throw new Error(`Could not find any VA clusters for tenant: ${apiConfig.basePath}`)
     }
 
     return clusterResponse.data;
