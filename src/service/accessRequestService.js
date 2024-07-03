@@ -3,7 +3,7 @@ import * as fs from "fs";
 import { AccessRequestsApi } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, writeConfigFile } from "../util.js";
-import { getGovGroupById, getGovGroupByName, getIdentityByAlias, getIdentityById } from "./identityUtil.js";
+import { getGovGroupById, getGovGroupByName, getIdentityByAlias, getIdentityById } from "./identityService.js";
 
 const ACCESS_REQUEST_CONFIG = "ACCESS_REQUEST_CONFIG";
 

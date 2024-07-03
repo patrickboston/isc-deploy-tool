@@ -4,9 +4,9 @@ import _ from 'lodash';
 import { Configuration, Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, walk, writeConfigFile } from "../util.js";
-import { getAllClusters } from "./clusterUtil.js";
-import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
-import { getAllRules } from "./ruleUtil.js";
+import { getAllClusters } from "./clusterService.js";
+import { getIdentityByAlias, getIdentityById } from "./identityService.js";
+import { getAllRules } from "./ruleService.js";
 
 const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";

@@ -4,7 +4,7 @@ import _ from 'lodash';
 import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
-import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
+import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 
 const WORKFLOW = "WORKFLOW";
 const existingAttributeToKeep = [

@@ -4,9 +4,9 @@ import _ from 'lodash';
 import { IdentityAttributesBetaApi, IdentityProfilesApi, LifecycleStatesApi, SourcesApi } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, walk, writeConfigFile } from "../util.js";
-import { getAccessProfileById, getAccessProfileByName } from "./accessProfileUtil.js";
-import { getIdentityByAlias, getIdentityById } from "./identityUtil.js";
-import { getAllRules } from "./ruleUtil.js";
+import { getAccessProfileById, getAccessProfileByName } from "./accessProfileService.js";
+import { getIdentityByAlias, getIdentityById } from "./identityService.js";
+import { getAllRules } from "./ruleService.js";
 import { getSourceById, getSourceByName } from "./sourceService.js";
 
 const IDENTITY_OBJECT_CONFIG = "IDENTITY_OBJECT_CONFIG";

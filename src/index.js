@@ -3,14 +3,14 @@ import clc from "cli-color";
 import * as fs from "fs";
 import { Configuration } from "sailpoint-api-client";
 import winston from "winston";
-import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestUtil.js";
+import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestService.js";
 import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfiles } from "./service/identityConfigService.js";
-import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityUtil.js";
-import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationUtil.js";
-import { exportRules, migrateRules } from "./service/ruleUtil.js";
+import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityService.js";
+import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationService.js";
+import { exportRules, migrateRules } from "./service/ruleService.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
-import { exportTransforms, migrateTransforms } from "./service/transformUtil.js";
-import { exportWorkflows, migrateWorkflows } from "./service/workflowUtil.js";
+import { exportTransforms, migrateTransforms } from "./service/transformService.js";
+import { exportWorkflows, migrateWorkflows } from "./service/workflowService.js";
 import { buildObjectsForEnvironment, reverseTokenize } from "./util.js";
 
 const start = Date.now();
@@ -78,7 +78,7 @@ const globalRetryConfig = {
         return retryCount * 20000;
     },
     onRetry(retryCount, error, requestConfig) {
-        winston.warn(clc.yellow(`ISC Rate limit reached, sleeping and retrying..., (retry number ${retryCount})`));
+        winston.warn(clc.yellow(`ISC Rate limit reached, sleeping and retrying... (retry number ${retryCount})`));
     },
     retryCondition: (error) => {
         return error.response.status === 429;
