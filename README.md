@@ -1,54 +1,37 @@
-# IdentityNow Object Migration Tool
-The IdentityNow Object Migration tool is a NodeJS command-line utility that allows you to export configuration objects such as Sources, Transforms, Rules, and more out of one IdentityNow environment and import/deploy them to other IdentityNow environments. It utilizes the [SP-Config API endpoints](https://developer.sailpoint.com/idn/api/beta/sp-config) to perform all export and import operations. One of the main benefits from using this tool is the ability to maintain single configuration objects that can be deploy to any environment via tokenization. This allows Source Code Management to actually make sense for IDN implementations and this process could easily be plugged into a CI/CD pipeline.
+# Identity Security Cloud Object Migration Tool
+The Identity Security Cloud Object Migration tool is a NodeJS command-line utility that allows you to export configuration objects such as Sources, Transforms, Rules, and more out of one Identity Security Cloud environment and import/deploy them to other Identity Security Cloud environments. It utilizes various v3/beta API endpoints to perform all export and import operations. One of the main benefits from using this tool is the ability to maintain single configuration objects that can be deploy to any environment via tokenization. This allows Source Code Management to actually make sense for ISC implementations and this process could easily be plugged into a CI/CD pipeline.
 
 It offers the following features:
-- Export objects and perform reverse-tokenization via JSONPath which replaces actual setting values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any IdentityNow environment
-- Tokenize and build objects for a target IdentityNow environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual setting values which are needed for a specific environment (i.e. IQService host for an Active Directory Source)
-- Tokenize and deploy objects to a target IdentityNow environment
+- Export objects and perform reverse-tokenization via JSONPath which replaces actual setting values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any Identity Security Cloud environment
+- Tokenize and build objects for a target Identity Security Cloud environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual setting values which are needed for a specific environment (i.e. IQService host for an Active Directory Source)
+- Tokenize and deploy objects to a target Identity Security Cloud environment
 
-If used properly, this tool can offer deployment workflows like the following:
-1. Perform initial sandbox setup
-2. Export objects you wish to be maintained in SCM and to be deployed to higher environments via this process
-3. Replace configuration values with tokens in configuration files and set up reverse tokenization to retain tokens on subsequent tenant exports
-4. Continue development in sandbox and export periodically, committing changes to a SCM repository. Changes could also be made directly in JSON configuration files in local repository and deployed back to an environment
-5. Once configuration is fully exported, tokenized, and ready to deploy to another environment, use the deploy process
+## Supported Object Types
+The following object types are currently supported for export/deploy:
+- RULE (connector rules + already approved cloud rules)
+- TRANSFORM
+- SOURCE (includes correlation config, schemas, and provisioning policies)
+- IDENTITY_OBJECT_CONFIG
+- IDENTITY_PROFILE (includes lifecycle states tied to the identity profile. **Does not include security settings**)
+- ACCESS_REQUEST_CONFIG
+- NOTIFICATION_TEMPLATE
+- WORKFLOW
+- GOVERNANCE_GROUP
 
 ## Setup
 This a NodeJS project that was written on NodeJS 18. You will need NodeJS installed prior to using this tool. Find the latest NodeJS download here: https://nodejs.org/en/download
 
 You can then clone this repository. Once the repository is cloned, run `npm install` within the cloned repository directory to install all project dependencies.
 
-You will also need to set up the following files in the root of your project to be able to export/import from IdentityNow environments:
-- `<env>.env.js` - Holds the parameters needed to login to hit IDN API endpoints via a PAT (Personal Access Token). There is an example in this repository, but it needs to look like this:
+You will also need to set up the following files in the root of your project to be able to export/import from Identity Security Cloud environments:
+- `<env>.env.js` - Holds the parameters needed to login to hit ISC API endpoints via a PAT (Personal Access Token). These files is in the default `.gitignore` and should never be pushed to the remote repository. There is an example in this repository, but it needs to look like this:
 ```js
 export default
     {
-        baseurl: "https://<env>.api.identitynow-demo.com",
+        baseurl: "https://<env>.api.identitynow.com",
         clientId: "id1234",
         clientSecret: "secret1234",
-        tokenUrl: "https://<env>.api.identitynow-demo.com/oauth/token",
-    }
-```
-- `export-config.js` - Contains the JSON object that is needed for the SP-Config tenant export process to run. This is where you can pick and choose what exactly you want to be exported out of an environment. For more information, see the following: https://developer.sailpoint.com/idn/api/beta/export-sp-config/
-```js
-export default
-    {
-        "description": "Export Job",
-        "excludeTypes": [
-            
-        ],
-        "includeTypes": [
-            "SOURCE"
-        ],
-        "objectOptions": {
-            "SOURCE": {
-                "includedIds": [
-                ],
-                "includedNames": [
-                    "Active Directory"
-                ]
-            }
-        }
+        tokenUrl: "https://<env>.api.identitynow.com/oauth/token",
     }
 ```
 - `reverse.target.js` - Contains entries specific for each config file that you would want to perform reverse-tokenization on when running the `export` command. Each entry under config file contains a key for the JSONPath of where to replace the value with the token specified. Reverse-tokenization simply means replacing the value of an entry in an object that is exported with a common token which can be replaced with an actual value when deploying that object to another environment
@@ -61,13 +44,21 @@ export default
         }
     }
 ```
-- `<env>.target.js` - Contains entries where the key is the token in your config files (which is put there manually or by reverse-tokenization) and the value is the specific value for that token that you want to be deployed to a target IdentityNow environment when running the `deploy` command
+- `<env>.target.js` - Contains entries where the key is the token in your config files (which is put there manually or by reverse-tokenization) and the value is the specific value for that token that you want to be deployed to a target Identity Security Cloud environment when running the `deploy` command
 ```js
 export default
     {
         "%%AD_OWNER_ID%%": "ABCD1234",
         "%%AD_IQSERVICE_PORT%%": "888888",
     }
+```
+- `export-ignore.js` - Contains an array of specific objects to ignore (not write to local config directory) when performing an export. Each entry must be in this specific format: `OBJECT_TYPE:Object Name`. See examples below:
+```js
+export default
+    [
+        "TRANSFORM:identityDisplayName",
+        ""
+    ]
 ```
 
 ## Commands
@@ -81,32 +72,34 @@ However, in the `package.json`, there are a number of scripts set up which make 
 > Ensure you put the double dash (`--`) after the command initial command and your arguments as documented below for each command
 
 ### Export
-To export objects from a specific environment and perform reverse-tokenization based on properties defined in your `reverse.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`. This process relies on the `export-config.js` file you have configured to determine which objects you want to export out of your source IdentityNow environment.
+To export objects from a specific environment and perform reverse-tokenization based on properties defined in your `reverse.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`.
 
 **NOTE:** The export process will overwrite any manual changes made in your `/config/` directory. This is why it is crucial to set up your reverse tokenization properties if you wish to retain a neutral object state that can be deployed to any target environment.
 ```
-npm run export -- --src-env=<env>
+npm run export -- --src_env=<env>
 ```
+
+All supported object types will be exported by default. To ignore exporting specific files, please see the information on the `export-ignore.js` file above.
 
 ### Build
 To perform tokenization and build objects locally for specific target environment based on tokens defined in your `<env>.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`. The built objects will reside in the `/build/config` directory
 ```
-npm run build -- --target-env=<env>
+npm run build -- --target_env=<env>
 ```
 
 ### Deploy/Import
 To perform tokenization and deploy/import into a specific target environment based on tokens defined in your `<env>.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`
 ```
-npm run deploy -- --target-env=<env>
+npm run deploy -- --target_env=<env>
 ```
 
 > [!NOTE]
-> The deploy/import execution process will continue on errors. Errors will be recorded in the terminal if encountered
+> The deploy/import execution process will continue on most errors. Errors will be recorded in the terminal if encountered
 
 
 
 ## Logging
-The commands above print out various logs by default. The default log priority is `info`. In order to print more verbose logs, pass the `--log_level` parameter. The following are valid log levels prioritized from highest to lowest:
+The commands above print out various logs by default to show progress, warnings, and errors. The default log priority is `info`. In order to print more verbose logs, pass the `--log_level` parameter. The following are valid log levels prioritized from highest to lowest:
 ```
 error: 0
 warn: 1
@@ -122,7 +115,7 @@ Most of the more detailed logging (HTTP requests, etc. is available at the `debu
 
 ## Configuration Object Special Considerations
 ### Owner References
-There are many objects throughout IDN that have owner references which point to an identity that have created an object, modified an object, etc. It is very important that owners are properly set up in exported configuration objects.
+There are many objects throughout ISC that have owner references which point to an identity that have created an object, modified an object, etc. It is very important that owners are properly set up in exported configuration objects.
 
 By default, you will see owner references contain a `type` which is always set to `IDENTITY`, an `id` which points to a very environment specific `id` for the identity that owns the objects (this is actually omitted during the export process), and lastly a `name` which is more of a soft reference that points to the owning identity. The `name` value can very between different object types, but is most often the `displayName` of an identity which is not ideal and does not guarantee a unique identity when looking up an identity by this name during migration to other environments. The only unique soft reference attribute on identities that guarantee a unique lookup is the `alias` attribute. **When you run the export process, objects with owner references will automatically have the `name` property value written as the owning identity's `alias` as opposed to their `displayName`.** This will allow us to perform unique identity lookups when migrating objects with owners to another environment. If an identity with that alias does not exist, the migration import will fail.  If you need different owners per environment because of preference or because an identity with a specific alias will next exist in the next environment, you will need to perform the following tokenization steps:
 1. Set up a reverse token in `reverse.target.js` for the object being exported. You could also hard code an identity alias here that will be the same owner across all environments instead of using a token

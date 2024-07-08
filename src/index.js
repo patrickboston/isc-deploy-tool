@@ -15,7 +15,6 @@ import { buildObjectsForEnvironment, reverseTokenize } from "./util.js";
 
 const start = Date.now();
 
-const results = [];
 const nodeArgs = (argList => {
     const args = {};
 
