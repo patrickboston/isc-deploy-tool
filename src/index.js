@@ -4,6 +4,7 @@ import * as fs from "fs";
 import { Configuration } from "sailpoint-api-client";
 import winston from "winston";
 import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestService.js";
+import { exportBranding, updateBranding } from "./service/brandingService.js";
 import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfiles } from "./service/identityConfigService.js";
 import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityService.js";
 import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationService.js";
@@ -135,6 +136,7 @@ if (isExport && isDetokenize) {
     await exportNotificationTemplates(srcApiConfig);
     await exportWorkflows(srcApiConfig);
     await exportGovernanceGroups(srcApiConfig);
+    await exportBranding(srcApiConfig);
 
     //Perform reverse tokenization on all exported files
     await reverseTokenize();
@@ -160,13 +162,14 @@ if (isDeploy) {
      * Objects need to be migrated in a specific order for reference sake. That order is:
      * 1. Rules (Connector + Already Approved Cloud)
      * 2. Transforms
-     * 3. Sources
-     * 4. Identity Object Config
-     * 5. Identity Profile (including Lifecycle States)
+     * 3. Sources (dependencies on rules, transforms)
+     * 4. Identity Object Config (dependencies on sources, rules, transforms)
+     * 5. Identity Profile (including Lifecycle States, dependencies on sources)
      * 6. Access Request Config
      * 7. Notification Template
      * 8. Workflow
      * 9. Governance Groups
+     * 10. Branding
     */
 
     await migrateRules(targetApiConfig);
@@ -178,6 +181,7 @@ if (isDeploy) {
     await migrateNotificationTemplates(targetApiConfig);
     await migrateWorkflows(targetApiConfig);
     await migrateGovernanceGroups(targetApiConfig);
+    await updateBranding(targetApiConfig, targetEnvName);
 }
 
 const end = Date.now();

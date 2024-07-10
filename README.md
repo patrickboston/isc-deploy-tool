@@ -17,6 +17,7 @@ The following object types are currently supported for export/deploy:
 - NOTIFICATION_TEMPLATE
 - WORKFLOW
 - GOVERNANCE_GROUP
+- BRANDING_CONFIG
 
 ## Setup
 This a NodeJS project that was written on NodeJS 18. You will need NodeJS installed prior to using this tool. Find the latest NodeJS download here: https://nodejs.org/en/download
@@ -60,6 +61,45 @@ export default
         ""
     ]
 ```
+
+## Config Directory Structure
+When the export command is run, it will automatically created a directory in the root of the project called `/config`. This is where all of the configuration JSON files from the export will be stored. It will look like this:
+```
+config
+ ┣ ACCESS_REQUEST_CONFIG
+ ┃ ┗ ACCESS_REQUEST_CONFIG.json
+ ┣ BRANDING_CONFIG
+ ┃ ┗ BRANDING_CONFIG.json
+ ┣ GOVERNANCE_GROUP
+ ┣ IDENTITY_OBJECT_CONFIG
+ ┃ ┗ IDENTITY_OBJECT_CONFIG.json
+ ┣ IDENTITY_PROFILE
+ ┃ ┣ HR
+ ┃ ┃ ┣ LIFECYCLE_STATE
+ ┃ ┃ ┃ ┣ Active.json
+ ┃ ┃ ┃ ┗ Inactive.json
+ ┃ ┃ ┗ HR.json
+ ┣ NOTIFICATION_TEMPLATE
+ ┣ RULE
+ ┣ SOURCE
+ ┃ ┣ Active Directory
+ ┃ ┃ ┣ ATTR_SYNC_SOURCE_CONFIG
+ ┃ ┃ ┃ ┗ Active Directory_ATTR_SYNC.json
+ ┃ ┃ ┣ CONNECTOR_SCHEMA
+ ┃ ┃ ┃ ┣ account.json
+ ┃ ┃ ┃ ┣ group.json
+ ┃ ┃ ┃ ┗ sharedMailbox.json
+ ┃ ┃ ┣ CORRELATION_CONFIG
+ ┃ ┃ ┃ ┗ Active Directory [source] Account Correlation.json
+ ┃ ┃ ┣ PROVISIONING_POLICY
+ ┃ ┃ ┃ ┣ Account_CREATE.json
+ ┃ ┃ ┗ Active Directory.json
+ ┣ TRANSFORM
+ ┗ WORKFLOW
+```
+As you can see, some more complex object types such as sources will have subdirectories for directly referenced objects such as schemas. This structure helps to keep everything conveniently organized and it is very important to keep this format as is for the deploy/import process. Files should not be moved unless you know what you are doing.
+
+When the `deploy` command is run, an additional directory will be created in the root of the project called `/build`. It will contain all built/tokenized objects that are going to be deployed to the target environment. It will be cleaned up every time the `deploy` command is run. You can view the built objects to view what was deployed to a target environment
 
 ## Commands
 Once you have all the pre-requisites above setup, you can now start running some commands. Open up your favorite terminal and navigate to your project location. Our `src/index.js` file is the main file that is run with NodejS. We can run the app with the following if we wanted
@@ -111,6 +151,13 @@ silly: 6
 ```
 
 Most of the more detailed logging (HTTP requests, etc. is available at the `debug` level).
+
+
+## Configuration Object Guidelines
+Follow these guidelines to ensure these object types are deployed successfully
+
+### BRANDING_CONFIG
+In order to deploy a branding logo image, you must create a directory in the root of the project called `./assets`. This directory will contain your logo images in `.png` format only. The name of each png image should match the name of your target environment (`--target_env`) that you provide in the `deploy` command, for example: `prod.png`.
 
 
 ## Configuration Object Special Considerations
