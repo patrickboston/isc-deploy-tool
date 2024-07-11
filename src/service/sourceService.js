@@ -95,8 +95,7 @@ const exportSources = async (apiConfig) => {
         }
 
         //Attribute Sync Config
-        const betaSourcesApi = new SourcesBetaApi(apiConfig);
-        const attrSyncConfigResponse = await betaSourcesApi.getSourceAttrSyncConfig({ id: source.id });
+        const attrSyncConfigResponse = await sourcesApiBeta.getSourceAttrSyncConfig({ id: source.id });
         if (attrSyncConfigResponse.data) {
             winston.info(`Exporting attribute sync config for source: ${sourceName}`);
             const attrSyncFileName = sourceName + "_ATTR_SYNC";
