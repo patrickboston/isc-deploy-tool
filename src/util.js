@@ -159,12 +159,20 @@ const reverseTokenize = async () => {
     })
 }
 
+const escapeString = (str) => {
+    return str.replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+}
+
 const buildObjectsForEnvironment = async (env) => {
     winston.info(clc.bgBlueBright(`Starting object tokenization for target environment: ${env}`))
 
     //Standard Tokens
     const envTokenFileName = "./../" + env + ".target.js";
-    let { default: envTokens } = await import(envTokenFileName);    
+    let { default: envTokens } = await import(envTokenFileName);
 
     //Secret Tokens
     const secretTokenFileName = "./../" + env + ".secrets.js";
@@ -176,9 +184,6 @@ const buildObjectsForEnvironment = async (env) => {
     } catch (e) {
         winston.info(clc.yellow(`No secrets file found for target environment [${env}]`));
     }
-
-    console.log(envTokens);
-        
 
     //Create directory for object type if it does not exist yet
     if (!fs.existsSync("./build/config/")) {
@@ -194,10 +199,12 @@ const buildObjectsForEnvironment = async (env) => {
             Object.entries(envTokens).forEach((token) => {
                 const [tokenName, tokenValue] = token;
                 const matches = fileSource.match(tokenName);
+                console.log(escapeString(tokenValue));
                 if (matches) {
                     winston.info(clc.green(`${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`));
                 }
-                fileSource = fileSource.replaceAll(tokenName, tokenValue);
+                //Stringify the value so it's escaped properly if a secret token or something   
+                fileSource = fileSource.replaceAll(tokenName, escapeString(tokenValue));
             });
 
             //Write tokenized file to /build/[TYPE] directory

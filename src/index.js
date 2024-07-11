@@ -75,7 +75,6 @@ winston.configure({
 const globalRetryConfig = {
     retries: 2,
     retryDelay: (retryCount) => {
-        console.log(`retry attempt: ${retryCount}`);
         return retryCount * 20000;
     },
     onRetry(retryCount, error, requestConfig) {
