@@ -1,7 +1,7 @@
 export default
     {
-        baseurl: "https://<env>.api.identitynow-demo.com",
+        baseurl: "https://<env>.api.identitynow.com",
         clientId: "id1234",
         clientSecret: "secret1234",
-        tokenUrl: "https://<env>.api.identitynow-demo.com/oauth/token",
+        tokenUrl: "https://<env>.api.identitynow.com/oauth/token",
     }

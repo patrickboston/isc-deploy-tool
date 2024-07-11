@@ -1,12 +1,22 @@
 #!/usr/bin/env node
-import { runExport, reverseTokenize, buildObjectsForEnvironment, buildDeploymentFile, runDeploy } from "./util.js";
-import { Configuration } from "sailpoint-api-client";
-import axiosRetry from "axios-retry";
 import clc from "cli-color";
+import * as fs from "fs";
+import { Configuration } from "sailpoint-api-client";
+import winston from "winston";
+import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestService.js";
+import { exportBranding, updateBranding } from "./service/brandingService.js";
+import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfiles } from "./service/identityConfigService.js";
+import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityService.js";
+import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationService.js";
+import { exportRules, migrateRules } from "./service/ruleService.js";
+import { exportServiceDeskIntegrations, migrateServiceDeskIntegrations } from "./service/serviceDeskIntegrationService.js";
+import { exportSources, migrateSources } from "./service/sourceService.js";
+import { exportTransforms, migrateTransforms } from "./service/transformService.js";
+import { exportWorkflows, migrateWorkflows } from "./service/workflowService.js";
+import { buildObjectsForEnvironment, reverseTokenize } from "./util.js";
 
-console.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
+const start = Date.now();
 
-const results = [];
 const nodeArgs = (argList => {
     const args = {};
 
@@ -41,66 +51,102 @@ let {
     deploy: isDeploy,
     detokenize: isDetokenize,
     src_env: srcEnvName,
-    target_env: targetEnvName
+    target_env: targetEnvName,
+    log_level: logLevel
 } = nodeArgs;
+
+//Logger
+const logFormat = winston.format.printf(({ level, message, label, timestamp }) => {
+    return `${timestamp} [${level}]: ${message}`;
+});
+winston.configure({
+    level: logLevel || "info",
+    format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.cli(),
+        winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+        logFormat
+    ),
+    transports: [
+        new winston.transports.Console()
+    ]
+});
+
+const globalRetryConfig = {
+    retries: 2,
+    retryDelay: (retryCount) => {
+        return retryCount * 20000;
+    },
+    onRetry(retryCount, error, requestConfig) {
+        winston.warn(clc.yellow(`ISC Rate limit reached, sleeping and retrying... (retry number ${retryCount})`));
+    },
+    retryCondition: (error) => {
+        return error.response.status === 429;
+    }
+};
 
 //Process args
 srcEnvName = srcEnvName && srcEnvName.toLowerCase();
 targetEnvName = targetEnvName && targetEnvName.toLowerCase();
 
+winston.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
+
 //Check export params
-if (isExport && (!srcEnvName || srcEnvName == "%npm_config_src_env%")) {
-    console.error(clc.bgRed("FAILED: --src_env argument is required for export but was not supplied, exiting"));
+if (isExport && !srcEnvName) {
+    winston.error(clc.bgRed("FAILED: --src_env argument is required for export but was not supplied, exiting"));
     process.exit(1);
-} else {
-    console.info(clc.bgMagentaBright(`Running with src_env: ${srcEnvName}`));
+} else if (isExport) {
+    winston.info(clc.bgMagentaBright(`Running with src_env: ${srcEnvName}`));
 }
 
 //Check build params
-if (isBuild && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
-    console.error(clc.bgRed("FAILED: --target_env argument is required for build but was not supplied, exiting"));
+if (isBuild && !targetEnvName) {
+    winston.error(clc.bgRed("FAILED: --target_env argument is required for build but was not supplied, exiting"));
     process.exit(1);
-} else {
-    console.info(clc.bgMagentaBright(`Running build with target_env: ${targetEnvName}`));
+} else if (isBuild) {
+    winston.info(clc.bgMagentaBright(`Running build with target_env: ${targetEnvName}`));
 }
 
 //Check deploy params
-if (isDeploy && (!targetEnvName || targetEnvName == "%npm_config_target_env%")) {
-    console.error(clc.bgRed("FAILED: --target_env argument is required for deploy but was not supplied, exiting"));
+if (isDeploy && (!targetEnvName)) {
+    winston.error(clc.bgRed("FAILED: --target_env argument is required for deploy but was not supplied, exiting"));
     process.exit(1);
-} else {
-    console.info(clc.bgMagentaBright(`Running deploy with target_env: ${targetEnvName}`));
+} else if (isDeploy) {
+    winston.info(clc.bgMagentaBright(`Running deploy with target_env: ${targetEnvName}`));
 }
 
+//Cleanup build directory
+fs.rmSync("./build", { recursive: true, force: true });
+
 //Perform export setup and process
-if (isExport) {
-    //Set up config based on envirnments
+if (isExport && isDetokenize) {
+    winston.info(clc.bgMagentaBright("Running export and de-tokenization..."));
+
     const { default: srcEnvParams } = await import("./../" + srcEnvName + ".env.js");
 
     let srcApiConfig = new Configuration(srcEnvParams);
-    srcApiConfig.retriesConfig = {
-        retries: 4,
-        retryDelay: axiosRetry.exponentialDelay,
-        onRetry(retryCount, error, requestConfig) {
-            console.log(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
-        }
-    }
+    srcApiConfig.retriesConfig = globalRetryConfig;
 
-    if (isExport && isDetokenize) {
-        console.log(clc.bgMagentaBright("Running export and de-tokenization..."));
-        await runExport(srcApiConfig).then((res) => {
-            reverseTokenize();
-        });
-    } else if (isExport && !isDetokenize) {
-        console.log(clc.bgMagentaBright("Running raw export WITHOUT de-tokenization"));
-        await runExport(srcApiConfig);
-    }
+    await exportRules(srcApiConfig);
+    await exportTransforms(srcApiConfig);
+    await exportSources(srcApiConfig);
+    await exportServiceDeskIntegrations(srcApiConfig);
+    await exportIdentityAttributeConfig(srcApiConfig);
+    await exportIdentityProfiles(srcApiConfig);
+    await exportAccessRequestConfig(srcApiConfig);
+    await exportNotificationTemplates(srcApiConfig);
+    await exportWorkflows(srcApiConfig);
+    await exportGovernanceGroups(srcApiConfig);
+    await exportBranding(srcApiConfig);
+
+    //Perform reverse tokenization on all exported files
+    await reverseTokenize();
 }
+
 
 //Perform local build only
 if (isBuild) {
     await buildObjectsForEnvironment(targetEnvName);
-    buildDeploymentFile();
 }
 
 //Perform deploy setup and process
@@ -108,27 +154,44 @@ if (isDeploy) {
     const { default: targetEnvParams } = await import("./../" + targetEnvName + ".env.js");
 
     let targetApiConfig = new Configuration(targetEnvParams);
-    targetApiConfig.retriesConfig = {
-        retries: 4,
-        retryDelay: axiosRetry.exponentialDelay,
-        onRetry(retryCount, error, requestConfig) {
-            console.log(clc.yellow(`Retrying due to request error, try number ${retryCount}`));
-        }
-    }
+    targetApiConfig.retriesConfig = globalRetryConfig;
 
+    //Perform tokenization
     await buildObjectsForEnvironment(targetEnvName);
-    const deployObj = buildDeploymentFile();
 
-    //Convert to a Blob for the HTTP multipart form data
-    const jsonString = JSON.stringify(deployObj);
-    const blobPayload = new Blob([jsonString], {
-        type: 'application/json'
-    });
+    /**
+     * Objects need to be migrated in a specific order for reference sake. That order is:
+     * 1. Rules (Connector + Already Approved Cloud)
+     * 2. Transforms
+     * 3. Sources (dependencies on rules, transforms)
+     * 4. Service Desk Integrations (dependencies on rules, sources)
+     * 5. Identity Object Config (dependencies on sources, rules, transforms)
+     * 6. Identity Profile (including Lifecycle States, dependencies on sources)
+     * 7. Access Request Config
+     * 8. Notification Template
+     * 9. Workflow
+     * 10. Governance Groups
+     * 11. Branding
+    */
 
-    await runDeploy(targetApiConfig, blobPayload).then((result) => {
-        console.info(JSON.stringify(result, null, 4));
-    });
+    await migrateRules(targetApiConfig);
+    await migrateTransforms(targetApiConfig);
+    await migrateSources(targetApiConfig);
+    await migrateServiceDeskIntegrations(targetApiConfig)
+    await migrateIdentityAttributeConfig(targetApiConfig);
+    await migrateIdentityProfiles(targetApiConfig);
+    await updateAccessRequestConfig(targetApiConfig);
+    await migrateNotificationTemplates(targetApiConfig);
+    await migrateWorkflows(targetApiConfig);
+    await migrateGovernanceGroups(targetApiConfig);
+    await updateBranding(targetApiConfig, targetEnvName);
 }
 
+const end = Date.now();
+const difference = end - start;
+const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+winston.info(clc.bgMagentaBright(`Execution time: ${hours}h ${minutes}m ${seconds}s`));
 
 process.exit(0);

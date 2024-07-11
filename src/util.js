@@ -1,120 +1,117 @@
-import { default as exportConfig } from "./../export-config.js";
-import { default as reverseTokens } from "./../reverse.target.js";
-import * as fs from "fs";
-import _ from 'lodash';
 import clc from "cli-color";
+import * as fs from "fs";
 import { JSONPath } from "jsonpath-plus";
+import _ from 'lodash';
 import { SPConfigBetaApi } from "sailpoint-api-client";
+import winston from "winston";
+import { default as exportIgnore } from "../export-ignore.js";
+import { default as reverseTokens } from "./../reverse.target.js";
 
-function walk(dir, files = []) {
-    // Get an array of all files and directories in the passed directory using fs.readdirSync
-    const fileList = fs.readdirSync(dir);
-    // Create the full path of the file/directory by concatenating the passed directory and file/directory name
-    for (const file of fileList) {
-        const name = `${dir}/${file}`;
-        // Check if the current file/directory is a directory using fs.statSync
-        if (fs.statSync(name).isDirectory()) {
-            // If it is a directory, recursively call the getFiles function with the directory path and the files array
-            walk(name, files);
-        } else {
-            // If it is a file, push the full path to the files array
-            files.push(name);
+/**
+* Sleeps for the specified number of milliseconds
+* @param {number} ms Time to sleep for in milliseconds
+*/
+const sleep = (ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+* Helper function to handle all of our HTTP requests via the SailPoint SDK
+* @param {Error} e The error which was caught
+*/
+const handleHttpException = async (e) => {
+    if (e.response) {
+        winston.error(clc.red(`Error while executing request:\nPath: ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+    } else {
+        winston.error(clc.red(`Generic while executing request: ${e.message}`));
+    }
+}
+
+/**
+* Recursively iterates all files in a given directory and returns a list of their full paths
+* @param {string} dir The name of the directory to walk
+* @param {number} [maxDepth=-1] How many directories deep to look
+* @returns {Array} List of full file paths found
+*/
+function walk(dir, maxDepth = -1, currentDepth = 0, files = []) {
+    //Get an array of all files and directories in the passed directory using fs.readdirSync
+    if (fs.existsSync(dir)) {
+        const fileList = fs.readdirSync(dir);
+        //Create the full path of the file/directory by concatenating the passed directory and file/directory name
+        for (const file of fileList) {
+            const name = `${dir}/${file}`;
+            //Check if the current file/directory is a directory using fs.statSync
+            if (fs.statSync(name).isDirectory()) {
+                if (maxDepth === -1 || currentDepth < maxDepth) {
+                    //If it is a directory and we haven't reached max depth, recursively call the walk function
+                    walk(name, maxDepth, currentDepth + 1, files);
+                }
+            } else {
+                //If it is a file, push the full path to the files array
+                files.push(name);
+            }
         }
+    } else {
+        winston.warn(clc.yellow(`Directory [${dir}] does not exist`));
     }
     return files;
 }
 
-function deepOmit(obj, keysToOmit) {
+function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "cloudExternalId", "cloudCacheUpdate", "since", "status", "healthy", "identityCount", "standardLogoURL"]) {
     let keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
     const keysToIgnore = [
-        "owner",
-        "passwordPolicies"
+        "transformDefinition" //This is very specific to identity profile transform references using key 'id'
     ];
 
-    function omitFromObject(obj) { // the inner function which will be called recursivley
+    function omitFromObject(obj) { //the inner function which will be called recursively
 
         return _.transform(obj, function (result, value, key) { // transform to a new object
-            if (key in keysToOmitIndex) { // if the key is in the index skip it
+            if (key in keysToOmitIndex) { //if the key is in the index skip it
                 return;
             }
 
             result[key] = _.isObject(value) && !keysToIgnore.includes(key) ? omitFromObject(value) : value;
         })
     }
-    return omitFromObject(obj); // return the inner function result
+    return omitFromObject(obj); //return the inner function result
 }
 
-const checkExportStatus = async (spConfigApi, jobId, timeout = 10000) => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            (async function wait() {
-                spConfigApi.getSpConfigExportStatus({ id: jobId }).then((response) => {
-                    if (response.data.status == "COMPLETE") {
-                        console.info(clc.bgGreen("SP-Config export completed"));
-                        resolve(response);
-                    } else if (response.data.status == "IN_PROGRESS") {
-                        console.log(clc.green("Export job [" + jobId + "] still in progress..."));
-                        setTimeout(wait, 100);
-                    } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
-                        console.error(response);
-                        resolve("Export job [" + jobId + "] has been cancelled or failed!");
-                    }
-                })
-            })();
-        }, 3000);
-    });
-}
+/**
+* Writes a IDN Config file to the specified location
+* creating a directory if needed to hold the object
+* Also omits certain attributes by default
+* @param {string} objectType Used for directory name and other special checks
+* @param {string} objectName Used for file name
+* @param {Object} object The actual object to write in JSON format
+* @param {string} [overrideDir=null] Override default write directory built from this function
+*/
+const writeConfigFile = (objectType, objectName, object, overrideDir = null) => {
+    //TODO: Create export ignore properties to avoid writing certain config files
+    const dir = overrideDir ? "./config/" + overrideDir : "./config/" + objectType;
+    //Create directory for object type if it does not exist yet
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
 
-const getExportResult = async (spConfigApi, jobId) => {
-    await spConfigApi.getSpConfigExport({ id: jobId }).then((response) => {
-        const responseObjects = response.data.objects;
-        responseObjects.forEach((responseObject) => {
-            const objectType = responseObject.self.type;
-            const objectName = responseObject.self.name;
-            const objectSource = responseObject.object;
-            console.log(`Exporting object: ${objectName} (${objectType})`);
+    //Write JSON file for object, replace characters not allowed in file names with dash
+    let fileName = dir + "/" + objectName.replace(/[/\\?%*:|"<>]/g, '-') + ".json";
 
-            //Delete id, created, modified where applicable
-            responseObject = deepOmit(responseObject, ["id", "created", "modified"]);
-
-            //Create directory for object type if it does not exist yet
-            if (!fs.existsSync("./config/" + objectType)) {
-                fs.mkdirSync("./config/" + objectType, { recursive: true });
-            }
-
-            if (objectType == "RULE") {
-                const source = objectSource.sourceCode.script;
-                const ruleSourceFileName = "./config/" + objectType + "/" + objectName + ".source.txt";
-                fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
-            }
-
-            //Write JSON file for object
-            const fileName = "./config/" + objectType + "/" + objectName + ".json";
-            fs.writeFileSync(fileName, JSON.stringify(responseObject, null, 4));
-        })
-    });
-}
-
-const runExport = async (apiConfig) => {
-    console.info(clc.bgBlueBright("Performing tenant export"));
-    return new Promise((resolve, reject) => {
-        let spConfigApi = new SPConfigBetaApi(apiConfig);
-
-        let spConfigReq = {
-            exportPayloadBeta: JSON.stringify(exportConfig)
-        };
-
-        spConfigApi.exportSpConfig(spConfigReq).then((response) => {
-            const jobId = response.data.jobId;
-            checkExportStatus(spConfigApi, jobId).then((response) => {
-                resolve(getExportResult(spConfigApi, jobId));
-            });
-        });
-    })
+    const ignoreFormat = `${objectType}:${objectName}`
+    if (exportIgnore.includes(ignoreFormat)) {
+        winston.info(clc.yellow(`${ignoreFormat} is set up for export ignore, not writing config file`));
+        if (fs.existsSync(fileName)) {
+            winston.info(clc.yellow(`${fileName} exists from previous exports, deleting it`));
+            fs.unlinkSync(fileName);
+        }
+    } else {
+        //Rule objects cannot be modified at all or else the signature validation fails, so don't omit from them
+        let omittedObj = objectType !== "RULE" ? deepOmit(object) : object;
+        fs.writeFileSync(fileName, JSON.stringify(omittedObj, null, 4));
+    }
 }
 
 const reverseTokenize = async () => {
-    console.info(clc.bgBlueBright("Performing reverse tokenization"));
+    winston.info(clc.bgBlueBright("Starting Reverse Tokenization"));
     return new Promise((resolve, reject) => {
         if (!reverseTokens) reject("No tokens to process")
 
@@ -124,14 +121,12 @@ const reverseTokenize = async () => {
             const fileLocation = "./config/" + fileName;
             try {
                 const fileSource = fs.readFileSync(fileLocation);
-
-                console.info(`Checking file: ${fileLocation}`);
                 let json = JSON.parse(fileSource);
 
                 //Iterate each token for a specific object/file
                 Object.entries(tokens).forEach((token) => {
                     const [jPath, tokenValue] = token;
-                    console.info(`Checking file [${fileName}] for JSONPath [${jPath}]`);
+                    winston.debug(`Checking file [${fileName}] for JSONPath [${jPath}]`);
 
                     let results = JSONPath({
                         path: jPath,
@@ -144,9 +139,9 @@ const reverseTokenize = async () => {
                         //Convert the JSONPath pointer to make it actual JavaScript dot notation
                         let correctPointer = results[0].pointer.replaceAll("/", ".").substring(1);
                         _.set(json, correctPointer, tokenValue);
-                        console.info(clc.bgGreen(`JSONPath match found, replacing value with token: ${tokenValue}`));
+                        winston.info(clc.green(`JSONPath match found in file [${fileLocation}], replacing environment value with token: ${tokenValue}`));
                     } else {
-                        console.warn(clc.yellow("Could not find JSON element for path: " + jPath));
+                        winston.warn(clc.yellow(`Could not find JSON element in file [${fileLocation}] for path: ` + jPath));
                     }
                 });
 
@@ -154,21 +149,41 @@ const reverseTokenize = async () => {
                 fs.writeFileSync(fileLocation, JSON.stringify(json, null, 4));
             } catch (err) {
                 if (err.code === 'ENOENT') {
-                    console.info(clc.bgRed(`File not found defined in reverse.target.js: ${fileLocation}`));
+                    winston.info(clc.bgRed(`File not found defined in reverse.target.js: ${fileLocation}`));
                 } else {
                     throw err;
                 }
             }
         });
-        console.info(clc.bgGreenBright("Reverse tokenization complete"));
         resolve("Reverse tokenization complete");
     })
 }
 
+const escapeString = (str) => {
+    return str.replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+}
+
 const buildObjectsForEnvironment = async (env) => {
-    console.info(clc.bgBlueBright(`Tokenizing objects for target environment: ${env}`))
+    winston.info(clc.bgBlueBright(`Starting object tokenization for target environment: ${env}`))
+
+    //Standard Tokens
     const envTokenFileName = "./../" + env + ".target.js";
-    const { default: envTokens } = await import(envTokenFileName);
+    let { default: envTokens } = await import(envTokenFileName);
+
+    //Secret Tokens
+    const secretTokenFileName = "./../" + env + ".secrets.js";
+    try {
+        const { default: secretTokens } = await import(secretTokenFileName);
+
+        //Merge secrets into existing tokens object
+        envTokens = { ...envTokens, ...secretTokens };
+    } catch (e) {
+        winston.info(clc.yellow(`No secrets file found for target environment [${env}]`));
+    }
 
     //Create directory for object type if it does not exist yet
     if (!fs.existsSync("./build/config/")) {
@@ -176,104 +191,178 @@ const buildObjectsForEnvironment = async (env) => {
     }
 
     //Iterate each config file from export
-    const configFileNames = walk('./config');
-    configFileNames.forEach((fileName) => {
+    const configFileNames = walk("./config");
+    for (const fileName of configFileNames) {
         if (fileName.endsWith(".json")) {
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
-            console.info(`Checking file ${fileName} for token replacement`);
+            winston.debug(`Checking file ${fileName} for token replacement`);
             Object.entries(envTokens).forEach((token) => {
                 const [tokenName, tokenValue] = token;
                 const matches = fileSource.match(tokenName);
                 if (matches) {
-                    console.info(clc.bgGreen(`${matches.length} occurence(s) of token name [${tokenName}] found in file [${fileName}]`));
+                    winston.info(clc.green(`${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`));
                 }
-                fileSource = fileSource.replaceAll(tokenName, tokenValue);
+                //Stringify the value so it's escaped properly if a secret token or something   
+                fileSource = fileSource.replaceAll(tokenName, escapeString(tokenValue));
             });
 
             //Write tokenized file to /build/[TYPE] directory
-            const objectJson = JSON.parse(fileSource);
-            const outputDir = "./build/config/" + objectJson.self.type
-            const outputFileName = outputDir + "/" + objectJson.self.name + ".json";
+            const outputFileName = "./build/" + fileName.substring(2);
+            const outputDir = outputFileName.substring(0, outputFileName.lastIndexOf('/'));
 
             if (!fs.existsSync(outputDir)) {
                 fs.mkdirSync(outputDir, { recursive: true });
             }
             fs.writeFileSync(outputFileName, fileSource);
         }
-    });
+    }
 }
 
-const buildDeploymentFile = () => {
+const buildSpConfigDeploymentFile = async (directoryToBuildFrom = "./build/config/") => {
     try {
-        if (!fs.existsSync("./build/config/")) {
-            throw new Error("./build/config directory does not exist, no objects to deploy");
+        if (!fs.existsSync(directoryToBuildFrom)) {
+            throw new Error(`${directoryToBuildFrom} directory does not exist, no objects to deploy`);
         }
 
         let objectArray = [];
-        const configFileNames = walk('./build/config');
-        configFileNames.forEach((fileName) => {
+        const configFileNames = walk(directoryToBuildFrom);
+        for (const fileName of configFileNames) {
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
-            console.info(`Including file ${fileName} for deployment`);
+            winston.debug(`Including file ${fileName} for SP-Config deployment file`);
             const objectJson = JSON.parse(fileSource);
             objectArray.push(objectJson);
-        });
+        }
         const deploymentObj = {
             objects: objectArray
         };
-        fs.writeFileSync("./build/deploy.json", JSON.stringify(deploymentObj, null, 4));
+        winston.debug(`Writing SP-Config import file to ${directoryToBuildFrom}`);
+        fs.writeFileSync(`${directoryToBuildFrom}/sp-config-deploy.json`, JSON.stringify(deploymentObj, null, 4));
         return deploymentObj;
     } catch (error) {
         throw new Error(error);
     }
 }
 
-const checkImportStatus = async (spConfigApi, jobId, timeout = 10000) => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            (async function wait() {
-                spConfigApi.getSpConfigImportStatus({ id: jobId }).then((response) => {
-                    if (response.data.status == "COMPLETE") {
-                        console.info(clc.bgGreen("SP-Config import completed"));
-                        resolve(response);
-                    } else if (response.data.status == "IN_PROGRESS") {
-                        console.log(clc.green("Import job [" + jobId + "] still in progress..."));
-                        setTimeout(wait, 100);
-                    } else if (response.data.status == "CANCELLED" || response.data.status == "FAILED") {
-                        resolve(clc.red("Import job [" + jobId + "] has been cancelled or failed!"));
-                    }
-                });
-            })();
-        }, 3000);
-    });
-}
+const runSpConfigExport = async (apiConfig, exportConfig) => {
+    winston.info(clc.green("SP-Config export started"));
+    const spConfigApi = new SPConfigBetaApi(apiConfig);
 
-const getImportResult = async (spConfigApi, jobId) => {
-    return new Promise((resolve) => {
-        spConfigApi.getSpConfigImport({ id: jobId }).then((response) => {
-            const result = response.data;
-            resolve(result);
+    let jobId;
+    try {
+        const startExportResponse = await spConfigApi.exportSpConfig({
+            exportPayloadBeta: JSON.stringify(exportConfig)
         });
-    });
+        jobId = startExportResponse.data.jobId;
+        winston.debug(`SP-Config Export jobId: ${jobId}`);
+    } catch (error) {
+        handleHttpException(error);
+        return; // Exit if the jobId cannot be retrieved
+    }
+
+    //Delay function to use with async/await
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    //Function to repeatedly check the import status
+    const checkStatus = async () => {
+        while (true) {
+            try {
+                const currentStatusResponse = await spConfigApi.getSpConfigExportStatus({ id: jobId });
+                winston.debug(`Current SP-Config export status for jobId [${jobId}]:\n${JSON.stringify(currentStatusResponse.data, null, 4)}`);
+                if (currentStatusResponse.data.status === "COMPLETE") {
+                    winston.info(clc.green("SP-Config export completed"));
+                    break;
+                } else if (currentStatusResponse.data.status === "IN_PROGRESS") {
+                    winston.info(`SP-Config export job [${jobId}] still in progress...`);
+                    await delay(2000); // Wait before checking the status again
+                } else if (currentStatusResponse.data.status === "CANCELLED" || currentStatusResponse.data.status === "FAILED") {
+                    winston.error(clc.red(`SP-Config export job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`));
+                    return;
+                }
+            } catch (error) {
+                handleHttpException(error);
+                break;
+            }
+        }
+    };
+
+    //Initial delay before starting to check the status
+    await delay(2000);
+    await checkStatus();
+
+    //Continue to get result if we actually have a jobId
+    if (jobId) {
+        try {
+            const exportResponse = await spConfigApi.getSpConfigExport({ id: jobId });
+            winston.debug(`SP-Config export full response:\n${JSON.stringify(exportResponse.data, null, 4)}`);
+            return exportResponse.data.objects;
+        } catch (error) {
+            handleHttpException(error);
+        }
+    }
 }
 
-const runDeploy = async (apiConfig, importData) => {
-    return new Promise((resolve, reject) => {
-        console.info(clc.bgBlueBright("Performing tenant deployment"));
-        let spConfigApi = new SPConfigBetaApi(apiConfig);
+const runSpConfigImport = async (apiConfig, importObj) => {
+    winston.info(clc.green("SP-Config import started"));
+    let spConfigApi = new SPConfigBetaApi(apiConfig);
 
-        spConfigApi.importSpConfig({ data: importData }).then((response) => {
-            const jobId = response.data.jobId;
-            checkImportStatus(spConfigApi, jobId).then((response) => {
-                resolve(getImportResult(spConfigApi, jobId));
-            })
-        });
+    const jsonString = JSON.stringify(importObj);
+    const blobPayload = new Blob([jsonString], {
+        type: 'application/json'
     });
-}
 
-export {
-    buildObjectsForEnvironment,
-    buildDeploymentFile,
-    runExport,
-    runDeploy,
-    reverseTokenize
+    let jobId;
+    try {
+        const startImportResponse = await spConfigApi.importSpConfig({ data: blobPayload });
+        jobId = startImportResponse.data.jobId;
+        winston.debug(`SP-Config import jobId: ${jobId}`);
+    } catch (error) {
+        handleHttpException(error);
+        return; // Exit if the jobId cannot be retrieved
+    }
+
+    //Delay function to use with async/await
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    //Function to repeatedly check the import status
+    const checkStatus = async () => {
+        while (true) {
+            try {
+                const currentStatusResponse = await spConfigApi.getSpConfigImportStatus({ id: jobId });
+                winston.debug(`Current SP-Config import status for jobId [${jobId}]:\n${JSON.stringify(currentStatusResponse.data, null, 4)}`);
+                if (currentStatusResponse.data.status === "COMPLETE") {
+                    winston.info(clc.green("SP-Config import completed"));
+                    break;
+                } else if (currentStatusResponse.data.status === "IN_PROGRESS") {
+                    winston.info(`SP-Config import job [${jobId}] still in progress...`);
+                    await delay(2000); // Wait before checking the status again
+                } else if (currentStatusResponse.data.status === "CANCELLED" || currentStatusResponse.data.status === "FAILED") {
+                    winston.error(clc.red(`SP-Config import job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`));
+                    return;
+                }
+            } catch (error) {
+                handleHttpException(error);
+                break;
+            }
+        }
+    };
+
+    //Initial delay before starting to check the status
+    await delay(2000);
+    await checkStatus();
+
+    //Continue to get result if we actually have a jobId
+    if (jobId) {
+        try {
+            const importResponse = await spConfigApi.getSpConfigImport({ id: jobId });
+            winston.debug(`SP-Config import full response:\n${JSON.stringify(importResponse.data, null, 4)}`);
+            return importResponse;
+        } catch (error) {
+            handleHttpException(error);
+        }
+    }
+    winston.info(clc.green("SP-Config import completed"));
 };
+
+
+export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, handleHttpException, reverseTokenize, runSpConfigExport, runSpConfigImport, sleep, walk, writeConfigFile };
+
