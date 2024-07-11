@@ -19,7 +19,7 @@ The following object types are currently supported for export/deploy:
 - GOVERNANCE_GROUP
 - BRANDING_CONFIG
 
-## Setup
+## Setup/Import Configuration Files
 This a NodeJS project that was written on NodeJS 18. You will need NodeJS installed prior to using this tool. Find the latest NodeJS download here: https://nodejs.org/en/download
 
 You can then clone this repository. Once the repository is cloned, run `npm install` within the cloned repository directory to install all project dependencies.
@@ -53,12 +53,20 @@ export default
         "%%AD_IQSERVICE_PORT%%": "888888",
     }
 ```
-- `export-ignore.js` - Contains an array of specific objects to ignore (not write to local config directory) when performing an export. Each entry must be in this specific format: `OBJECT_TYPE:Object Name`. See examples below:
+- `<env>.secrets.js` - Contains entries where the key is the token in your config files (which is put there manually or by reverse-tokenization) and the value is the plaintext secret/password for that token that you want to be deployed to a target Identity Security Cloud environment when running the `deploy` command. **These files are in the default .gitignore and should never be commmitted to the remote repository. This should only be used if you do not want to manually encrypt a password in a target environment so you can have the encrypted version of a secret to put into the `<env>.target.js` file**
+```js
+export default
+    {
+        "%%AD_OWNER_ID%%": "ABCD1234",
+        "%%AD_IQSERVICE_PORT%%": "888888",
+    }
+```
+- `export-ignore.js` - Contains an array of specific objects to ignore (not write to local config directory) when performing an export. Each entry must be in this specific format: `OBJECT_TYPE:Object Name`. If a file exists in your local `./config` directory and is then later added to this file, it will be deleted on the next export run See examples below:
 ```js
 export default
     [
         "TRANSFORM:identityDisplayName",
-        ""
+        "SOURCE:TestAD"
     ]
 ```
 
@@ -156,7 +164,12 @@ Most of the more detailed logging (HTTP requests, etc. is available at the `debu
 ## Configuration Object Guidelines
 Follow these guidelines to ensure these object types are deployed successfully
 
-### BRANDING_CONFIG
+### Secrets
+Objects such as sources and service desk integrations contain encrypted secrets/passwords for connecting to applications. Plain text secrets are either entered through the UI or via API and when saved, they are automatically encrypted using SailPoint's backend encryption process. Additionally, you will be connecting to different environments of these downstream applications from different ISC environments (i.e. Non-Prod AD vs Prod AD). This means the encrypted secret value will differ per ISC environments. Passwords can be deployed via this build tool and there are two methods for doing that:
+1. Tokenization of Encrypted Secrets - Encrypted secret values can simply be stored in your `<env>.target.js` file. The issue here is that you will need to have those encrypted secret values for all environments. For example, if you onboard a source into your sandbox ISC environment which connects to a non-prod downstream application where in your production ISC tenant it will be connecting to the production instance of that downstream application, before you can deploy that new source to production ISC for the first time, you need the encrypted secret value. One way to do this would to create a dummy source in your production ISC tenant and provide the password in a password/secret field, save the source, and then fetch the encrypted value via API/VSCode/etc. and then plug that value into the appropriate token for that secret in your repository
+2. Plaintext Secrets via Separate Secret Tokens - Another less-secure option this tool provides is a separate tokens file named `<env>.secrets.js`. This has the same exact concept of your `<env>.target.js` file, but is only used to store plaintext secrets. These files would never be committed to a remote repository and would only be held by a trust member of the team who is running the build process. The plaintext passwords would be provided when creating/updating objects via API calls and would be automatically encrypted by ISC
+
+### Branding
 In order to deploy a branding logo image, you must create a directory in the root of the project called `./assets`. This directory will contain your logo images in `.png` format only. The name of each png image should match the name of your target environment (`--target_env`) that you provide in the `deploy` command, for example: `prod.png`.
 
 

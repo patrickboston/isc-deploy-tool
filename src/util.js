@@ -161,8 +161,24 @@ const reverseTokenize = async () => {
 
 const buildObjectsForEnvironment = async (env) => {
     winston.info(clc.bgBlueBright(`Starting object tokenization for target environment: ${env}`))
+
+    //Standard Tokens
     const envTokenFileName = "./../" + env + ".target.js";
-    const { default: envTokens } = await import(envTokenFileName);
+    let { default: envTokens } = await import(envTokenFileName);    
+
+    //Secret Tokens
+    const secretTokenFileName = "./../" + env + ".secrets.js";
+    try {
+        const { default: secretTokens } = await import(secretTokenFileName);
+
+        //Merge secrets into existing tokens object
+        envTokens = { ...envTokens, ...secretTokens };
+    } catch (e) {
+        winston.info(clc.yellow(`No secrets file found for target environment [${env}]`));
+    }
+
+    console.log(envTokens);
+        
 
     //Create directory for object type if it does not exist yet
     if (!fs.existsSync("./build/config/")) {

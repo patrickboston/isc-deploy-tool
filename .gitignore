@@ -1,6 +1,7 @@
 # IDN Project Specific
 build/
 *.env.js
+*.secrets.js
 
 # Logs
 logs
