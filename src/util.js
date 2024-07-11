@@ -199,7 +199,6 @@ const buildObjectsForEnvironment = async (env) => {
             Object.entries(envTokens).forEach((token) => {
                 const [tokenName, tokenValue] = token;
                 const matches = fileSource.match(tokenName);
-                console.log(escapeString(tokenValue));
                 if (matches) {
                     winston.info(clc.green(`${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`));
                 }
