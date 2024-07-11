@@ -9,6 +9,7 @@ import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityA
 import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityService.js";
 import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationService.js";
 import { exportRules, migrateRules } from "./service/ruleService.js";
+import { exportServiceDeskIntegrations, migrateServiceDeskIntegrations } from "./service/serviceDeskIntegrationService.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
 import { exportTransforms, migrateTransforms } from "./service/transformService.js";
 import { exportWorkflows, migrateWorkflows } from "./service/workflowService.js";
@@ -130,6 +131,7 @@ if (isExport && isDetokenize) {
     await exportRules(srcApiConfig);
     await exportTransforms(srcApiConfig);
     await exportSources(srcApiConfig);
+    await exportServiceDeskIntegrations(srcApiConfig);
     await exportIdentityAttributeConfig(srcApiConfig);
     await exportIdentityProfiles(srcApiConfig);
     await exportAccessRequestConfig(srcApiConfig);
@@ -163,18 +165,20 @@ if (isDeploy) {
      * 1. Rules (Connector + Already Approved Cloud)
      * 2. Transforms
      * 3. Sources (dependencies on rules, transforms)
-     * 4. Identity Object Config (dependencies on sources, rules, transforms)
-     * 5. Identity Profile (including Lifecycle States, dependencies on sources)
-     * 6. Access Request Config
-     * 7. Notification Template
-     * 8. Workflow
-     * 9. Governance Groups
-     * 10. Branding
+     * 4. Service Desk Integrations (dependencies on rules, sources)
+     * 5. Identity Object Config (dependencies on sources, rules, transforms)
+     * 6. Identity Profile (including Lifecycle States, dependencies on sources)
+     * 7. Access Request Config
+     * 8. Notification Template
+     * 9. Workflow
+     * 10. Governance Groups
+     * 11. Branding
     */
 
     await migrateRules(targetApiConfig);
     await migrateTransforms(targetApiConfig);
     await migrateSources(targetApiConfig);
+    await migrateServiceDeskIntegrations(targetApiConfig)
     await migrateIdentityAttributeConfig(targetApiConfig);
     await migrateIdentityProfiles(targetApiConfig);
     await updateAccessRequestConfig(targetApiConfig);
