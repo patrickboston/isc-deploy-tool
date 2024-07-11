@@ -192,7 +192,7 @@ const buildObjectsForEnvironment = async (env) => {
 
     //Iterate each config file from export
     const configFileNames = walk("./config");
-    configFileNames.forEach((fileName) => {
+    for (const fileName of configFileNames) {
         if (fileName.endsWith(".json")) {
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
             winston.debug(`Checking file ${fileName} for token replacement`);
@@ -215,7 +215,7 @@ const buildObjectsForEnvironment = async (env) => {
             }
             fs.writeFileSync(outputFileName, fileSource);
         }
-    });
+    }
 }
 
 const buildSpConfigDeploymentFile = async (directoryToBuildFrom = "./build/config/") => {
