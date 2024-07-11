@@ -1,7 +1,7 @@
 {
-  "name": "isc-build-tool",
+  "name": "isc-deploy-tool",
   "version": "1.0.0",
-  "description": "Identity Security Cloud Build Tool",
+  "description": "Identity Security Cloud Deploy Tool",
   "main": "index.js",
   "type": "module",
   "scripts": {
