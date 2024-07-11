@@ -89,7 +89,7 @@ const globalRetryConfig = {
 srcEnvName = srcEnvName && srcEnvName.toLowerCase();
 targetEnvName = targetEnvName && targetEnvName.toLowerCase();
 
-winston.info(clc.bgBlueBright("SailPoint IDN Migration Tool"));
+winston.info(clc.bgBlueBright("SailPoint ISC Build Tool"));
 
 //Check export params
 if (isExport && !srcEnvName) {

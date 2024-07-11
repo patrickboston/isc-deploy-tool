@@ -1,7 +1,7 @@
 {
-  "name": "idn-migration-tool",
+  "name": "isc-build-tool",
   "version": "1.0.0",
-  "description": "IdentityNow Object Migration Tool",
+  "description": "Identity Security Cloud Build Tool",
   "main": "index.js",
   "type": "module",
   "scripts": {
