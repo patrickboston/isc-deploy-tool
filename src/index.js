@@ -17,6 +17,7 @@ import { buildObjectsForEnvironment, reverseTokenize } from "./util.js";
 
 const start = Date.now();
 
+//Parse input args from cmd
 const nodeArgs = (argList => {
     const args = {};
 
@@ -55,7 +56,7 @@ let {
     log_level: logLevel
 } = nodeArgs;
 
-//Logger
+//Global winston logger
 const logFormat = winston.format.printf(({ level, message, label, timestamp }) => {
     return `${timestamp} [${level}]: ${message}`;
 });
@@ -72,6 +73,9 @@ winston.configure({
     ]
 });
 
+winston.info(clc.bgBlueBright("SailPoint ISC Deploy Tool"));
+
+//Retry config for Axios
 const globalRetryConfig = {
     retries: 2,
     retryDelay: (retryCount) => {
@@ -85,11 +89,30 @@ const globalRetryConfig = {
     }
 };
 
-//Process args
+/**
+ * Check environment variables for BASE_URL, TOKEN_URL, CLIENT_ID, and CLIENT_SECRET
+ * If these exist, we will use these and ignore <env>.env.js files since we would are
+ * preferring local env variables or using a pipeline process
+*/
+const BASE_URL = process.env.BASE_URL;
+const TOKEN_URL = process.env.TOKEN_URL;
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+let globalApiConfiguration;
+if (BASE_URL && TOKEN_URL && CLIENT_ID && CLIENT_SECRET) {
+    winston.debug("Detected required environment variables, using those instead of env.js config file");
+    globalApiConfiguration = new Configuration({
+        baseurl: BASE_URL,
+        tokenUrl: TOKEN_URL,
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+    });
+    globalApiConfiguration.retriesConfig = globalRetryConfig;
+}
+
+//Process input args
 srcEnvName = srcEnvName && srcEnvName.toLowerCase();
 targetEnvName = targetEnvName && targetEnvName.toLowerCase();
-
-winston.info(clc.bgBlueBright("SailPoint ISC Deploy Tool"));
 
 //Check export params
 if (isExport && !srcEnvName) {
@@ -122,22 +145,23 @@ fs.rmSync("./build", { recursive: true, force: true });
 if (isExport && isDetokenize) {
     winston.info(clc.bgMagentaBright("Running export and de-tokenization..."));
 
-    const { default: srcEnvParams } = await import("./../" + srcEnvName + ".env.js");
+    if (!globalApiConfiguration) {
+        const { default: srcEnvParams } = await import("./../" + srcEnvName + ".env.js");
+        globalApiConfiguration = new Configuration(srcEnvParams);
+        globalApiConfiguration.retriesConfig = globalRetryConfig;
+    }
 
-    let srcApiConfig = new Configuration(srcEnvParams);
-    srcApiConfig.retriesConfig = globalRetryConfig;
-
-    await exportRules(srcApiConfig);
-    await exportTransforms(srcApiConfig);
-    await exportSources(srcApiConfig);
-    await exportServiceDeskIntegrations(srcApiConfig);
-    await exportIdentityAttributeConfig(srcApiConfig);
-    await exportIdentityProfiles(srcApiConfig);
-    await exportAccessRequestConfig(srcApiConfig);
-    await exportNotificationTemplates(srcApiConfig);
-    await exportWorkflows(srcApiConfig);
-    await exportGovernanceGroups(srcApiConfig);
-    await exportBranding(srcApiConfig);
+    await exportRules(globalApiConfiguration);
+    await exportTransforms(globalApiConfiguration);
+    await exportSources(globalApiConfiguration);
+    await exportServiceDeskIntegrations(globalApiConfiguration);
+    await exportIdentityAttributeConfig(globalApiConfiguration);
+    await exportIdentityProfiles(globalApiConfiguration);
+    await exportAccessRequestConfig(globalApiConfiguration);
+    await exportNotificationTemplates(globalApiConfiguration);
+    await exportWorkflows(globalApiConfiguration);
+    await exportGovernanceGroups(globalApiConfiguration);
+    await exportBranding(globalApiConfiguration);
 
     //Perform reverse tokenization on all exported files
     await reverseTokenize();
@@ -151,10 +175,12 @@ if (isBuild) {
 
 //Perform deploy setup and process
 if (isDeploy) {
-    const { default: targetEnvParams } = await import("./../" + targetEnvName + ".env.js");
 
-    let targetApiConfig = new Configuration(targetEnvParams);
-    targetApiConfig.retriesConfig = globalRetryConfig;
+    if (!globalApiConfiguration) {
+        const { default: targetEnvParams } = await import("./../" + targetEnvName + ".env.js");
+        globalApiConfiguration = new Configuration(targetEnvParams);
+        globalApiConfiguration.retriesConfig = globalRetryConfig;
+    }
 
     //Perform tokenization
     await buildObjectsForEnvironment(targetEnvName);
@@ -174,17 +200,17 @@ if (isDeploy) {
      * 11. Branding
     */
 
-    await migrateRules(targetApiConfig);
-    await migrateTransforms(targetApiConfig);
-    await migrateSources(targetApiConfig);
-    await migrateServiceDeskIntegrations(targetApiConfig)
-    await migrateIdentityAttributeConfig(targetApiConfig);
-    await migrateIdentityProfiles(targetApiConfig);
-    await updateAccessRequestConfig(targetApiConfig);
-    await migrateNotificationTemplates(targetApiConfig);
-    await migrateWorkflows(targetApiConfig);
-    await migrateGovernanceGroups(targetApiConfig);
-    await updateBranding(targetApiConfig, targetEnvName);
+    await migrateRules(globalApiConfiguration);
+    await migrateTransforms(globalApiConfiguration);
+    await migrateSources(globalApiConfiguration);
+    await migrateServiceDeskIntegrations(globalApiConfiguration)
+    await migrateIdentityAttributeConfig(globalApiConfiguration);
+    await migrateIdentityProfiles(globalApiConfiguration);
+    await updateAccessRequestConfig(globalApiConfiguration);
+    await migrateNotificationTemplates(globalApiConfiguration);
+    await migrateWorkflows(globalApiConfiguration);
+    await migrateGovernanceGroups(globalApiConfiguration);
+    await updateBranding(globalApiConfiguration, targetEnvName);
 }
 
 const end = Date.now();
