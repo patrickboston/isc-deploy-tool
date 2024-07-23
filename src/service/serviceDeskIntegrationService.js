@@ -164,6 +164,7 @@ const migrateServiceDeskIntegrations = async (apiConfig) => {
         const serviceDeskIntegration = fs.readFileSync(serviceDeskIntegrationFilePath);
         await migrateServiceDeskIntegration(apiConfig, serviceDeskIntegration);
     }
+    winston.info(clc.bgGreen("Completed Service Desk Integration Deployment"));
 }
 
 export {

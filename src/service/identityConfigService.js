@@ -83,68 +83,75 @@ const exportIdentityProfiles = async (apiConfig) => {
 const migrateIdentityAttributeConfig = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Identity Attribute Configuration Deployment"));
     const identityAttributesApi = new IdentityAttributesBetaApi(apiConfig);
-    const identityAttributeConfigFile = fs.readFileSync("./build/config/IDENTITY_OBJECT_CONFIG/IDENTITY_OBJECT_CONFIG.json");
 
-    //Differs from other objects as we need to iterate each attribute in the array of attributes
-    let localIdentityAttributeConfig = JSON.parse(identityAttributeConfigFile);
-    for (const localIdentityAttribute of localIdentityAttributeConfig) {
-        //Check and see if a identity attribute with this name already exists in the target environment
-        let currentTargetIdentityAttribute;
-        try {
-            const currentIdentityAttributeResponse = await identityAttributesApi.getIdentityAttribute({
-                name: localIdentityAttribute.name
-            });
-            currentTargetIdentityAttribute = currentIdentityAttributeResponse.data;
-        } catch (error) {
-            if (error.response.status === 404) {
-                winston.debug(`Identity Attribute [${localIdentityAttribute.name}] does not exist yet`);
+    const identityAttributeConfigFilePaths = walk("./build/config/IDENTITY_OBJECT_CONFIG");
+
+    //Iterate each source and pass it to migrateSource
+    for (const identityAttributeConfigFilePath of identityAttributeConfigFilePaths) {
+        const identityAttributeConfigFile = fs.readFileSync(identityAttributeConfigFilePath);
+
+        //Differs from other objects as we need to iterate each attribute in the array of attributes
+        let localIdentityAttributeConfig = JSON.parse(identityAttributeConfigFile);
+        for (const localIdentityAttribute of localIdentityAttributeConfig) {
+            //Check and see if a identity attribute with this name already exists in the target environment
+            let currentTargetIdentityAttribute;
+            try {
+                const currentIdentityAttributeResponse = await identityAttributesApi.getIdentityAttribute({
+                    name: localIdentityAttribute.name
+                });
+                currentTargetIdentityAttribute = currentIdentityAttributeResponse.data;
+            } catch (error) {
+                if (error.response.status === 404) {
+                    winston.debug(`Identity Attribute [${localIdentityAttribute.name}] does not exist yet`);
+                } else {
+                    handleHttpException(error);
+                }
+            }
+
+            if (!currentTargetIdentityAttribute) {
+                winston.info(clc.bgBlueBright(`Creating new identity attribute for: ${localIdentityAttribute.name}`));
+                try {
+                    const createIdentityAttributeResponse = await identityAttributesApi.createIdentityAttribute({
+                        identityAttributeBeta: {
+                            name: localIdentityAttribute.name,
+                            displayName: localIdentityAttribute.displayName,
+                            multi: localIdentityAttribute.multi,
+                            searchable: localIdentityAttribute.searchable,
+                            sources: localIdentityAttribute.sources,
+                            standard: localIdentityAttribute.standard,
+                            system: localIdentityAttribute.system,
+                            type: localIdentityAttribute.type
+                        }
+                    });
+                    currentTargetIdentityAttribute = createIdentityAttributeResponse.data;
+                } catch (error) {
+                    await handleHttpException(error);
+                }
             } else {
-                handleHttpException(error);
-            }
-        }
+                winston.info(`Updating existing identity attribute: ${localIdentityAttribute.name}`);
 
-        if (!currentTargetIdentityAttribute) {
-            winston.info(clc.bgBlueBright(`Creating new identity attribute for: ${localIdentityAttribute.name}`));
-            try {
-                const createIdentityAttributeResponse = await identityAttributesApi.createIdentityAttribute({
-                    identityAttributeBeta: {
+                //Update the identity attribute with all config, references, etc.
+                try {
+                    await identityAttributesApi.putIdentityAttribute({
                         name: localIdentityAttribute.name,
-                        displayName: localIdentityAttribute.displayName,
-                        multi: localIdentityAttribute.multi,
-                        searchable: localIdentityAttribute.searchable,
-                        sources: localIdentityAttribute.sources,
-                        standard: localIdentityAttribute.standard,
-                        system: localIdentityAttribute.system,
-                        type: localIdentityAttribute.type
-                    }
-                });
-                currentTargetIdentityAttribute = createIdentityAttributeResponse.data;
-            } catch (error) {
-                await handleHttpException(error);
-            }
-        } else {
-            winston.info(`Updating existing identity attribute: ${localIdentityAttribute.name}`);
-
-            //Update the identity attribute with all config, references, etc.
-            try {
-                await identityAttributesApi.putIdentityAttribute({
-                    name: localIdentityAttribute.name,
-                    identityAttributeBeta: {
-                        name: localIdentityAttribute.name,
-                        displayName: localIdentityAttribute.displayName,
-                        multi: localIdentityAttribute.multi,
-                        searchable: localIdentityAttribute.searchable,
-                        sources: localIdentityAttribute.sources,
-                        standard: localIdentityAttribute.standard,
-                        system: localIdentityAttribute.system,
-                        type: localIdentityAttribute.type
-                    }
-                });
-            } catch (error) {
-                await handleHttpException(error);
+                        identityAttributeBeta: {
+                            name: localIdentityAttribute.name,
+                            displayName: localIdentityAttribute.displayName,
+                            multi: localIdentityAttribute.multi,
+                            searchable: localIdentityAttribute.searchable,
+                            sources: localIdentityAttribute.sources,
+                            standard: localIdentityAttribute.standard,
+                            system: localIdentityAttribute.system,
+                            type: localIdentityAttribute.type
+                        }
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
+                }
             }
         }
     }
+    winston.info(clc.bgGreen("Completed Identity Attribute Configuration Deployment"));
 }
 
 const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
@@ -152,7 +159,6 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     const sourcesApi = new SourcesApi(apiConfig);
 
     let localIdentityProfile = JSON.parse(identityProfileJson);
-
 
     //Get all rules incase we need to perform a lookup
     const rules = await getAllRules(apiConfig);
@@ -427,6 +433,7 @@ const migrateIdentityProfiles = async (apiConfig) => {
         const identityProfile = fs.readFileSync(identityProfileFilePath);
         await migrateIdentityProfile(apiConfig, identityProfile);
     }
+    winston.info(clc.bgGreen("Completed Identity Profile Deployment"));
 }
 
 export {

@@ -72,6 +72,7 @@ const migrateTransforms = async (apiConfig) => {
         const transform = fs.readFileSync(transformFilePath);
         await migrateTransform(apiConfig, transform);
     }
+    winston.info(clc.bgGreen("Completed Transform Deployment"));
 }
 
 export {

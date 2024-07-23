@@ -90,6 +90,7 @@ const migrateNotificationTemplates = async (apiConfig) => {
         const notificationTemplate = fs.readFileSync(notificationTemplateFilePath);
         await migrateNotificationTemplate(apiConfig, notificationTemplate);
     }
+    winston.info(clc.bgGreen("Completed Notification Template Deployment"));
 }
 
 export {

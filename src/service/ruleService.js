@@ -51,13 +51,19 @@ const migrateRules = async (apiConfig) => {
         let localRule = JSON.parse(fs.readFileSync(ruleFilePath));
         rulesToDeploy.push(localRule);
     }
-    const spConfigImportObject = {
-        objects: rulesToDeploy
-    };
-    const ruleImportResponse = await runSpConfigImport(apiConfig, spConfigImportObject);
-    if (ruleImportResponse.data && ruleImportResponse.data.results.RULE.errors.length > 0) {
-        winston.error(clc.red(`Error import rules via SP-Config:\n${JSON.stringify(ruleImportResponse.data.results.RULE.errors, null, 4)}`))
+    if (rulesToDeploy.length > 0) {
+        const spConfigImportObject = {
+            objects: rulesToDeploy
+        };
+        const ruleImportResponse = await runSpConfigImport(apiConfig, spConfigImportObject);
+        winston.debug(JSON.stringify(ruleImportResponse.data, null, 4));
+        if (ruleImportResponse.data && ruleImportResponse.data.results && ruleImportResponse.data.results.RULE && ruleImportResponse.data.results.RULE.errors) {
+            if (ruleImportResponse.data.results.RULE.errors.length > 0) {
+                winston.error(clc.red(`Error import rules via SP-Config:\n${JSON.stringify(ruleImportResponse.data.results.RULE.errors, null, 4)}`));
+            }
+        }
     }
+    winston.info(clc.bgGreen("Completed Rule Deployment"));
 }
 
 export {

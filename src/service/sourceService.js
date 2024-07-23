@@ -416,6 +416,7 @@ const migrateSources = async (apiConfig) => {
         const source = fs.readFileSync(sourceFilePath);
         await migrateSource(apiConfig, source);
     }
+    winston.info(clc.bgGreen("Completed Source Deployment"));
 }
 
 export {

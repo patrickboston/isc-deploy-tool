@@ -180,6 +180,7 @@ const migrateWorkflows = async (apiConfig) => {
         const workflow = fs.readFileSync(workflowFilePath);
         await migrateWorkflow(apiConfig, workflow);
     }
+    winston.info(clc.bgGreen("Completed Workflow Deployment"));
 }
 
 export {
