@@ -151,6 +151,7 @@ if (isExport && isDetokenize) {
         globalApiConfiguration.retriesConfig = globalRetryConfig;
     }
 
+    await exportGovernanceGroups(globalApiConfiguration);
     await exportRules(globalApiConfiguration);
     await exportTransforms(globalApiConfiguration);
     await exportSources(globalApiConfiguration);
@@ -160,7 +161,6 @@ if (isExport && isDetokenize) {
     await exportAccessRequestConfig(globalApiConfiguration);
     await exportNotificationTemplates(globalApiConfiguration);
     await exportWorkflows(globalApiConfiguration);
-    await exportGovernanceGroups(globalApiConfiguration);
     await exportBranding(globalApiConfiguration);
 
     //Perform reverse tokenization on all exported files
@@ -187,19 +187,20 @@ if (isDeploy) {
 
     /**
      * Objects need to be migrated in a specific order for reference sake. That order is:
-     * 1. Rules (Connector + Already Approved Cloud)
-     * 2. Transforms
-     * 3. Sources (dependencies on rules, transforms)
-     * 4. Service Desk Integrations (dependencies on rules, sources)
-     * 5. Identity Object Config (dependencies on sources, rules, transforms)
-     * 6. Identity Profile (including Lifecycle States, dependencies on sources)
-     * 7. Access Request Config
-     * 8. Notification Template
-     * 9. Workflow
-     * 10. Governance Groups
+     * 1. Governance Groups
+     * 2. Rules (Connector + Already Approved Cloud)
+     * 3. Transforms
+     * 4. Sources (dependencies on rules, transforms)
+     * 5. Service Desk Integrations (dependencies on rules, sources)
+     * 6. Identity Object Config (dependencies on sources, rules, transforms)
+     * 7. Identity Profile (including Lifecycle States, dependencies on sources)
+     * 8. Access Request Config
+     * 9. Notification Template
+     * 10. Workflow
      * 11. Branding
     */
 
+    await migrateGovernanceGroups(globalApiConfiguration);
     await migrateRules(globalApiConfiguration);
     await migrateTransforms(globalApiConfiguration);
     await migrateSources(globalApiConfiguration);
@@ -209,7 +210,6 @@ if (isDeploy) {
     await updateAccessRequestConfig(globalApiConfiguration);
     await migrateNotificationTemplates(globalApiConfiguration);
     await migrateWorkflows(globalApiConfiguration);
-    await migrateGovernanceGroups(globalApiConfiguration);
     await updateBranding(globalApiConfiguration, targetEnvName);
 }
 
