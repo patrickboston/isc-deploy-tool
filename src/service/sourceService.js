@@ -3,7 +3,7 @@ import * as fs from "fs";
 import _ from 'lodash';
 import { Configuration, Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
 import winston from "winston";
-import { handleHttpException, walk, writeConfigFile } from "../util.js";
+import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
 import { getAllClusters } from "./clusterService.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 import { getAllRules } from "./ruleService.js";
@@ -150,6 +150,9 @@ const migrateSource = async (apiConfig, sourceJson) => {
 
         //Remove accountCorrelationConfig on create since we have no way of finding the reference
         _.unset(localSource, "accountCorrelationConfig");
+        if (localSource.schemas) {
+            _.unset(localSource, "schemas");
+        }
 
         try {
             const createSourceResponse = await sourcesApi.createSource({
@@ -179,13 +182,17 @@ const migrateSource = async (apiConfig, sourceJson) => {
                     correlationConfigBeta: correlationConfigCopy
                 });
 
-                const sourceCorrelationConfig = await sourceCorrelationConfigResponse.data;
+                sleep(1000);
+
+                const sourceCorrelationConfig = sourceCorrelationConfigResponse.data;
                 localSource.accountCorrelationConfig.id = sourceCorrelationConfig.id;
             } catch (error) {
                 handleHttpException(error);
 
                 //Make sure we still update the correlation reference if there was a failure or else the source will fail to update
-                localSource.accountCorrelationConfig.id = currentTartgetSource.accountCorrelationConfig.id;
+                if (currentTartgetSource.accountCorrelationConfig) {
+                    localSource.accountCorrelationConfig.id = currentTartgetSource.accountCorrelationConfig.id;
+                }
             }
         }
 
@@ -369,9 +376,11 @@ const processSchema = async (api, localSource, currentTartgetSource, localSchema
                 sourceId: currentTartgetSource.id
             });
 
-            for (let schemaReference of localSource.schemas) {
-                if (schemaReference.name === schemaCopy.name) {
-                    schemaReference.id = currentSchema.id;
+            if (localSource.schemas) {
+                for (let schemaReference of localSource.schemas) {
+                    if (schemaReference.name === schemaCopy.name) {
+                        schemaReference.id = currentSchema.id;
+                    }
                 }
             }
         } catch (error) {
@@ -396,8 +405,10 @@ const processSchema = async (api, localSource, currentTartgetSource, localSchema
             };
 
             let currentSchemas = localSource.schemas;
-            currentSchemas.push(schemaRef);
-            localSource.schemas = currentSchemas;
+            if (currentSchemas) {
+                currentSchemas.push(schemaRef);
+                localSource.schemas = currentSchemas;
+            }   
             return createSchemaResponse.data;
         } catch (error) {
             await handleHttpException(error);
