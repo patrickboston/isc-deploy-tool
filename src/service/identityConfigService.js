@@ -195,7 +195,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
 
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
     if (!currentTargetSource) throw new Error(`Cannot find authoritative source [${sourceLookupName}] for Identity Profile [${localIdentityProfile.self.name}] in target environment`);
-    localIdentityProfile.object.authoritativeSource.id = currentTargetSource.id;
+        localIdentityProfile.object.authoritativeSource.id = currentTargetSource.id;
 
 
     //Iterate each identity attribute mapping and update references
@@ -246,6 +246,13 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                 localIdentityProfile
             ]
         });
+        //We need to fetch it now since it's not returned in the response
+        const currentIdentityProfileResponse = await identityProfilesApi.exportIdentityProfiles({
+            filters: `name eq "${localIdentityProfile.object.name}"`
+        });
+        currentTargetIdentityProfile = currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
+        if (currentTargetIdentityProfile == null)
+            winston.error(clc.red(`Could not fetch identity profile by name [${localIdentityProfile.object.name}] after create/update`))
     } catch (error) {
         await handleHttpException(error);
     }
@@ -258,7 +265,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     //If the initial profile is created/updated OK, move onto lifecycle states tied to it
     //Read directly from build directly for now instead of param passed in
     const localLifecycleStateFileNames = walk(`./build/config/IDENTITY_PROFILE/${localIdentityProfile.self.name}/LIFECYCLE_STATE`);
-    if (localLifecycleStateFileNames) {
+    if (localLifecycleStateFileNames && currentTargetIdentityProfile) {
         const lifecycleStateApi = new LifecycleStatesApi(apiConfig);
 
         //Get current lifecycle states if any
@@ -409,9 +416,9 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                 }
             }
             if (!existsInTarget) {
-                winston.info(`Creating new lifecycle state: ${currentTargetLifecycleState.name} (${currentTargetLifecycleState.id})`)
+                winston.info(`Creating new lifecycle state: ${localLifecycleState.name})`)
                 try {
-                    await lifecycleStateApi.createLifecycleState({
+                    const createLifecycleStateResponse = await lifecycleStateApi.createLifecycleState({
                         identityProfileId: currentTargetIdentityProfile.self.id,
                         lifecycleState: localLifecycleState
                     });
