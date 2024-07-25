@@ -11,6 +11,7 @@ The following object types are currently supported for export/deploy:
 - RULE (connector rules + already approved cloud rules)
 - TRANSFORM
 - SOURCE (includes correlation config, schemas, and provisioning policies)
+- SERVICE_DESK_INTEGRATION
 - IDENTITY_OBJECT_CONFIG
 - IDENTITY_PROFILE (includes lifecycle states tied to the identity profile. **Does not include security settings**)
 - ACCESS_REQUEST_CONFIG
@@ -117,7 +118,7 @@ node src/index.js --export --detokenize
 However, in the `package.json`, there are a number of scripts set up which make the commands slightly easier to run
 
 > [!NOTE]
-> Ensure you put the double dash (`--`) after the command initial command and your arguments as documented below for each command
+> Ensure you put the double dash (`--`) after the initial command and your arguments as documented below for each command
 
 ### Export
 To export objects from a specific environment and perform reverse-tokenization based on properties defined in your `reverse.target.js` file, run the following where `<env>` is the actual name of your environment such as `sb`.
@@ -177,7 +178,7 @@ In order to deploy a branding logo image, you must create a directory in the roo
 ### Owner References
 There are many objects throughout ISC that have owner references which point to an identity that have created an object, modified an object, etc. It is very important that owners are properly set up in exported configuration objects.
 
-By default, you will see owner references contain a `type` which is always set to `IDENTITY`, an `id` which points to a very environment specific `id` for the identity that owns the objects (this is actually omitted during the export process), and lastly a `name` which is more of a soft reference that points to the owning identity. The `name` value can very between different object types, but is most often the `displayName` of an identity which is not ideal and does not guarantee a unique identity when looking up an identity by this name during migration to other environments. The only unique soft reference attribute on identities that guarantee a unique lookup is the `alias` attribute. **When you run the export process, objects with owner references will automatically have the `name` property value written as the owning identity's `alias` as opposed to their `displayName`.** This will allow us to perform unique identity lookups when migrating objects with owners to another environment. If an identity with that alias does not exist, the migration import will fail.  If you need different owners per environment because of preference or because an identity with a specific alias will next exist in the next environment, you will need to perform the following tokenization steps:
+By default, you will see owner references contain a `type` which is always set to `IDENTITY`, an `id` which points to a very environment specific `id` for the identity that owns the objects (this is actually omitted during the export process), and lastly a `name` which is more of a soft reference that points to the owning identity. The `name` value can very between different object types, but is most often the `displayName` of an identity which is not ideal and does not guarantee a unique identity when looking up an identity by this name during migration to other environments. The only unique soft reference attribute on identities that guarantee a unique lookup is the `alias` attribute. **When you run the export process, objects with owner references will automatically have the `name` property value written as the owning identity's `alias` as opposed to their `displayName`.** This will allow us to perform unique identity lookups when migrating objects with owners to another environment. If an identity with that alias does not exist, the migration import will fail.  If you need different owners per environment because of preference or because an identity with a specific alias will not exist in the next environment, you will need to perform the following tokenization steps:
 1. Set up a reverse token in `reverse.target.js` for the object being exported. You could also hard code an identity alias here that will be the same owner across all environments instead of using a token
 ```json
 {
@@ -219,6 +220,12 @@ There are two scenarios to consider when deleting objects:
 - When objects are deleted from your build directory/repository, they will not automatically be cleaned up during the next build deployment. You must also delete objects directly in the tenant if you are removing them from your build repository
 
 
+
+## Deploying to a Clean Environment
+When you are deploying to a clean environment for the first time (i.e. first time from Sandbox to Production), there are a few pre-requisites/guidelines that need to be followed:
+- A Virtual Appliance cluster needs to be configured. Virtual appliance cluster names will most likely be different, ensure to analyze all cluster references in sources, etc. and tokenized them as needed
+- All owner references should be analyzed and tokenized as needed. Owner references may fail if not aggregations have occurred yet. You can use something like `slpt.services` as the default owner on objects to avoid this
+- Source attribute sync configurations may failed to deploy initially if an identity profile with the corresponding identity attributes does not exist yet. There is no real workaround for this at the moment. Some identity profiles rely on sources to exist before being created, so we are prioritizing that over attribute sync. You must run another import after identity profiles are created to allow attribute sync configs to be updated properly
 
 
 
