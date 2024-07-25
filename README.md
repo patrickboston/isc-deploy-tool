@@ -10,7 +10,7 @@ It offers the following features:
 The following object types are currently supported for export/deploy:
 - RULE (connector rules + already approved cloud rules)
 - TRANSFORM
-- SOURCE (includes correlation config, schemas, and provisioning policies)
+- SOURCE (includes correlation config, schemas, and provisioning policies. **Does not include password policy references**)
 - SERVICE_DESK_INTEGRATION
 - IDENTITY_OBJECT_CONFIG
 - IDENTITY_PROFILE (includes lifecycle states tied to the identity profile. **Does not include security settings**)
@@ -19,6 +19,7 @@ The following object types are currently supported for export/deploy:
 - WORKFLOW
 - GOVERNANCE_GROUP
 - BRANDING_CONFIG
+- PASSWORD_POLICY
 
 ## Setup/Import Configuration Files
 This a NodeJS project that was written on NodeJS 18. You will need NodeJS installed prior to using this tool. Find the latest NodeJS download here: https://nodejs.org/en/download
