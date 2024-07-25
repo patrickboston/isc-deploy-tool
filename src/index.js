@@ -8,6 +8,7 @@ import { exportBranding, updateBranding } from "./service/brandingService.js";
 import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfiles } from "./service/identityConfigService.js";
 import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityService.js";
 import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationService.js";
+import { exportPasswordPolicies, migratePasswordPolicies } from "./service/passwordPolicyService.js";
 import { exportRules, migrateRules } from "./service/ruleService.js";
 import { exportServiceDeskIntegrations, migrateServiceDeskIntegrations } from "./service/serviceDeskIntegrationService.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
@@ -152,6 +153,7 @@ if (isExport && isDetokenize) {
     }
 
     await exportGovernanceGroups(globalApiConfiguration);
+    await exportPasswordPolicies(globalApiConfiguration);
     await exportRules(globalApiConfiguration);
     await exportTransforms(globalApiConfiguration);
     await exportSources(globalApiConfiguration);
@@ -188,19 +190,21 @@ if (isDeploy) {
     /**
      * Objects need to be migrated in a specific order for reference sake. That order is:
      * 1. Governance Groups
-     * 2. Rules (Connector + Already Approved Cloud)
-     * 3. Transforms
-     * 4. Sources (dependencies on rules, transforms)
-     * 5. Service Desk Integrations (dependencies on rules, sources)
-     * 6. Identity Object Config (dependencies on sources, rules, transforms)
-     * 7. Identity Profile (including Lifecycle States, dependencies on sources)
-     * 8. Access Request Config
-     * 9. Notification Template
-     * 10. Workflow
-     * 11. Branding
+     * 2. Password Policies
+     * 3. Rules (Connector + Already Approved Cloud)
+     * 4. Transforms
+     * 5. Sources (dependencies on rules, transforms, password policies)
+     * 6. Service Desk Integrations (dependencies on rules, sources)
+     * 7. Identity Object Config (dependencies on sources, rules, transforms)
+     * 8. Identity Profile (including Lifecycle States, dependencies on sources)
+     * 9. Access Request Config
+     * 10. Notification Template
+     * 11. Workflow
+     * 12. Branding
     */
 
     await migrateGovernanceGroups(globalApiConfiguration);
+    await migratePasswordPolicies(globalApiConfiguration);
     await migrateRules(globalApiConfiguration);
     await migrateTransforms(globalApiConfiguration);
     await migrateSources(globalApiConfiguration);
