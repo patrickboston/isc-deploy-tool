@@ -7,6 +7,7 @@ import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
 import { getAllClusters } from "./clusterService.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 import { getAllRules } from "./ruleService.js";
+import { getAllPasswordPolicies } from "./passwordPolicyService.js"
 
 const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
@@ -153,6 +154,9 @@ const migrateSource = async (apiConfig, sourceJson) => {
         if (localSource.schemas) {
             _.unset(localSource, "schemas");
         }
+        if (localSource.passwordPolicies) {
+            _.unset(localSource, "passwordPolicies");
+        }
 
         try {
             const createSourceResponse = await sourcesApi.createSource({
@@ -215,6 +219,24 @@ const migrateSource = async (apiConfig, sourceJson) => {
                 }
             }
         }
+
+        //Password Policy References - we can't filter by name in API so need to iterate each and check
+        /* This doesn't actually work for whatever reason, if you attach a policy in the UI, it uses
+        PATCH /beta/sources/:id/password-policies which is not a documented endpoint so there is no
+        function for it in the SDK right now, so leaving it out until that becomes available
+        if (localSource.passwordPolicies) {
+            const currentTargetPasswordPolicies = await getAllPasswordPolicies(apiConfig);
+            if (currentTargetPasswordPolicies) {
+                for (let localSourcePolicy of localSource.passwordPolicies) {
+                    for (const currentTargetPasswordPolicy of currentTargetPasswordPolicies) {
+                        if (currentTargetPasswordPolicy.name === localSourcePolicy.name) {
+                            localSourcePolicy.id = currentTargetPasswordPolicy.id;
+                        }
+                    }
+                }
+            }
+        }
+        */
 
         //Update all rule references
         const rules = await getAllRules(apiConfig);
@@ -408,7 +430,7 @@ const processSchema = async (api, localSource, currentTartgetSource, localSchema
             if (currentSchemas) {
                 currentSchemas.push(schemaRef);
                 localSource.schemas = currentSchemas;
-            }   
+            }
             return createSchemaResponse.data;
         } catch (error) {
             await handleHttpException(error);

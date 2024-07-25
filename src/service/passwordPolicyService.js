@@ -9,6 +9,19 @@ const PASSWORD_POLICY = "PASSWORD_POLICY";
 const existingAttributeToKeep = [
     "id"
 ];
+let passwordPolicyCache;
+
+const getAllPasswordPolicies = async (apiConfig) => {
+    if (passwordPolicyCache) return passwordPolicyCache;
+    
+    const passwordPoliciesApi = new PasswordPoliciesApi(apiConfig);
+    const passwordPoliciesResponse = await Paginator.paginate(passwordPoliciesApi, passwordPoliciesApi.listPasswordPolicies, { limit: 1000 }, 250);
+    if (passwordPoliciesResponse.data) {
+        passwordPolicyCache = passwordPoliciesResponse.data;
+        return passwordPoliciesResponse.data;
+    }
+    return null;
+}
 
 const exportPasswordPolicies = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Password Policy Export"));
@@ -77,7 +90,6 @@ const migratePasswordPolicies = async (apiConfig) => {
 }
 
 export {
-    exportPasswordPolicies,
-    migratePasswordPolicies
+    exportPasswordPolicies, getAllPasswordPolicies, migratePasswordPolicies
 };
 
