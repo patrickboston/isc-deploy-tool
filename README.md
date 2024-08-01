@@ -220,6 +220,19 @@ There are two scenarios to consider when deleting objects:
 - When objects are deleted directly inside of a tenant, they must also be removed in your build directory/repository because the export process does not consider cleaning up objects that may have been deleted in a tenant. If not cleaned up, they may be re-deployed inadvertently
 - When objects are deleted from your build directory/repository, they will not automatically be cleaned up during the next build deployment. You must also delete objects directly in the tenant if you are removing them from your build repository
 
+### Reserved Keywords
+The export process omits certain keys from configuration objects to make them repository oriented. This means the following keywords should not be using in configuration object (i.e. defined attributes in transforms):
+- id
+- created
+- modified
+- sourceId
+- cloudExternalId
+- cloudCacheUpdate
+- since
+- status
+- healthy
+- identityCount
+- standardLogoURL
 
 
 ## Deploying to a Clean Environment
