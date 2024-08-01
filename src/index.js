@@ -9,7 +9,7 @@ import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityA
 import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityService.js";
 import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationService.js";
 import { exportPasswordPolicies, migratePasswordPolicies } from "./service/passwordPolicyService.js";
-import { exportRules, migrateRules } from "./service/ruleService.js";
+import { exportConnectorRules, exportCloudRules, migrateCloudRules, migrateConnectorRules } from "./service/ruleService.js";
 import { exportServiceDeskIntegrations, migrateServiceDeskIntegrations } from "./service/serviceDeskIntegrationService.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
 import { exportTransforms, migrateTransforms } from "./service/transformService.js";
@@ -154,7 +154,8 @@ if (isExport && isDetokenize) {
 
     await exportGovernanceGroups(globalApiConfiguration);
     await exportPasswordPolicies(globalApiConfiguration);
-    await exportRules(globalApiConfiguration);
+    await exportCloudRules(globalApiConfiguration);
+    await exportConnectorRules(globalApiConfiguration);
     await exportTransforms(globalApiConfiguration);
     await exportSources(globalApiConfiguration);
     await exportServiceDeskIntegrations(globalApiConfiguration);
@@ -205,7 +206,8 @@ if (isDeploy) {
 
     await migrateGovernanceGroups(globalApiConfiguration);
     await migratePasswordPolicies(globalApiConfiguration);
-    await migrateRules(globalApiConfiguration);
+    await migrateCloudRules(globalApiConfiguration);
+    await migrateConnectorRules(globalApiConfiguration)
     await migrateTransforms(globalApiConfiguration);
     await migrateSources(globalApiConfiguration);
     await migrateServiceDeskIntegrations(globalApiConfiguration)

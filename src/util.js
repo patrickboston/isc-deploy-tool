@@ -104,8 +104,8 @@ const writeConfigFile = (objectType, objectName, object, overrideDir = null) => 
             fs.unlinkSync(fileName);
         }
     } else {
-        //Rule objects cannot be modified at all or else the signature validation fails, so don't omit from them
-        let omittedObj = objectType !== "RULE" ? deepOmit(object) : object;
+        //Cloud Rule objects cannot be modified at all or else the signature validation fails, so don't omit from them
+        let omittedObj = objectType !== "CLOUD_RULE" ? deepOmit(object) : object;
         fs.writeFileSync(fileName, JSON.stringify(omittedObj, null, 4));
     }
 }
