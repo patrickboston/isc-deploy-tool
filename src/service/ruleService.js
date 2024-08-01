@@ -44,7 +44,7 @@ const getAllConnectorRules = async (apiConfig) => {
     return connectorRuleCache;
 }
 
-const exportRules = async (apiConfig) => {
+const exportCloudRules = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Cloud Rule Export"));
     const rules = await getAllRules(apiConfig);
     for (const rule of rules) {
@@ -172,6 +172,6 @@ const migrateConnectorRules = async (apiConfig) => {
 }
 
 export {
-    exportConnectorRules, exportRules, getAllRules, migrateCloudRules, migrateConnectorRules
+    exportConnectorRules, exportCloudRules, getAllRules, migrateCloudRules, migrateConnectorRules
 };
 

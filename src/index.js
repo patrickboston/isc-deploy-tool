@@ -9,7 +9,7 @@ import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityA
 import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityService.js";
 import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationService.js";
 import { exportPasswordPolicies, migratePasswordPolicies } from "./service/passwordPolicyService.js";
-import { exportConnectorRules, exportRules, migrateCloudRules, migrateConnectorRules } from "./service/ruleService.js";
+import { exportConnectorRules, exportCloudRules, migrateCloudRules, migrateConnectorRules } from "./service/ruleService.js";
 import { exportServiceDeskIntegrations, migrateServiceDeskIntegrations } from "./service/serviceDeskIntegrationService.js";
 import { exportSources, migrateSources } from "./service/sourceService.js";
 import { exportTransforms, migrateTransforms } from "./service/transformService.js";
@@ -154,7 +154,7 @@ if (isExport && isDetokenize) {
 
     await exportGovernanceGroups(globalApiConfiguration);
     await exportPasswordPolicies(globalApiConfiguration);
-    await exportRules(globalApiConfiguration);
+    await exportCloudRules(globalApiConfiguration);
     await exportConnectorRules(globalApiConfiguration);
     await exportTransforms(globalApiConfiguration);
     await exportSources(globalApiConfiguration);
