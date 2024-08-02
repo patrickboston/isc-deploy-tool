@@ -57,11 +57,9 @@ function walk(dir, maxDepth = -1, currentDepth = 0, files = []) {
     return files;
 }
 
-function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "cloudExternalId", "cloudCacheUpdate", "since", "status", "healthy", "identityCount", "standardLogoURL"]) {
+//transformDefinition ignore key  is very specific to identity profile transform references using key 'id'
+function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "cloudExternalId", "cloudCacheUpdate", "since", "status", "healthy", "identityCount", "standardLogoURL"], keysToIgnore = ["transformDefinition"]) {
     let keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
-    const keysToIgnore = [
-        "transformDefinition" //This is very specific to identity profile transform references using key 'id'
-    ];
 
     function omitFromObject(obj) { //the inner function which will be called recursively
 
@@ -198,7 +196,8 @@ const buildObjectsForEnvironment = async (env) => {
             winston.debug(`Checking file ${fileName} for token replacement`);
             Object.entries(envTokens).forEach((token) => {
                 const [tokenName, tokenValue] = token;
-                const matches = fileSource.match(tokenName);
+                const globalRegex = new RegExp(tokenName, 'g');
+                const matches = fileSource.match(globalRegex);
                 if (matches) {
                     winston.info(clc.green(`${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`));
                 }
