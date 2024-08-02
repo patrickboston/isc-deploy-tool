@@ -4,11 +4,14 @@ The Identity Security Cloud Object Deploy Tool is a NodeJS command-line utility 
 It offers the following features:
 - Export objects and perform reverse-tokenization via JSONPath which replaces actual setting values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any Identity Security Cloud environment
 - Tokenize and build objects for a target Identity Security Cloud environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual setting values which are needed for a specific environment (i.e. IQService host for an Active Directory Source)
-- Tokenize and deploy objects to a target Identity Security Cloud environment
+- Tokenize and deploy objects to a target Identity Security Cloud environment with dynamic object reference lookup and insertion
+
+
 
 ## Supported Object Types
 The following object types are currently supported for export/deploy:
-- RULE (connector rules + already approved cloud rules)
+- CLOUD_RULE (already approved and deploy by SailPoint)
+- CONNECTOR_RULE
 - TRANSFORM
 - SOURCE (includes correlation config, schemas, and provisioning policies. **Does not include password policy references**)
 - SERVICE_DESK_INTEGRATION
@@ -21,13 +24,15 @@ The following object types are currently supported for export/deploy:
 - BRANDING_CONFIG
 - PASSWORD_POLICY
 
+
+
 ## Setup/Import Configuration Files
 This a NodeJS project that was written on NodeJS 18. You will need NodeJS installed prior to using this tool. Find the latest NodeJS download here: https://nodejs.org/en/download
 
 You can then clone this repository. Once the repository is cloned, run `npm install` within the cloned repository directory to install all project dependencies.
 
 You will also need to set up the following files in the root of your project to be able to export/import from Identity Security Cloud environments:
-- `<env>.env.js` - Holds the parameters needed to login to hit ISC API endpoints via a PAT (Personal Access Token). These files is in the default `.gitignore` and should never be pushed to the remote repository. There is an example in this repository, but it needs to look like this:
+- `<env>.env.js` - Holds the parameters needed to login to hit ISC API endpoints via a PAT (Personal Access Token). These files are in the default `.gitignore` and should never be pushed to the remote repository. There is an example in this repository, but it needs to look like this:
 ```js
 export default
     {
@@ -55,7 +60,7 @@ export default
         "%%AD_IQSERVICE_PORT%%": "888888",
     }
 ```
-- `<env>.secrets.js` - Contains entries where the key is the token in your config files (which is put there manually or by reverse-tokenization) and the value is the plaintext secret/password for that token that you want to be deployed to a target Identity Security Cloud environment when running the `deploy` command. **These files are in the default .gitignore and should never be commmitted to the remote repository. This should only be used if you do not want to manually encrypt a password in a target environment so you can have the encrypted version of a secret to put into the `<env>.target.js` file**
+- `<env>.secrets.js` - (Optional) Contains entries where the key is the token in your config files (which is put there manually or by reverse-tokenization) and the value is the plaintext secret/password for that token that you want to be deployed to a target Identity Security Cloud environment when running the `deploy` command. **These files are in the default .gitignore and should never be commmitted to the remote repository. This should only be used if you do not want to manually encrypt a password in a target environment so you can have the encrypted version of a secret to put into the `<env>.target.js` file**
 ```js
 export default
     {
@@ -68,12 +73,15 @@ export default
 export default
     [
         "TRANSFORM:identityDisplayName",
-        "SOURCE:TestAD"
+        "SOURCE:TestAD",
+        "IDENTITY_OBJECT_CONFIG:IDENTITY_OBJECT_CONFIG" //Doesn't have a name so we put the type twice
     ]
 ```
 
+
+
 ## Config Directory Structure
-When the export command is run, it will automatically created a directory in the root of the project called `/config`. This is where all of the configuration JSON files from the export will be stored. It will look like this:
+When the export command is run, it will automatically create a directory in the root of the project called `/config`. This is where all of the configuration JSON files from the export will be reverse-tokenized and stored. It will look something like this:
 ```
 config
  ┣ ACCESS_REQUEST_CONFIG
@@ -109,10 +117,12 @@ config
 ```
 As you can see, some more complex object types such as sources will have subdirectories for directly referenced objects such as schemas. This structure helps to keep everything conveniently organized and it is very important to keep this format as is for the deploy/import process. Files should not be moved unless you know what you are doing.
 
-When the `deploy` command is run, an additional directory will be created in the root of the project called `/build`. It will contain all built/tokenized objects that are going to be deployed to the target environment. It will be cleaned up every time the `deploy` command is run. You can view the built objects to view what was deployed to a target environment
+When the `build` or `deploy` command is run, an additional directory will be created in the root of the project called `/build`. It will contain all built/tokenized objects that are going to be deployed to the target environment. It will be cleaned up every time the `deploy` command is run. You can view the built objects to view what will be/was deployed to a target environment.
+
+
 
 ## Commands
-Once you have all the pre-requisites above setup, you can now start running some commands. Open up your favorite terminal and navigate to your project location. Our `src/index.js` file is the main file that is run with NodejS. We can run the app with the following if we wanted
+Once you have all the pre-requisites above setup, you will be able to run commands to perform operations. Open up your favorite terminal and navigate to your project location. Our `src/index.js` file is the main file that is run with NodejS. We can run the app with the following if we wanted
 ```
 node src/index.js --export --detokenize
 ```
@@ -148,34 +158,12 @@ npm run deploy -- --target_env=<env>
 
 
 
-## Logging
-The commands above print out various logs by default to show progress, warnings, and errors. The default log priority is `info`. In order to print more verbose logs, pass the `--log_level` parameter. The following are valid log levels prioritized from highest to lowest:
-```
-error: 0
-warn: 1
-info: 2
-http: 3
-verbose: 4
-debug: 5
-silly: 6
-```
+## Configuration Object Guidelines/Considerations
+Follow these guidelines to ensure these object types are deployed successfully.
 
-Most of the more detailed logging (HTTP requests, etc. is available at the `debug` level).
+### Object References by `id`
+In ISC, majority of object references are by `id` as opposed a softer reference such as `name`. As part of the export process, `id` and other environment specific data are omitted from objects to make objects more common/repository friendly. When you run the deployment process to a target environment, `id` references that are needed are dynamically inserted into objects by looking up objects by `name` in the target deployment environment. You do not need to lookup and insert `id` references yourself before deployment
 
-
-## Configuration Object Guidelines
-Follow these guidelines to ensure these object types are deployed successfully
-
-### Secrets
-Objects such as sources and service desk integrations contain encrypted secrets/passwords for connecting to applications. Plain text secrets are either entered through the UI or via API and when saved, they are automatically encrypted using SailPoint's backend encryption process. Additionally, you will be connecting to different environments of these downstream applications from different ISC environments (i.e. Non-Prod AD vs Prod AD). This means the encrypted secret value will differ per ISC environments. Passwords can be deployed via this build tool and there are two methods for doing that:
-1. Tokenization of Encrypted Secrets - Encrypted secret values can simply be stored in your `<env>.target.js` file. The issue here is that you will need to have those encrypted secret values for all environments. For example, if you onboard a source into your sandbox ISC environment which connects to a non-prod downstream application where in your production ISC tenant it will be connecting to the production instance of that downstream application, before you can deploy that new source to production ISC for the first time, you need the encrypted secret value. One way to do this would to create a dummy source in your production ISC tenant and provide the password in a password/secret field, save the source, and then fetch the encrypted value via API/VSCode/etc. and then plug that value into the appropriate token for that secret in your repository
-2. Plaintext Secrets via Separate Secret Tokens - Another less-secure option this tool provides is a separate tokens file named `<env>.secrets.js`. This has the same exact concept of your `<env>.target.js` file, but is only used to store plaintext secrets. These files would never be committed to a remote repository and would only be held by a trust member of the team who is running the build process. The plaintext passwords would be provided when creating/updating objects via API calls and would be automatically encrypted by ISC
-
-### Branding
-In order to deploy a branding logo image, you must create a directory in the root of the project called `./assets`. This directory will contain your logo images in `.png` format only. The name of each png image should match the name of your target environment (`--target_env`) that you provide in the `deploy` command, for example: `prod.png`.
-
-
-## Configuration Object Special Considerations
 ### Owner References
 There are many objects throughout ISC that have owner references which point to an identity that have created an object, modified an object, etc. It is very important that owners are properly set up in exported configuration objects.
 
@@ -204,16 +192,24 @@ The following object types have owner references that will need to be considered
 - SOURCE
 - WORKFLOW
 
+### Secrets
+Objects such as sources and service desk integrations contain encrypted secrets/passwords for connecting to applications. Plain text secrets are either entered through the UI or via API and when saved, they are automatically encrypted using SailPoint's backend encryption process. Additionally, you will be connecting to different environments of these downstream applications from different ISC environments (i.e. Non-Prod AD vs Prod AD). This means the encrypted secret value will differ per ISC environments. Passwords can be deployed via this build tool and there are two methods for doing that:
+1. Tokenization of Encrypted Secrets - Encrypted secret values can simply be stored in your `<env>.target.js` file. The issue here is that you will need to have those encrypted secret values for all environments. For example, if you onboard a source into your sandbox ISC environment which connects to a non-prod downstream application where in your production ISC tenant it will be connecting to the production instance of that downstream application, before you can deploy that new source to production ISC for the first time, you need the encrypted secret value. One way to do this would to create a dummy source in your production ISC tenant and provide the password in a password/secret field, save the source, and then fetch the encrypted value via API/VSCode/etc. and then plug that value into the appropriate token for that secret in your repository
+2. Plaintext Secrets via Separate Secret Tokens - Another less-secure option this tool provides is a separate tokens file named `<env>.secrets.js`. This has the same exact concept of your `<env>.target.js` file, but is only used to store plaintext secrets. These files would never be committed to a remote repository and would only be held by a trust member of the team who is running the build process. The plaintext passwords would be provided when creating/updating objects via API calls and would be automatically encrypted by ISC
+
+### Branding
+In order to deploy a branding logo image, you must create a directory in the root of the project called `./assets`. This directory will contain your logo images in `.png` format only. The name of each png image should match the name of your target environment (`--target_env`) that you provide in the `deploy` command, for example: `prod.png`.
+
 ### Lifecycle States
 When lifecycle states are exported, access profile and source ID references will be replaced with the names of the object. This allows us to perform a lookup of the objects by name and dynamically populate the IDs from the target environment. **Make sure names are consistent across environments for this reason**.
 
 ### Workflows
-- When workflows are being updated via the deployment process, if they are enabled, they will be temporarily disabled (1-2s) to perform the update, and then the enabled status defined in the workflow in the repository will be the final state the workflow ends up in. It will not be automatically enabled after update just because it was already enabled before we updated it with the pipeline.
-- If your workflow has any secrets stored in it such as OAuth client secrets, when the workflow is saved via the UI, those secrets are encrypted and referenced via a special syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`). If you tokenize the actual secret values in your token files to be deployed, when you run the workflow it will error our saying the secret is not stored in the correct format as the secret with no be converted over to the other special encrypted format mentioned above until the workflow is saved from the UI again. To circumvent this, tokenize the special encrypted secret syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`), or after deployments you must go save the workflow in the UI again.
+- When workflows are being updated via the deployment process, if they are enabled, they will be temporarily disabled (1-2 seconds) to perform the update, and then the enabled status defined in the workflow in the repository will be the final state the workflow ends up in. It will not be automatically enabled after update just because it was already enabled before we updated it with the pipeline.
+- If your workflow has any secrets stored in it such as OAuth client secrets, when the workflow is saved via the UI, those secrets are encrypted and referenced via a special syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`). If you tokenize the actual secret values in your token files to be deployed, when you run the workflow it will error our saying the secret is not stored in the correct format as the secret with no be converted over to the other special encrypted format mentioned above until the workflow is saved from the UI again. To circumvent this, tokenize the special encrypted secret syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`), or after deployments you must go save the workflow in the UI again (this may not always work from experience).
 
 ### Transforms
 - During the export process, only non-internal (`"internal": false`) transforms are exported since internal transforms (maintained by SailPoint) cannot be changed
-- If you are changing the `type` of a transform where that transform is already deployed to a target environment, the import will fail indicating that you cannot change the type. You must delete the transform in the target environment before you can be deployed with the name type, or else create a new transform with a different name and update all references
+- If you are changing the `type` of a transform where that transform is already deployed to a target environment, the import will fail indicating that you cannot change the type. You must delete the transform in the target environment before you can be deploy the transform with the same name, or else create a new transform with a different name and update all references
 
 ### Deleting Objects
 There are two scenarios to consider when deleting objects:
@@ -222,17 +218,18 @@ There are two scenarios to consider when deleting objects:
 
 ### Reserved Keywords
 The export process omits certain keys from configuration objects to make them repository oriented. This means the following keywords should not be using in configuration object (i.e. defined attributes in transforms):
-- id
-- created
-- modified
-- sourceId
-- cloudExternalId
-- cloudCacheUpdate
-- since
-- status
-- healthy
-- identityCount
-- standardLogoURL
+- `id`
+- `created`
+- `modified`
+- `sourceId`
+- `cloudExternalId`
+- `cloudCacheUpdate`
+- `since`
+- `status`
+- `healthy`
+- `identityCount`
+- `standardLogoURL`
+
 
 
 ## Deploying to a Clean Environment
@@ -240,6 +237,22 @@ When you are deploying to a clean environment for the first time (i.e. first tim
 - A Virtual Appliance cluster needs to be configured. Virtual appliance cluster names will most likely be different, ensure to analyze all cluster references in sources, etc. and tokenized them as needed
 - All owner references should be analyzed and tokenized as needed. Owner references may fail if not aggregations have occurred yet. You can use something like `slpt.services` as the default owner on objects to avoid this
 - Source attribute sync configurations may failed to deploy initially if an identity profile with the corresponding identity attributes does not exist yet. There is no real workaround for this at the moment. Some identity profiles rely on sources to exist before being created, so we are prioritizing that over attribute sync. You must run another import after identity profiles are created to allow attribute sync configs to be updated properly
+
+
+
+## Logging
+The commands above print out various logs by default to show progress, warnings, and errors. The default log priority is `info`. In order to print more verbose logs, pass the `--log_level` parameter. The following are valid log levels prioritized from highest to lowest:
+```
+error: 0
+warn: 1
+info: 2
+http: 3
+verbose: 4
+debug: 5
+silly: 6
+```
+
+Most of the more detailed logging (HTTP requests, etc. is available at the `debug` level).
 
 
 
