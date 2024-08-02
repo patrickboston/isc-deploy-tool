@@ -80,7 +80,7 @@ const getGovGroupById = async (apiConfig, govGroupId) => {
 const exportGovernanceGroups = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Governance Group Export"));
     const govGroupApi = new GovernanceGroupsBetaApi(apiConfig);
-    const govGroupsResponse = await Paginator.paginate(govGroupApi, govGroupApi.listWorkgroups, { limit: 1000 }, 250);
+    const govGroupsResponse = await Paginator.paginate(govGroupApi, govGroupApi.listWorkgroups, undefined, 250);
     for (const govGroup of govGroupsResponse.data) {
         winston.info(`Exporting Governance Group: ${govGroup.name} (${govGroup.id})`);
         writeConfigFile(GOVERNANCE_GROUP_TYPE, govGroup.name, govGroup);

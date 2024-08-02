@@ -13,7 +13,7 @@ const existingAttributeToKeep = [
 const exportNotificationTemplates = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Notification Template Export"));
     const notificationsBetaApi = new NotificationsBetaApi(apiConfig);
-    const notificationTemplatesResponse = await Paginator.paginate(notificationsBetaApi, notificationsBetaApi.listNotificationTemplates, { limit: 1000 }, 250);
+    const notificationTemplatesResponse = await Paginator.paginate(notificationsBetaApi, notificationsBetaApi.listNotificationTemplates, undefined, 250);
     for (const notificationTemplate of notificationTemplatesResponse.data) {
         winston.info(`Exporting Notification Template: ${notificationTemplate.name} (${notificationTemplate.id})`);
         writeConfigFile(NOTIFICATION_TEMPLATE, notificationTemplate.name, notificationTemplate);

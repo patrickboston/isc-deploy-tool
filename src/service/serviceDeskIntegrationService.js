@@ -24,7 +24,7 @@ const exportServiceDeskIntegrations = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Service Desk Integration Export"));
     const serviceDeskIntegrationApi = new ServiceDeskIntegrationApi(apiConfig);
 
-    const serviceDeskIntegrationsResponse = await Paginator.paginate(serviceDeskIntegrationApi, serviceDeskIntegrationApi.getServiceDeskIntegrations, { limit: 1000 }, 250);
+    const serviceDeskIntegrationsResponse = await Paginator.paginate(serviceDeskIntegrationApi, serviceDeskIntegrationApi.getServiceDeskIntegrations, undefined, 250);
     for (const serviceDeskIntegration of serviceDeskIntegrationsResponse.data) {
         //Clone for modifications
         let serviceDeskIntegrationClone = structuredClone(serviceDeskIntegration);

@@ -62,7 +62,7 @@ const exportSources = async (apiConfig) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const sourcesApiBeta = new SourcesBetaApi(apiConfig);
 
-    const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSources, { limit: 1000 }, 250);
+    const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSources, undefined, 250);
     for (const source of sources.data) {
         //Clone for modifications
         let sourceClone = structuredClone(source);
