@@ -258,5 +258,6 @@ Most of the more detailed logging (HTTP requests, etc. is available at the `debu
 
 ## Known Issues/Limitations
 - Identity Profiles which reference transforms use a key named `id` with a value of the transform name. Because of this, some actual `id` references are not omitted from Identity Profile objects. It will not harm the migration/deployment process at all as those `id` references would be replaced with the proper target `id` anyways. A future enhancement could make this better
+- Password policies themselves will be exported/deployed, but their references to sources cannot be automated at this time. The beta API endpoint is not documented so it's not in the SDK. A future enhancement could fix this
 - When objects are exported and save to a file, the file name becomes the name of the object. Any special characters not allowed in file names will be replaced with a dash (`-`)
 - Workflow secrets such as OAuth client secrets cannot be converted to the proper encrypted secrets as the endpoint requires a browser JWT token
