@@ -3,7 +3,7 @@ import * as fs from "fs";
 import _ from 'lodash';
 import { IdentityAttributesBetaApi, IdentityProfilesApi, LifecycleStatesApi, SourcesApi } from "sailpoint-api-client";
 import winston from "winston";
-import { handleHttpException, walk, writeConfigFile } from "../util.js";
+import { deepOmit, handleHttpException, walk, writeConfigFile } from "../util.js";
 import { getAccessProfileById, getAccessProfileByName } from "./accessProfileService.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 import { getAllRules } from "./ruleService.js";
@@ -74,6 +74,12 @@ const exportIdentityProfiles = async (apiConfig) => {
             }
         }
 
+        /*
+         * Special case where we do an additional omit for sourceId on identity profiles
+         * since in the main omit where we write the file we ignore the transformDefinition
+         * entry since it has an 'id' entry for transform references which we cannot omit
+        */
+        profile = deepOmit(profile, ["sourceId"], []);
 
         //This is basically using SP-Config in the backend so we need to reference self.name here
         writeConfigFile(IDENTITY_PROFILE, profile.self.name, profile, `IDENTITY_PROFILE/${profile.self.name}`);
