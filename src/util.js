@@ -202,8 +202,12 @@ const buildObjectsForEnvironment = async (env) => {
                 if (matches) {
                     winston.info(clc.green(`${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`));
                 }
-                //Stringify the value so it's escaped properly if a secret token or something   
-                fileSource = fileSource.replaceAll(tokenName, escapeString(tokenValue));
+                //Stringify the value so it's escaped properly if a secret token or something
+                if (tokenValue instanceof String) {
+                    fileSource = fileSource.replaceAll(tokenName, escapeString(tokenValue));
+                } else {
+                    fileSource = fileSource.replaceAll(tokenName, tokenValue);
+                }
             });
 
             //Write tokenized file to /build/[TYPE] directory
