@@ -13,7 +13,9 @@ const existingAttributeToKeep = [
 const exportTransforms = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Transform Export"));
     const transformsApi = new TransformsApi(apiConfig);
-    const transforms = await Paginator.paginate(transformsApi, transformsApi.listTransforms, undefined, 250);
+    const transforms = await Paginator.paginate(transformsApi, transformsApi.listTransforms, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
     for (const transform of transforms.data) {
         //Doesn't seem to be a way to provide filters to paginated call, so doing this for now
         if (!transform.internal) {
@@ -30,6 +32,8 @@ const migrateTransform = async (apiConfig, transformJson) => {
     //Check and see if a transform with this name already exists in the target environment
     const currentTransformResponse = await transformApi.listTransforms({
         filters: `name eq "${localTransform.name}"`
+    }).catch(error => {
+        handleHttpException(error);
     });
     let currentTargetTransform = currentTransformResponse.data.length == 1 ? currentTransformResponse.data[0] : null;
 
@@ -58,6 +62,7 @@ const migrateTransform = async (apiConfig, transformJson) => {
                 transform: localTransform
             });
         } catch (error) {
+            console.log(error);
             await handleHttpException(error);
         }
     }

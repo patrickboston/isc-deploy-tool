@@ -24,7 +24,9 @@ const exportServiceDeskIntegrations = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Service Desk Integration Export"));
     const serviceDeskIntegrationApi = new ServiceDeskIntegrationApi(apiConfig);
 
-    const serviceDeskIntegrationsResponse = await Paginator.paginate(serviceDeskIntegrationApi, serviceDeskIntegrationApi.getServiceDeskIntegrations, undefined, 250);
+    const serviceDeskIntegrationsResponse = await Paginator.paginate(serviceDeskIntegrationApi, serviceDeskIntegrationApi.getServiceDeskIntegrations, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
     for (const serviceDeskIntegration of serviceDeskIntegrationsResponse.data) {
         //Clone for modifications
         let serviceDeskIntegrationClone = structuredClone(serviceDeskIntegration);
@@ -90,6 +92,8 @@ const migrateServiceDeskIntegration = async (apiConfig, serviceDeskIntegrationJs
     const currentServiceDeskIntegrationResponse = await serviceDeskIntegrationApi.getServiceDeskIntegrations({
         filters: `name eq "${localServiceDeskIntegration.name}"`,
         limit: 1
+    }).catch(error => {
+        handleHttpException(error);
     });
 
     let currentTargetServiceDeskIntegration = currentServiceDeskIntegrationResponse.data.length == 1 ? currentServiceDeskIntegrationResponse.data[0] : null;

@@ -13,9 +13,11 @@ let passwordPolicyCache;
 
 const getAllPasswordPolicies = async (apiConfig) => {
     if (passwordPolicyCache) return passwordPolicyCache;
-    
+
     const passwordPoliciesApi = new PasswordPoliciesApi(apiConfig);
-    const passwordPoliciesResponse = await Paginator.paginate(passwordPoliciesApi, passwordPoliciesApi.listPasswordPolicies, undefined, 250);
+    const passwordPoliciesResponse = await Paginator.paginate(passwordPoliciesApi, passwordPoliciesApi.listPasswordPolicies, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
     if (passwordPoliciesResponse.data) {
         passwordPolicyCache = passwordPoliciesResponse.data;
         return passwordPoliciesResponse.data;
@@ -26,7 +28,9 @@ const getAllPasswordPolicies = async (apiConfig) => {
 const exportPasswordPolicies = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Password Policy Export"));
     const passwordPoliciesApi = new PasswordPoliciesApi(apiConfig);
-    const passwordPoliciesResponse = await Paginator.paginate(passwordPoliciesApi, passwordPoliciesApi.listPasswordPolicies, undefined, 250);
+    const passwordPoliciesResponse = await Paginator.paginate(passwordPoliciesApi, passwordPoliciesApi.listPasswordPolicies, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
     for (const passwordPolicy of passwordPoliciesResponse.data) {
         winston.info(`Exporting Password Policy: ${passwordPolicy.name} (${passwordPolicy.id})`);
         writeConfigFile(PASSWORD_POLICY, passwordPolicy.name, passwordPolicy);
@@ -40,7 +44,9 @@ const migratePasswordPolicy = async (apiConfig, passwordPolicyJson) => {
     //Check and see if a password policy with this name already exists in the target environment
     //We cannot filter on name so we need to compare each
     let currentTargetPasswordPolicy;
-    const currentPasswordPoliciesResponse = await Paginator.paginate(passwordPoliciesApi, passwordPoliciesApi.listPasswordPolicies, undefined, 250);
+    const currentPasswordPoliciesResponse = await Paginator.paginate(passwordPoliciesApi, passwordPoliciesApi.listPasswordPolicies, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
     for (const currentPasswordPolicy of currentPasswordPoliciesResponse.data) {
         if (currentPasswordPolicy.name === localPasswordPolicy.name) {
             currentTargetPasswordPolicy = currentPasswordPolicy;

@@ -13,7 +13,9 @@ const existingAttributeToKeep = [
 const exportNotificationTemplates = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Notification Template Export"));
     const notificationsBetaApi = new NotificationsBetaApi(apiConfig);
-    const notificationTemplatesResponse = await Paginator.paginate(notificationsBetaApi, notificationsBetaApi.listNotificationTemplates, undefined, 250);
+    const notificationTemplatesResponse = await Paginator.paginate(notificationsBetaApi, notificationsBetaApi.listNotificationTemplates, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
     for (const notificationTemplate of notificationTemplatesResponse.data) {
         winston.info(`Exporting Notification Template: ${notificationTemplate.name} (${notificationTemplate.id})`);
         writeConfigFile(NOTIFICATION_TEMPLATE, notificationTemplate.name, notificationTemplate);
@@ -27,6 +29,8 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
     //Check and see if a template with this name already exists in the target environment
     const currentTemplateResponse = await notificationsBetaApi.listNotificationTemplates({
         filters: `name eq "${localTemplate.name}"`
+    }).catch(error => {
+        handleHttpException(error);
     });
     let currentTargetTemplate = currentTemplateResponse.data.length == 1 ? currentTemplateResponse.data[0] : null;
 

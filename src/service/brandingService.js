@@ -37,10 +37,10 @@ const updateBranding = async (apiConfig, targetEnvName) => {
             //Check and see if a branding config with this name already exists in the target environment
             let currentTargetBrandingConfig;
             try {
-                const currentTargetBrandingCoonfigResponse = await brandingApi.getBranding({
+                const currentTargetBrandingConfigResponse = await brandingApi.getBranding({
                     name: localBrandingConfig.name
                 });
-                currentTargetBrandingConfig = currentTargetBrandingCoonfigResponse.data;
+                currentTargetBrandingConfig = currentTargetBrandingConfigResponse.data;
             } catch (error) {
                 if (error.response.status === 404) {
                     winston.debug(`Branding Config [${localBrandingConfig.name}] does not exist yet`);
@@ -68,21 +68,19 @@ const updateBranding = async (apiConfig, targetEnvName) => {
                 }
             } else {
                 winston.info(`Updating existing branding config: ${localBrandingConfig.name}`);
-                try {
-                    const res = await brandingApi.setBrandingItem({
-                        name: localBrandingConfig.name,
-                        name2: localBrandingConfig.name,
-                        productName: localBrandingConfig.productName,
-                        actionButtonColor: localBrandingConfig.actionButtonColor != null ? localBrandingConfig.actionButtonColor : undefined,
-                        activeLinkColor: localBrandingConfig.activeLinkColor != null ? localBrandingConfig.activeLinkColor : undefined,
-                        emailFromAddress: localBrandingConfig.emailFromAddress != null ? localBrandingConfig.emailFromAddress : undefined,
-                        fileStandard: logoFile != null ? logoFile : undefined,
-                        loginInformationalMessage: localBrandingConfig.loginInformationalMessage != null ? localBrandingConfig.loginInformationalMessage : undefined,
-                        navigationColor: localBrandingConfig.navigationColor != null ? localBrandingConfig.navigationColor : undefined
-                    });
-                } catch (error) {
-                    await handleHttpException(error);
-                }
+                const res = await brandingApi.setBrandingItem({
+                    name: localBrandingConfig.name,
+                    name2: localBrandingConfig.name,
+                    productName: localBrandingConfig.productName,
+                    actionButtonColor: localBrandingConfig.actionButtonColor != null ? localBrandingConfig.actionButtonColor : undefined,
+                    activeLinkColor: localBrandingConfig.activeLinkColor != null ? localBrandingConfig.activeLinkColor : undefined,
+                    emailFromAddress: localBrandingConfig.emailFromAddress != null ? localBrandingConfig.emailFromAddress : undefined,
+                    fileStandard: logoFile != null ? logoFile : undefined,
+                    loginInformationalMessage: localBrandingConfig.loginInformationalMessage != null ? localBrandingConfig.loginInformationalMessage : undefined,
+                    navigationColor: localBrandingConfig.navigationColor != null ? localBrandingConfig.navigationColor : undefined
+                }).catch(error => {
+                    handleHttpException(error);
+                });
             }
         }
     }

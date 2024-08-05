@@ -86,7 +86,9 @@ const globalRetryConfig = {
         winston.warn(clc.yellow(`ISC Rate limit reached, sleeping and retrying... (retry number ${retryCount})`));
     },
     retryCondition: (error) => {
-        return error.response.status === 429;
+        if (error.response) {
+            return error.response.status === 429;
+        }
     }
 };
 
@@ -109,6 +111,12 @@ if (BASE_URL && TOKEN_URL && CLIENT_ID && CLIENT_SECRET) {
         clientSecret: CLIENT_SECRET,
     });
     globalApiConfiguration.retriesConfig = globalRetryConfig;
+
+    //Make sure we have api in endpoints
+    if (!globalApiConfiguration.tokenUrl.includes(".api.") || !globalApiConfiguration.basePath.includes(".api.")) {
+        winston.error(clc.bgRed("FAILED: baseurl or tokenUrl provided does not contain .api. in the endpoint URI"));
+        process.exit(1);
+    }
 }
 
 //Process input args
@@ -150,6 +158,12 @@ if (isExport && isDetokenize) {
         const { default: srcEnvParams } = await import("./../" + srcEnvName + ".env.js");
         globalApiConfiguration = new Configuration(srcEnvParams);
         globalApiConfiguration.retriesConfig = globalRetryConfig;
+
+        //Make sure we have api in endpoints
+        if (!globalApiConfiguration.tokenUrl.includes(".api.") || !globalApiConfiguration.basePath.includes(".api.")) {
+            winston.error(clc.bgRed("FAILED: baseurl or tokenUrl provided does not contain .api. in the endpoint URI"));
+            process.exit(1);
+        }
     }
 
     await exportGovernanceGroups(globalApiConfiguration);
@@ -183,6 +197,12 @@ if (isDeploy) {
         const { default: targetEnvParams } = await import("./../" + targetEnvName + ".env.js");
         globalApiConfiguration = new Configuration(targetEnvParams);
         globalApiConfiguration.retriesConfig = globalRetryConfig;
+
+        //Make sure we have api in endpoints
+        if (!globalApiConfiguration.tokenUrl.includes(".api.") || !globalApiConfiguration.basePath.includes(".api.")) {
+            winston.error(clc.bgRed("FAILED: baseurl or tokenUrl provided does not contain .api. in the endpoint URI"));
+            process.exit(1);
+        }
     }
 
     //Perform tokenization
