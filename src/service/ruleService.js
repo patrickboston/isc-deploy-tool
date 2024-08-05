@@ -95,6 +95,7 @@ const migrateCloudRules = async (apiConfig) => {
         if (ruleImportResponse.data && ruleImportResponse.data.results && ruleImportResponse.data.results.RULE && ruleImportResponse.data.results.RULE.errors) {
             if (ruleImportResponse.data.results.RULE.errors.length > 0) {
                 winston.error(clc.red(`Error importing cloud rules via SP-Config:\n${JSON.stringify(ruleImportResponse.data.results.RULE.errors, null, 4)}`));
+                process.exit(1);
             }
         }
     }

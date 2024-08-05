@@ -58,6 +58,7 @@ const migrateTransform = async (apiConfig, transformJson) => {
                 transform: localTransform
             });
         } catch (error) {
+            console.log(error);
             await handleHttpException(error);
         }
     }

@@ -366,7 +366,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
             await handleHttpException(error);
         }
     } else {
-        winston.error(`Source [${localSource.name}] does not exist and did not get created properly in the target tenant. Schemas, policies, etc. cannot be processed`)
+        winston.error(`Source [${localSource.name}] does not exist and did not get created properly in the target tenant. Schemas, policies, etc. cannot be processed`);
     }
 }
 

@@ -257,8 +257,10 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
             filters: `name eq "${localIdentityProfile.object.name}"`
         });
         currentTargetIdentityProfile = currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
-        if (currentTargetIdentityProfile == null)
-            winston.error(clc.red(`Could not fetch identity profile by name [${localIdentityProfile.object.name}] after create/update`))
+        if (currentTargetIdentityProfile == null) {
+            winston.error(clc.red(`Could not fetch identity profile by name [${localIdentityProfile.object.name}] after create/update`));
+            process.exit(1);
+        }
     } catch (error) {
         await handleHttpException(error);
     }
@@ -266,6 +268,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     //Since this is sp-config import, we need to check for errors manually in the body
     if (importResponse.data.errors.length > 0) {
         winston.error(clc.red(JSON.stringify(importResponse.data, null, 4)));
+        process.exit(1);
     }
 
     //If the initial profile is created/updated OK, move onto lifecycle states tied to it
