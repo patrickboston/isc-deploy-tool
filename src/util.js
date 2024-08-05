@@ -206,7 +206,7 @@ const buildObjectsForEnvironment = async (env) => {
                 if (typeof tokenValue === "string") {
                     fileSource = fileSource.replaceAll(tokenName, escapeString(tokenValue));
                 } else {
-                    fileSource = fileSource.replaceAll(tokenName, tokenValue);
+                    fileSource = fileSource.replaceAll(tokenName, JSON.stringify(tokenValue));
                 }
             });
 
