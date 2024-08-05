@@ -55,7 +55,7 @@ const exportCloudRules = async (apiConfig) => {
 
             //Write separate txt file with source code for easy reference
             const source = rule.object.sourceCode.script;
-            const ruleSourceFileName = `./config/${CLOUD_RULE}/${rule.self.name}.source.txt`;
+            const ruleSourceFileName = `./config/${CLOUD_RULE}/${rule.self.name}.source.bsh`;
             fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
         }
     }
