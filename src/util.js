@@ -203,7 +203,7 @@ const buildObjectsForEnvironment = async (env) => {
                     winston.info(clc.green(`${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`));
                 }
                 //Stringify the value so it's escaped properly if a secret token or something
-                if (tokenValue instanceof String) {
+                if (typeof tokenValue === "string") {
                     fileSource = fileSource.replaceAll(tokenName, escapeString(tokenValue));
                 } else {
                     fileSource = fileSource.replaceAll(tokenName, tokenValue);
