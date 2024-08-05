@@ -223,8 +223,6 @@ if (isDeploy) {
      * 11. Workflow
      * 12. Branding
     */
-    await migrateSources(globalApiConfiguration);
-
     await migrateGovernanceGroups(globalApiConfiguration);
     await migratePasswordPolicies(globalApiConfiguration);
     await migrateCloudRules(globalApiConfiguration);
