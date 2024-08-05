@@ -38,7 +38,9 @@ const getAllConnectorRules = async (apiConfig) => {
     if (connectorRuleCache) return connectorRuleCache;
 
     const connectorRuleManagementBetaApi = new ConnectorRuleManagementBetaApi(apiConfig);
-    const connectorRulesResponse = await Paginator.paginate(connectorRuleManagementBetaApi, connectorRuleManagementBetaApi.getConnectorRuleList, undefined, 250);
+    const connectorRulesResponse = await Paginator.paginate(connectorRuleManagementBetaApi, connectorRuleManagementBetaApi.getConnectorRuleList, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
 
     connectorRuleCache = connectorRulesResponse.data;
     return connectorRuleCache;

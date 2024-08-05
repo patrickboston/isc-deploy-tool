@@ -27,7 +27,9 @@ const lifecycleStateExistingAttributeToKeep = [
 const exportIdentityAttributeConfig = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Identity Attribute Configuration Export"));
     const identityAttributesApi = new IdentityAttributesBetaApi(apiConfig);
-    const identityAttributeConfig = await identityAttributesApi.listIdentityAttributes();
+    const identityAttributeConfig = await identityAttributesApi.listIdentityAttributes().catch(error => {
+        handleHttpException(error);
+    });;
     writeConfigFile(IDENTITY_OBJECT_CONFIG, IDENTITY_OBJECT_CONFIG, identityAttributeConfig.data);
 };
 
@@ -35,7 +37,9 @@ const exportIdentityProfiles = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Identity Profile Export"));
     const identityProfilesApi = new IdentityProfilesApi(apiConfig);
     const lifecycleStatesApi = new LifecycleStatesApi(apiConfig);
-    const identityProfiles = await identityProfilesApi.exportIdentityProfiles();
+    const identityProfiles = await identityProfilesApi.exportIdentityProfiles().catch(error => {
+        handleHttpException(error);
+    });
     for (let profile of identityProfiles.data) {
         winston.info(`Exporting Identity Profile: ${profile.self.name} (${profile.self.id})`);
         //Update owner to alias for lookup when migrating, default IDN Admin won't have owner
@@ -47,6 +51,8 @@ const exportIdentityProfiles = async (apiConfig) => {
         //Lifecycle states are attached to Identity Profiles so let's grab them
         const lifecycleStatesResponse = await lifecycleStatesApi.getLifecycleStates({
             identityProfileId: profile.self.id
+        }).catch(error => {
+            handleHttpException(error);
         });
         if (lifecycleStatesResponse.data) {
             for (let lifecycleState of lifecycleStatesResponse.data) {
@@ -172,6 +178,8 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     //Check and see if an identity profile with this name already exists in the target environment
     const currentIdentityProfileResponse = await identityProfilesApi.exportIdentityProfiles({
         filters: `name eq "${localIdentityProfile.object.name}"`
+    }).catch(error => {
+        handleHttpException(error);
     });
     let currentTargetIdentityProfile = currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
     if (currentTargetIdentityProfile) {
@@ -195,13 +203,15 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     const targetSourceResponse = await sourcesApi.listSources({
         filters: `name eq "${sourceLookupName}"`,
         limit: 1
+    }).catch(error => {
+        handleHttpException(error);
     });
 
     let currentTargetSource = targetSourceResponse.data.length == 1 ? targetSourceResponse.data[0] : null;
 
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
     if (!currentTargetSource) throw new Error(`Cannot find authoritative source [${sourceLookupName}] for Identity Profile [${localIdentityProfile.self.name}] in target environment`);
-        localIdentityProfile.object.authoritativeSource.id = currentTargetSource.id;
+    localIdentityProfile.object.authoritativeSource.id = currentTargetSource.id;
 
 
     //Iterate each identity attribute mapping and update references
@@ -215,6 +225,8 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
             const mappingSourceResponse = await sourcesApi.listSources({
                 filters: `name eq "${mappingSourceName}"`,
                 limit: 1
+            }).catch(error => {
+                handleHttpException(error);
             });
             let currentMappingSource = mappingSourceResponse.data.length == 1 ? mappingSourceResponse.data[0] : null;
             if (!currentMappingSource) throw new Error(`Cannot find source [${mappingSourceName}] for attribute mapping [${attributeMapping.identityAttributeName}] for Identity Profile [${localIdentityProfile.self.name}] in target environment`);
@@ -255,6 +267,8 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
         //We need to fetch it now since it's not returned in the response
         const currentIdentityProfileResponse = await identityProfilesApi.exportIdentityProfiles({
             filters: `name eq "${localIdentityProfile.object.name}"`
+        }).catch(error => {
+            handleHttpException(error);
         });
         currentTargetIdentityProfile = currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
         if (currentTargetIdentityProfile == null) {
@@ -280,6 +294,8 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
         //Get current lifecycle states if any
         const currentTargetLifecycleStatesResponse = await lifecycleStateApi.getLifecycleStates({
             identityProfileId: currentTargetIdentityProfile.self.id
+        }).catch(error => {
+            handleHttpException(error);
         });
 
         //Iterate each local, check if it exists in remote, and create/update accordingly

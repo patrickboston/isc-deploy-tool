@@ -10,7 +10,9 @@ const ACCESS_REQUEST_CONFIG = "ACCESS_REQUEST_CONFIG";
 const exportAccessRequestConfig = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Access Request Configuration Export"));
     const accessRequestApi = new AccessRequestsApi(apiConfig);
-    const accessRequestConfigResponse = await accessRequestApi.getAccessRequestConfig();
+    const accessRequestConfigResponse = await accessRequestApi.getAccessRequestConfig().catch(error => {
+        handleHttpException(error);
+    });
     let accessRequestConfig = accessRequestConfigResponse.data;
 
     //Update fallbackApproverRef.name to alias for lookup when migrating
@@ -67,13 +69,11 @@ const updateAccessRequestConfig = async (apiConfig) => {
             localAccessRequestConfig.entitlementRequestConfig.grantRequestApprovalSchemes = grantRequestApprovalSchemes;
         }
 
-        try {
-            const accessRequestConfigResponse = await accessRequestApi.setAccessRequestConfig({
-                accessRequestConfig: localAccessRequestConfig
-            });
-        } catch (error) {
-            await handleHttpException(error);
-        }
+        const accessRequestConfigResponse = await accessRequestApi.setAccessRequestConfig({
+            accessRequestConfig: localAccessRequestConfig
+        }).catch(error => {
+            handleHttpException(error);
+        });
     }
     winston.info(clc.bgGreen("Completed Access Request Configuration Deployment"));
 }

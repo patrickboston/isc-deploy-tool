@@ -154,7 +154,7 @@ npm run deploy -- --target_env=<env>
 ```
 
 > [!NOTE]
-> The deploy/import execution process will halt on errors return from ISC APIs. Errors will be recorded in the terminal if encountered. You must resolve any issues with configuration objects that are throwing errors during deployment or report at lower level tool bugs with the team so they can resolve them. 
+> The deploy/import execution process will halt on errors return from ISC APIs. Errors will be recorded in the terminal if encountered. You must resolve any issues with configuration objects that are throwing errors during deployment or report at lower level tool bugs with the team so they can resolve them. We do this as opposed to continuing on errors due to object dependencies.
 
 
 

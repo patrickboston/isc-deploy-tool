@@ -28,6 +28,8 @@ const getSourceByName = async (apiConfig, sourceName) => {
     const currentSourceResponse = await sourcesApi.listSources({
         filters: `name eq "${sourceName}"`,
         limit: 1
+    }).catch(error => {
+        handleHttpException(error);
     });
 
     const currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
@@ -43,6 +45,8 @@ const getSourceById = async (apiConfig, sourceId) => {
     const currentSourceResponse = await sourcesApi.listSources({
         filters: `id eq "${sourceId}"`,
         limit: 1
+    }).catch(error => {
+        handleHttpException(error);
     });
 
     const currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
@@ -62,7 +66,9 @@ const exportSources = async (apiConfig) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const sourcesApiBeta = new SourcesBetaApi(apiConfig);
 
-    const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSources, undefined, 250);
+    const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSources, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
     for (const source of sources.data) {
         //Clone for modifications
         let sourceClone = structuredClone(source);
@@ -81,14 +87,18 @@ const exportSources = async (apiConfig) => {
         }
 
         //Get and write referenced schemas on source
-        const sourceSchemas = await sourcesApi.getSourceSchemas({ sourceId: source.id });
+        const sourceSchemas = await sourcesApi.getSourceSchemas({ sourceId: source.id }).catch(error => {
+            handleHttpException(error);
+        });
         for (const schema of sourceSchemas.data) {
             winston.info(`Exporting schema for source: ${sourceName} - ${schema.name}`);
             writeConfigFile(CONNECTOR_SCHEMA, schema.name, schema, `SOURCE/${sourceName}/CONNECTOR_SCHEMA`);
         }
 
         //Get and write referenced policies on source
-        const sourcePolicies = await sourcesApi.listProvisioningPolicies({ sourceId: source.id });
+        const sourcePolicies = await sourcesApi.listProvisioningPolicies({ sourceId: source.id }).catch(error => {
+            handleHttpException(error);
+        });
         for (const policy of sourcePolicies.data) {
             const policyFileName = policy.name + "_" + policy.usageType;
             winston.info(`Exporting policy for source: ${sourceName} - ${policy.name} (${policy.usageType})`);
@@ -140,6 +150,8 @@ const migrateSource = async (apiConfig, sourceJson) => {
     const currentSourceResponse = await sourcesApi.listSources({
         filters: `name eq "${localSource.name}"`,
         limit: 1
+    }).catch(error => {
+        handleHttpException(error);
     });
 
     let currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
@@ -264,6 +276,8 @@ const migrateSource = async (apiConfig, sourceJson) => {
             let currentTargetPolicyResponse;
             currentTargetPolicyResponse = await sourcesApi.listProvisioningPolicies({
                 sourceId: currentTartgetSource.id,
+            }).catch(error => {
+                handleHttpException(error);
             });
 
             if (currentTargetPolicyResponse) {
@@ -316,6 +330,8 @@ const migrateSource = async (apiConfig, sourceJson) => {
             // Get all schemas from current target source
             let currentTargetSchemasResponse = await sourcesApi.getSourceSchemas({
                 sourceId: currentTartgetSource.id,
+            }).catch(error => {
+                handleHttpException(error);
             });
 
             let schemaReferences = {};
