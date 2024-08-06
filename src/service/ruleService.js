@@ -101,9 +101,9 @@ const migrateCloudRules = async (apiConfig) => {
     winston.info(clc.bgGreen("Completed Cloud Rule Deployment"));
 }
 
-const migrateConnectorRule = async (apiConfig, cloudRuleJson) => {
+const migrateConnectorRule = async (apiConfig, connectorRuleJson) => {
     const connectorRuleManagementBetaApi = new ConnectorRuleManagementBetaApi(apiConfig);
-    let localConnectorRule = JSON.parse(cloudRuleJson);
+    let localConnectorRule = JSON.parse(connectorRuleJson);
 
     //Check and see if a connector rule already exists in the target environment, no filtering need to iterate
     let currentTargetConnectorRule;
