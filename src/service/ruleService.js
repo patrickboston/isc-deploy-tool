@@ -70,7 +70,7 @@ const exportConnectorRules = async (apiConfig) => {
 
         //Write separate txt file with source code for easy reference
         const source = connectorRule.sourceCode.script;
-        const ruleSourceFileName = `./config/${CONNECTOR_RULE}/${connectorRule.name}.source.txt`;
+        const ruleSourceFileName = `./config/${CONNECTOR_RULE}/${connectorRule.name}.source.bsh`;
         fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
     }
 }
