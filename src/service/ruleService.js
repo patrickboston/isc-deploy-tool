@@ -53,7 +53,7 @@ const exportCloudRules = async (apiConfig) => {
             winston.info(`Exporting Cloud Rule: ${rule.self.name} (${rule.self.id})`);
             writeConfigFile(CLOUD_RULE, rule.self.name, rule);
 
-            //Write separate txt file with source code for easy reference
+            //Write separate bsh file with source code for easy reference
             const source = rule.object.sourceCode.script;
             const ruleSourceFileName = `./config/${CLOUD_RULE}/${rule.self.name}.source.bsh`;
             fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
@@ -68,7 +68,7 @@ const exportConnectorRules = async (apiConfig) => {
         winston.info(`Exporting Connector Rule: ${connectorRule.name} (${connectorRule.id})`);
         writeConfigFile(CONNECTOR_RULE, connectorRule.name, connectorRule);
 
-        //Write separate txt file with source code for easy reference
+        //Write separate bsh file with source code for easy reference
         const source = connectorRule.sourceCode.script;
         const ruleSourceFileName = `./config/${CONNECTOR_RULE}/${connectorRule.name}.source.bsh`;
         fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
