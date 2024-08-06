@@ -3,7 +3,7 @@ import * as fs from "fs";
 import _ from 'lodash';
 import { GovernanceGroupsBetaApi, IdentitiesBetaApi, Paginator } from "sailpoint-api-client";
 import winston from "winston";
-import { walk, writeConfigFile } from "../util.js";
+import { handleHttpException, walk, writeConfigFile } from "../util.js";
 
 const GOVERNANCE_GROUP_TYPE = "GOVERNANCE_GROUP";
 const existingAttributeToKeep = [
@@ -21,6 +21,8 @@ const getIdentityByAlias = async (apiConfig, identityAlias) => {
     const identityResponse = await identityApi.listIdentities({
         filters: `alias eq "${identityAlias}"`,
         defaultFilter: "NONE" //Show hidden SailPoint identities
+    }).catch(error => {
+        handleHttpException(error);
     });
 
     if (!identityResponse || identityResponse.data.length === 0) {
@@ -38,6 +40,8 @@ const getIdentityById = async (apiConfig, identityId) => {
     const identityResponse = await identityApi.listIdentities({
         filters: `id eq "${identityId}"`,
         defaultFilter: "NONE" //Show hidden SailPoint identities
+    }).catch(error => {
+        handleHttpException(error);
     });
 
     if (!identityResponse || identityResponse.data.length === 0) {
@@ -53,6 +57,8 @@ const getGovGroupByName = async (apiConfig, govGroupName) => {
     const govGroupApi = new GovernanceGroupsBetaApi(apiConfig);
     const govGroupResponse = await govGroupApi.listWorkgroups({
         filters: `name eq "${govGroupName}"`
+    }).catch(error => {
+        handleHttpException(error);
     });
 
     if (!govGroupResponse || govGroupResponse.data.length === 0) {
@@ -68,6 +74,8 @@ const getGovGroupById = async (apiConfig, govGroupId) => {
     const govGroupApi = new GovernanceGroupsBetaApi(apiConfig);
     const govGroupResponse = await govGroupApi.getWorkgroup({
         id: govGroupId
+    }).catch(error => {
+        handleHttpException(error);
     });
 
     if (!govGroupResponse) {
@@ -80,7 +88,9 @@ const getGovGroupById = async (apiConfig, govGroupId) => {
 const exportGovernanceGroups = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Governance Group Export"));
     const govGroupApi = new GovernanceGroupsBetaApi(apiConfig);
-    const govGroupsResponse = await Paginator.paginate(govGroupApi, govGroupApi.listWorkgroups, undefined, 250);
+    const govGroupsResponse = await Paginator.paginate(govGroupApi, govGroupApi.listWorkgroups, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
     for (const govGroup of govGroupsResponse.data) {
         winston.info(`Exporting Governance Group: ${govGroup.name} (${govGroup.id})`);
         writeConfigFile(GOVERNANCE_GROUP_TYPE, govGroup.name, govGroup);
@@ -101,6 +111,8 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
     //Check and see if a gov group with this name already exists in the target environment
     const currentGovGroupResponse = await govGroupApi.listWorkgroups({
         filters: `name eq "${localGovGroup.name}"`
+    }).catch(error => {
+        handleHttpException(error);
     });
     let currentTargetGovGroup = currentGovGroupResponse.data.length == 1 ? currentGovGroupResponse.data[0] : null;
 
@@ -112,6 +124,8 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
                 description: localGovGroup.description,
                 owner: localGovGroup.owner
             }
+        }).catch(error => {
+            handleHttpException(error);
         });
         currentTargetGovGroup = createGovGroupResponse.data;
     } else {
@@ -131,6 +145,8 @@ const migrateGovernanceGroup = async (apiConfig, govGroupJson) => {
                     value: localGovGroup.description
                 }
             ]
+        }).catch(error => {
+            handleHttpException(error);
         });
     }
 }

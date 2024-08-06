@@ -21,10 +21,11 @@ const sleep = (ms) => {
 */
 const handleHttpException = async (e) => {
     if (e.response) {
-        winston.error(clc.red(`Error while executing request:\nPath: ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+        winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
     } else {
         winston.error(clc.red(`Generic while executing request: ${e.message}`));
     }
+    process.exit(0);
 }
 
 /**
@@ -201,8 +202,12 @@ const buildObjectsForEnvironment = async (env) => {
                 if (matches) {
                     winston.info(clc.green(`${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`));
                 }
-                //Stringify the value so it's escaped properly if a secret token or something   
-                fileSource = fileSource.replaceAll(tokenName, escapeString(tokenValue));
+                //Stringify the value so it's escaped properly if a secret token or something
+                if (typeof tokenValue === "string") {
+                    fileSource = fileSource.replaceAll(tokenName, escapeString(tokenValue));
+                } else {
+                    fileSource = fileSource.replaceAll(tokenName, JSON.stringify(tokenValue));
+                }
             });
 
             //Write tokenized file to /build/[TYPE] directory
@@ -275,7 +280,7 @@ const runSpConfigExport = async (apiConfig, exportConfig) => {
                     await delay(2000); // Wait before checking the status again
                 } else if (currentStatusResponse.data.status === "CANCELLED" || currentStatusResponse.data.status === "FAILED") {
                     winston.error(clc.red(`SP-Config export job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`));
-                    return;
+                    process.exit(1);
                 }
             } catch (error) {
                 handleHttpException(error);
@@ -336,7 +341,7 @@ const runSpConfigImport = async (apiConfig, importObj) => {
                     await delay(2000); // Wait before checking the status again
                 } else if (currentStatusResponse.data.status === "CANCELLED" || currentStatusResponse.data.status === "FAILED") {
                     winston.error(clc.red(`SP-Config import job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`));
-                    return;
+                    process.exit(1);
                 }
             } catch (error) {
                 handleHttpException(error);

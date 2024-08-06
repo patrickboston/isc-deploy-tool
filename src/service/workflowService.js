@@ -14,7 +14,9 @@ const existingAttributeToKeep = [
 const exportWorkflows = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Workflow Export"));
     const workflowsApi = new WorkflowsApi(apiConfig);
-    const workflows = await Paginator.paginate(workflowsApi, workflowsApi.listWorkflows, undefined, 250);
+    const workflows = await Paginator.paginate(workflowsApi, workflowsApi.listWorkflows, undefined, 250).catch(error => {
+        handleHttpException(error);
+    });
     for (let workflow of workflows.data) {
         winston.info(`Exporting Workflow: ${workflow.name} (${workflow.id})`);
         //Update owner/creator/modifiedBy to alias for lookup when migrating
