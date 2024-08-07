@@ -3,7 +3,7 @@ import * as fs from "fs";
 import _ from 'lodash';
 import { NotificationsBetaApi, Paginator } from "sailpoint-api-client";
 import winston from "winston";
-import { walk, writeConfigFile } from "../util.js";
+import { handleHttpException, walk, writeConfigFile } from "../util.js";
 
 const NOTIFICATION_TEMPLATE = "NOTIFICATION_TEMPLATE";
 const existingAttributeToKeep = [
