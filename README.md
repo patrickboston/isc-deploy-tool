@@ -211,6 +211,10 @@ When lifecycle states are exported, access profile and source ID references will
 - During the export process, only non-internal (`"internal": false`) transforms are exported since internal transforms (maintained by SailPoint) cannot be changed
 - If you are changing the `type` of a transform where that transform is already deployed to a target environment, the import will fail indicating that you cannot change the type. You must delete the transform in the target environment before you can be deploy the transform with the same name, or else create a new transform with a different name and update all references
 
+### Rules
+- The deployment process for rules injects the source code for the rule from the corresponding <rule-name>.source.bsh file created during an export.
+- The export process for rules will automatically exclude the sourceCode.script attribute for CONNECTOR_RULES
+
 ### Deleting Objects
 There are two scenarios to consider when deleting objects:
 - When objects are deleted directly inside of a tenant, they must also be removed in your build directory/repository because the export process does not consider cleaning up objects that may have been deleted in a tenant. If not cleaned up, they may be re-deployed inadvertently

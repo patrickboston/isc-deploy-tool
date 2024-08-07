@@ -192,8 +192,26 @@ const buildObjectsForEnvironment = async (env) => {
     //Iterate each config file from export
     const configFileNames = walk("./config");
     for (const fileName of configFileNames) {
+        // build CONNECTOR_RULE separate to inject script from .bsh file
         if (fileName.endsWith(".json")) {
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
+
+            // if this is a connector rule, then inject script from source file
+            if (fileName.startsWith("./config/CONNECTOR_RULE/")) {
+                winston.debug(`Injecting source script for rule ${fileName}`);
+                
+                // get a copy of the script from the .bsh file
+                let scriptFileName = fileName.replace(".json", ".source.bsh");
+                let scriptSource = fs.readFileSync(scriptFileName, { encoding: "utf8" });
+
+                // convert fileSource to JSON and set sourceCode.script
+                let rule = JSON.parse(fileSource);
+                rule.sourceCode.script = scriptSource;
+
+                // convert back
+                fileSource = JSON.stringify(rule, null, 4);
+            }
+
             winston.debug(`Checking file ${fileName} for token replacement`);
             Object.entries(envTokens).forEach((token) => {
                 const [tokenName, tokenValue] = token;

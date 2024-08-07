@@ -3,7 +3,7 @@ import * as fs from "fs";
 import _ from 'lodash';
 import { ConnectorRuleManagementBetaApi, Paginator } from "sailpoint-api-client";
 import winston from "winston";
-import { runSpConfigExport, runSpConfigImport, walk, writeConfigFile } from "../util.js";
+import { handleHttpException, runSpConfigExport, runSpConfigImport, walk, writeConfigFile } from "../util.js";
 
 const CLOUD_RULE = "CLOUD_RULE";
 const CONNECTOR_RULE = "CONNECTOR_RULE";
@@ -55,9 +55,9 @@ const exportCloudRules = async (apiConfig) => {
             winston.info(`Exporting Cloud Rule: ${rule.self.name} (${rule.self.id})`);
             writeConfigFile(CLOUD_RULE, rule.self.name, rule);
 
-            //Write separate txt file with source code for easy reference
+            //Write separate bsh file with source code for easy reference
             const source = rule.object.sourceCode.script;
-            const ruleSourceFileName = `./config/${CLOUD_RULE}/${rule.self.name}.source.txt`;
+            const ruleSourceFileName = `./config/${CLOUD_RULE}/${rule.self.name}.source.bsh`;
             fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
         }
     }
@@ -68,12 +68,17 @@ const exportConnectorRules = async (apiConfig) => {
     const currentConnectorRules = await getAllConnectorRules(apiConfig);
     for (const connectorRule of currentConnectorRules) {
         winston.info(`Exporting Connector Rule: ${connectorRule.name} (${connectorRule.id})`);
+
+        //Get a copy of the script and remove from rule
+        const script = connectorRule.sourceCode.script;
+        delete connectorRule.sourceCode.script;
+
+        // write rule file
         writeConfigFile(CONNECTOR_RULE, connectorRule.name, connectorRule);
 
-        //Write separate txt file with source code for easy reference
-        const source = connectorRule.sourceCode.script;
-        const ruleSourceFileName = `./config/${CONNECTOR_RULE}/${connectorRule.name}.source.txt`;
-        fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
+        //Write separate bsh file with source code for easy reference
+        const ruleSourceFileName = `./config/${CONNECTOR_RULE}/${connectorRule.name}.source.bsh`;
+        fs.writeFileSync(ruleSourceFileName, unescape(script), null, 4);
     }
 }
 
@@ -104,9 +109,9 @@ const migrateCloudRules = async (apiConfig) => {
     winston.info(clc.bgGreen("Completed Cloud Rule Deployment"));
 }
 
-const migrateConnectorRule = async (apiConfig, cloudRuleJson) => {
+const migrateConnectorRule = async (apiConfig, connectorRuleJson) => {
     const connectorRuleManagementBetaApi = new ConnectorRuleManagementBetaApi(apiConfig);
-    let localConnectorRule = JSON.parse(cloudRuleJson);
+    let localConnectorRule = JSON.parse(connectorRuleJson);
 
     //Check and see if a connector rule already exists in the target environment, no filtering need to iterate
     let currentTargetConnectorRule;
