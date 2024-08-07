@@ -69,15 +69,16 @@ const exportConnectorRules = async (apiConfig) => {
     for (const connectorRule of currentConnectorRules) {
         winston.info(`Exporting Connector Rule: ${connectorRule.name} (${connectorRule.id})`);
 
-        //Write separate bsh file with source code for easy reference
-        const source = connectorRule.sourceCode.script;
-        const ruleSourceFileName = `./config/${CONNECTOR_RULE}/${connectorRule.name}.source.bsh`;
-        fs.writeFileSync(ruleSourceFileName, unescape(source), null, 4);
-
-        //Remove script from rule
+        //Get a copy of the script and remove from rule
+        const script = connectorRule.sourceCode.script;
         delete connectorRule.sourceCode.script;
 
+        // write rule file
         writeConfigFile(CONNECTOR_RULE, connectorRule.name, connectorRule);
+
+        //Write separate bsh file with source code for easy reference
+        const ruleSourceFileName = `./config/${CONNECTOR_RULE}/${connectorRule.name}.source.bsh`;
+        fs.writeFileSync(ruleSourceFileName, unescape(script), null, 4);
     }
 }
 
