@@ -3,7 +3,7 @@ import * as fs from "fs";
 import _ from 'lodash';
 import { ConnectorRuleManagementBetaApi, Paginator } from "sailpoint-api-client";
 import winston from "winston";
-import { runSpConfigExport, runSpConfigImport, walk, writeConfigFile } from "../util.js";
+import { handleHttpException, runSpConfigExport, runSpConfigImport, walk, writeConfigFile } from "../util.js";
 
 const CLOUD_RULE = "CLOUD_RULE";
 const CONNECTOR_RULE = "CONNECTOR_RULE";
