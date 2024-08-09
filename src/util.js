@@ -25,7 +25,7 @@ const handleHttpException = async (e) => {
     } else {
         winston.error(clc.red(`Generic while executing request: ${e.message}`));
     }
-    process.exit(0);
+    process.exit(1);
 }
 
 /**
