@@ -117,6 +117,9 @@ const exportSources = async (apiConfig) => {
         const owner = await getIdentityById(apiConfig, source.owner.id);
         sourceClone.owner.name = owner.alias;
 
+        //Sort features alphabetically since the API outputs them in a different order every time
+        if (sourceClone.features) sourceClone.features.sort();
+        
         //Write the actual source
         writeConfigFile("SOURCE", sourceName, sourceClone, `SOURCE/${sourceName}`);
     }
