@@ -170,6 +170,22 @@ const migrateSource = async (apiConfig, sourceJson) => {
             _.unset(localSource, "passwordPolicies");
         }
 
+        //Update all rule references
+        const rules = await getAllRules(apiConfig);
+
+        for (const ruleReferenceName of ruleReferenceNames) {
+            if (_.get(localSource, ruleReferenceName)) {
+                let ruleRef = _.get(localSource, ruleReferenceName);
+
+                for (const rule of rules) {
+                    if (rule.self.name === ruleRef.name) {
+                        ruleRef.id = rule.self.id;
+                        _.set(localSource, ruleReferenceName, ruleRef);
+                    }
+                }
+            }
+        }
+
         try {
             const createSourceResponse = await sourcesApi.createSource({
                 source: localSource,
@@ -201,7 +217,8 @@ const migrateSource = async (apiConfig, sourceJson) => {
                 sleep(1000);
 
                 const sourceCorrelationConfig = sourceCorrelationConfigResponse.data;
-                localSource.accountCorrelationConfig.id = sourceCorrelationConfig.id;
+                _.set(localSource, "accountCorrelationConfig.id", sourceCorrelationConfig.id);
+                //localSource.accountCorrelationConfig.id = sourceCorrelationConfig.id;
             } catch (error) {
                 handleHttpException(error);
 
