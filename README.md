@@ -26,7 +26,7 @@ The following object types are currently supported for export/deploy:
 
 
 
-## Setup/Import Configuration Files
+## Setup/Configuration Files
 This a NodeJS project that was written on NodeJS 18. You will need NodeJS installed prior to using this tool. Find the latest NodeJS download here: https://nodejs.org/en/download
 
 You can then clone this repository. Once the repository is cloned, run `npm install` within the cloned repository directory to install all project dependencies.
@@ -68,6 +68,7 @@ export default
         "%%AD_IQSERVICE_PORT%%": "888888",
     }
 ```
+- `export-config.js` - Contains import configuration items that pertain to the export process, particularly it holds `omitProperties` which has all of the JSON properties that should be omitted from objects such as `id` references, created/modified timestamps, rule `id` references, etc. Additional entries can be added/remove as needed per implementation requirements, but the standard set provided is meant to make objects repository-oriented
 - `export-ignore.js` - Contains an array of specific objects to ignore (not write to local config directory) when performing an export. Each entry must be in this specific format: `OBJECT_TYPE:Object Name`. If a file exists in your local `./config` directory and is then later added to this file, it will be deleted on the next export run See examples below:
 ```js
 export default
@@ -220,19 +221,6 @@ There are two scenarios to consider when deleting objects:
 - When objects are deleted directly inside of a tenant, they must also be removed in your build directory/repository because the export process does not consider cleaning up objects that may have been deleted in a tenant. If not cleaned up, they may be re-deployed inadvertently
 - When objects are deleted from your build directory/repository, they will not automatically be cleaned up during the next build deployment. You must also delete objects directly in the tenant if you are removing them from your build repository
 
-### Reserved Keywords
-The export process omits certain keys from configuration objects to make them repository oriented. This means the following keywords should not be using in configuration object (i.e. defined attributes in transforms):
-- `id`
-- `created`
-- `modified`
-- `sourceId`
-- `cloudExternalId`
-- `cloudCacheUpdate`
-- `since`
-- `status`
-- `healthy`
-- `identityCount`
-- `standardLogoURL`
 
 
 
