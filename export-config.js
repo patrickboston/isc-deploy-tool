@@ -5,7 +5,7 @@ export default
                 "$.approvalReminderAndEscalationConfig.fallbackApproverRef.id"
             ],
             "ATTR_SYNC_SOURCE_CONFIG": [
-                "source.id"
+                "$.source.id"
             ],
             "BRANDING_CONFIG": [
                 "$.[*].standardLogoURL"
