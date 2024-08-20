@@ -4,6 +4,7 @@ import { JSONPath } from "jsonpath-plus";
 import _ from 'lodash';
 import { SPConfigBetaApi } from "sailpoint-api-client";
 import winston from "winston";
+import { default as exportConfig } from "../export-config.js";
 import { default as exportIgnore } from "../export-ignore.js";
 import { default as reverseTokens } from "./../reverse.target.js";
 
@@ -75,6 +76,34 @@ function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "c
     return omitFromObject(obj); //return the inner function result
 }
 
+const omitPropertiesFromObject = (objectType, object) => {
+    const globalOmitProperties = exportConfig.omitProperties.GLOBAL;
+    const objectTypeProperties = exportConfig.omitProperties[objectType];
+    let props;
+    if (objectTypeProperties) {
+        props = [...globalOmitProperties, ...objectTypeProperties];
+    } else {
+        props = globalOmitProperties;
+    }
+
+    //Iterate each token for a specific object/file
+    for (const prop of props) {
+        let results = JSONPath({
+            path: prop,
+            json: object,
+            resultType: "all"
+        });
+
+        //If we find a matching object via JSONPath, replace it with the reverse token
+        for (const result of results) {
+            //Convert the JSONPath pointer to make it actual JavaScript dot notation
+            let correctPointer = result.pointer.replaceAll("/", ".").substring(1);
+            _.unset(object, correctPointer);
+        }
+    }
+    return object;
+}
+
 /**
 * Writes a IDN Config file to the specified location
 * creating a directory if needed to hold the object
@@ -104,7 +133,7 @@ const writeConfigFile = (objectType, objectName, object, overrideDir = null) => 
         }
     } else {
         //Cloud Rule objects cannot be modified at all or else the signature validation fails, so don't omit from them
-        let omittedObj = objectType !== "CLOUD_RULE" ? deepOmit(object) : object;
+        let omittedObj = objectType !== "CLOUD_RULE" ? omitPropertiesFromObject(objectType, object) : object;
         fs.writeFileSync(fileName, JSON.stringify(omittedObj, null, 4));
     }
 }
@@ -199,7 +228,7 @@ const buildObjectsForEnvironment = async (env) => {
             // if this is a connector rule, then inject script from source file
             if (fileName.startsWith("./config/CONNECTOR_RULE/")) {
                 winston.debug(`Injecting source script for rule ${fileName}`);
-                
+
                 // get a copy of the script from the .bsh file
                 let scriptFileName = fileName.replace(".json", ".source.bsh");
                 let scriptSource = fs.readFileSync(scriptFileName, { encoding: "utf8" });
