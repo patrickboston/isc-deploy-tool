@@ -80,13 +80,6 @@ const exportIdentityProfiles = async (apiConfig) => {
             }
         }
 
-        /*
-         * Special case where we do an additional omit for sourceId on identity profiles
-         * since in the main omit where we write the file we ignore the transformDefinition
-         * entry since it has an 'id' entry for transform references which we cannot omit
-        */
-        profile = deepOmit(profile, ["sourceId"], []);
-
         //This is basically using SP-Config in the backend so we need to reference self.name here
         writeConfigFile(IDENTITY_PROFILE, profile.self.name, profile, `IDENTITY_PROFILE/${profile.self.name}`);
     }
