@@ -51,25 +51,6 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     if (!currentTargetWorkflow) {
         winston.info(`Creating new workflow: ${localWorkflow.name}`);
 
-        //TODO: Subscription error???
-        /*
-        Create completed and local workflow was marked as enabled, enabling it in target
-        Error while executing request:
-        Path: /beta/workflows/1d1f6a54-4241-4489-a784-529867d45586
-        Status Code: 500
-        Response Data: {
-            "detailCode": "Internal Server Error",
-            "trackingId": "529bdf59d9504632b7d05bf06f813394",
-            "messages": [
-                {
-                    "locale": "en-US",
-                    "localeOrigin": "DEFAULT",
-                    "text": "failed to enable workflow due to missing subscription"
-                }
-            ]
-        }
-        */
-
         try {
             const createWorkflowResponse = await workflowsApi.createWorkflow({
                 createWorkflowRequestBeta: {
