@@ -24,14 +24,6 @@ const exportWorkflows = async (apiConfig) => {
             const owner = await getIdentityById(apiConfig, workflow.owner.id);
             workflow.owner.name = owner.alias;
         }
-        if (workflow.creator) {
-            const creator = await getIdentityById(apiConfig, workflow.creator.id);
-            workflow.creator.name = creator.alias;
-        }
-        if (workflow.modifiedBy) {
-            const modifiedBy = await getIdentityById(apiConfig, workflow.modifiedBy.id);
-            workflow.modifiedBy.name = modifiedBy.alias;
-        }
 
         writeConfigFile(WORKFLOW, workflow.name, workflow);
     }
@@ -46,14 +38,6 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     const owner = await getIdentityByAlias(apiConfig, localWorkflow.owner.name);
     _.set(localWorkflow, "owner.id", owner.id);
 
-    //Get corresponding creator by name and add id
-    const creator = await getIdentityByAlias(apiConfig, localWorkflow.creator.name);
-    _.set(localWorkflow, "creator.id", creator.id);
-
-    //Get corresponding modified by name and add id
-    const modifiedBy = await getIdentityByAlias(apiConfig, localWorkflow.modifiedBy.name);
-    _.set(localWorkflow, "modifiedBy.id", modifiedBy.id);
-
     //Check and see if a workflow with this name already exists in the target environment
     //Current List Workflows endpoint does not allow filtering, so need to iterate all workflows
     const currentWorkflowsResponse = await workflowsApi.listWorkflows();
@@ -66,25 +50,6 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
 
     if (!currentTargetWorkflow) {
         winston.info(`Creating new workflow: ${localWorkflow.name}`);
-
-        //TODO: Subscription error???
-        /*
-        Create completed and local workflow was marked as enabled, enabling it in target
-        Error while executing request:
-        Path: /beta/workflows/1d1f6a54-4241-4489-a784-529867d45586
-        Status Code: 500
-        Response Data: {
-            "detailCode": "Internal Server Error",
-            "trackingId": "529bdf59d9504632b7d05bf06f813394",
-            "messages": [
-                {
-                    "locale": "en-US",
-                    "localeOrigin": "DEFAULT",
-                    "text": "failed to enable workflow due to missing subscription"
-                }
-            ]
-        }
-        */
 
         try {
             const createWorkflowResponse = await workflowsApi.createWorkflow({

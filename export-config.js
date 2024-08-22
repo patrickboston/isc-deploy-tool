@@ -61,8 +61,8 @@ export default
                 "$.healthy"
             ],
             "WORKFLOW": [
-                "$.modifiedBy.id",
-                "$.creator.id",
+                "$.modifiedBy",
+                "$.creator",
                 "$.owner.id"
             ]
         }
