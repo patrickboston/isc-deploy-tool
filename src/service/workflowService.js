@@ -24,14 +24,6 @@ const exportWorkflows = async (apiConfig) => {
             const owner = await getIdentityById(apiConfig, workflow.owner.id);
             workflow.owner.name = owner.alias;
         }
-        if (workflow.creator) {
-            const creator = await getIdentityById(apiConfig, workflow.creator.id);
-            workflow.creator.name = creator.alias;
-        }
-        if (workflow.modifiedBy) {
-            const modifiedBy = await getIdentityById(apiConfig, workflow.modifiedBy.id);
-            workflow.modifiedBy.name = modifiedBy.alias;
-        }
 
         writeConfigFile(WORKFLOW, workflow.name, workflow);
     }
