@@ -38,14 +38,6 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     const owner = await getIdentityByAlias(apiConfig, localWorkflow.owner.name);
     _.set(localWorkflow, "owner.id", owner.id);
 
-    //Get corresponding creator by name and add id
-    const creator = await getIdentityByAlias(apiConfig, localWorkflow.creator.name);
-    _.set(localWorkflow, "creator.id", creator.id);
-
-    //Get corresponding modified by name and add id
-    const modifiedBy = await getIdentityByAlias(apiConfig, localWorkflow.modifiedBy.name);
-    _.set(localWorkflow, "modifiedBy.id", modifiedBy.id);
-
     //Check and see if a workflow with this name already exists in the target environment
     //Current List Workflows endpoint does not allow filtering, so need to iterate all workflows
     const currentWorkflowsResponse = await workflowsApi.listWorkflows();
