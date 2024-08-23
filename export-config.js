@@ -33,6 +33,9 @@ export default
                 "$.object.identityAttributeConfig.attributeTransforms[?(@.transformDefinition.type == 'accountAttribute')].transformDefinition.attributes.sourceId",
                 "$.object.identityCount"
             ],
+            "LIFECYCLE_STATE": [
+                "identityCount"
+            ],
             "PASSWORD_POLICY": [
                 "$.dateCreated",
                 "$.lastUpdated"
