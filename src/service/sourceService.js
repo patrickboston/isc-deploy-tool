@@ -162,7 +162,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
     if (!currentTartgetSource) {
         winston.info(`Creating new source: ${localSource.name}`);
-        const csvSource = localSource.type === "Delimited File";
+        const csvSource = localSource.type === "DelimitedFile";
 
         //Remove accountCorrelationConfig on create since we have no way of finding the reference
         _.unset(localSource, "accountCorrelationConfig");
