@@ -2,9 +2,9 @@
 The Identity Security Cloud Object Deployment Tool (**ISC ODT**) is a NodeJS command-line utility that allows you to export configuration objects such as Sources, Transforms, Rules, and more out of one Identity Security Cloud environment and import/deploy them to other Identity Security Cloud environments. It utilizes various v3/beta API endpoints to perform all export and import operations. One of the main benefits of using this tool is the ability to maintain single configuration objects that can be deployed to any environment via tokenization. This allows Source Code Management to actually make sense for ISC implementations and this process could easily be plugged into a CI/CD pipeline.
 
 It offers the following features:
-- Export objects and perform reverse-tokenization via JSONPath which replaces actual configuration values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any target Identity Security Cloud environment
-- Tokenize and build objects for a target Identity Security Cloud environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual target configuration values which are needed for a specific target environment (i.e. IQService host for an Active Directory Source)
-- Tokenize and deploy objects to a target Identity Security Cloud environment with dynamic object reference lookup and insertion
+- **EXPORT:** Export objects and perform reverse-tokenization via JSONPath which replaces actual configuration values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any target Identity Security Cloud environment
+- **BUILD/TOKENIZE:** Tokenize and build objects for a target Identity Security Cloud environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual target configuration values which are needed for a specific target environment (i.e. IQService host for an Active Directory Source)
+- **DEPLOY:** Deploy built/tokenized objects to a target Identity Security Cloud environment with dynamic object reference lookup and insertion (i.e. owners, source schemas, etc.)
 
 
 
