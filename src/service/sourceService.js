@@ -134,19 +134,25 @@ const migrateSource = async (apiConfig, sourceJson) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const betaSourcesApi = new SourcesBetaApi(apiConfig);
     let localSource = JSON.parse(sourceJson);
-    let sassSourceConnectorAttributesCopy;
+    let saasSourceConnectorAttributesCopy;
+    let saasClusterCopy;
 
     //Get corresponding cluster by name and add id
     let isSaaS = false;
     if (localSource.cluster) {
-        const clusters = await getAllClusters(apiConfig);
-        for (const cluster of clusters) {
-            if (localSource.cluster.name === cluster.name) {
-                _.set(localSource, "cluster.id", cluster.id)
-            }
-            if (localSource.cluster.name === "sp_connect_proxy_cluster") {
-                isSaaS = true;
-                sassSourceConnectorAttributesCopy = localSource.connectorAttributes;
+        if (localSource.cluster.name === "sp_connect_proxy_cluster") {
+            isSaaS = true;
+            saasSourceConnectorAttributesCopy = localSource.connectorAttributes;
+            saasClusterCopy = localSource.cluster;
+        }
+
+        //We only need this lookup if not SaaS
+        if (!isSaaS) {
+            const clusters = await getAllClusters(apiConfig);
+            for (const cluster of clusters) {
+                if (localSource.cluster.name === cluster.name) {
+                    _.set(localSource, "cluster.id", cluster.id)
+                }
             }
         }
     }
@@ -226,6 +232,12 @@ const migrateSource = async (apiConfig, sourceJson) => {
 
     //A source needs to exist to perform all the updates properly
     if (currentTartgetSource) {
+        if (isSaaS && saasSourceConnectorAttributesCopy) {
+            //Restore connectorAttributes we removed during initial create
+            localSource.connectorAttributes = saasSourceConnectorAttributesCopy;
+            localSource.cluster = saasClusterCopy;
+        }
+
         /*
         * If this is a SaaS source, we need to inject the id of the proxy cluster that is currently set
         * on the source since we cannot fetch it before hand, there is no endpoint to get this private
@@ -233,11 +245,6 @@ const migrateSource = async (apiConfig, sourceJson) => {
         */
         if (isSaaS && currentTartgetSource.cluster) {
             _.set(localSource, "cluster.id", currentTartgetSource.cluster.id);
-        }
-
-        if (isSaaS && sassSourceConnectorAttributesCopy) {
-            //Restore connectorAttributes we removed during initial create
-            localSource.connectorAttributes = sassSourceConnectorAttributesCopy;
         }
 
         //Correlation Config needs to be updated from target source if exists
