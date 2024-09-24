@@ -1,4 +1,5 @@
 import clc from "cli-color";
+import * as crypto from 'crypto';
 import * as fs from "fs";
 import { JSONPath } from "jsonpath-plus";
 import _ from 'lodash';
@@ -103,6 +104,38 @@ const omitPropertiesFromObject = (objectType, object) => {
     }
     return object;
 }
+
+/**
+* Encrypts a password locally with a public key that could be retrieved from
+* a Virtual Appliance cluster.
+*
+* @param {string} publicKey publicKey from the Virtual Appliance cluster, should not contain -----BEGIN PUBLIC KEY----- or -----END PUBLIC KEY-----, although will be stripped beforehand if it does exist
+* @param {string} toEncrypt Secret you want to encrypt
+*/
+const encrypt = async (publicKey, toEncrypt) => {
+    publicKey = publicKey.replace("-----BEGIN PUBLIC KEY-----", "");
+    publicKey = publicKey.replace("-----END PUBLIC KEY-----", "");
+
+    const publicKeyBytes = Buffer.from(publicKey, 'base64');
+    const encryptedBytes = await encryptRsa(publicKeyBytes, Buffer.from(toEncrypt, 'utf-8'));
+    return encryptedBytes.toString('base64');
+};
+
+const encryptRsa = async (publicKeyBytes, toEncryptBytes) => {
+    const key = crypto.createPublicKey({
+        key: publicKeyBytes,
+        format: 'der',
+        type: 'spki'
+    });
+
+    const encrypted = crypto.publicEncrypt({
+        key: key,
+        padding: crypto.constants.RSA_PKCS1_PADDING
+    }, toEncryptBytes);
+
+    return encrypted;
+};
+
 
 /**
 * Writes a IDN Config file to the specified location
@@ -415,5 +448,5 @@ const runSpConfigImport = async (apiConfig, importObj) => {
 };
 
 
-export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, handleHttpException, reverseTokenize, runSpConfigExport, runSpConfigImport, sleep, walk, writeConfigFile };
+export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, encrypt, handleHttpException, reverseTokenize, runSpConfigExport, runSpConfigImport, sleep, walk, writeConfigFile };
 
