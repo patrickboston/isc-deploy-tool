@@ -232,26 +232,6 @@ const migrateSource = async (apiConfig, sourceJson) => {
             }
         }
 
-        //Attribute sync config
-        const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
-        for (const localAttrSyncFile of localAttrSyncFiles) {
-            let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
-            _.set(attrSyncCopy, "source.id", currentTartgetSource.id);
-
-            //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
-            if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
-                try {
-                    winston.info(`Updating source attribute sync config`)
-                    await betaSourcesApi.putSourceAttrSyncConfig({
-                        id: currentTartgetSource.id,
-                        attrSyncSourceConfigBeta: attrSyncCopy
-                    });
-                } catch (error) {
-                    await handleHttpException(error);
-                }
-            }
-        }
-
         //Password Policy References - we can't filter by name in API so need to iterate each and check
         /* This doesn't actually work for whatever reason, if you attach a policy in the UI, it uses
         PATCH /beta/sources/:id/password-policies which is not a documented endpoint so there is no
@@ -282,6 +262,54 @@ const migrateSource = async (apiConfig, sourceJson) => {
                         ruleRef.id = rule.self.id;
                         _.set(localSource, ruleReferenceName, ruleRef);
                     }
+                }
+            }
+        }
+
+        /*
+         * Get all local schema templates and iterate them, check and see if there is a matching current
+         * schema in the deployed target source. If found, update it with a PUT, if not found, create a new
+         * schema. Also need to update the schema reference ID in the source itself as we update the referenced
+         * schema object
+        */
+        const localSchemaFiles = walk(`./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
+        if (localSchemaFiles) {
+            let schemaFilesToProcessLater = [];
+
+            // Get all schemas from current target source
+            let currentTargetSchemasResponse = await sourcesApi.getSourceSchemas({
+                sourceId: currentTartgetSource.id,
+            }).catch(error => {
+                handleHttpException(error);
+            });
+
+            let schemaReferences = {};
+            if (currentTargetSchemasResponse.data) {
+                for (const currentSchema of currentTargetSchemasResponse.data) {
+                    schemaReferences[currentSchema.name] = currentSchema;
+                }
+            }
+
+            // First pass: Process schemas without references
+            for (const localSchemaFile of localSchemaFiles) {
+                let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
+                if (schemaCopy.attributes && schemaCopy.attributes.some(attr => attr.schema)) {
+                    schemaFilesToProcessLater.push(localSchemaFile);
+                } else {
+                    const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
+                    //If there was a schema created, it will return it here to update schema refs
+                    if (res) {
+                        schemaReferences[res.name] = res;
+                    }
+                }
+            }
+
+            // Second pass: Process schemas with references
+            for (const localSchemaFile of schemaFilesToProcessLater) {
+                const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
+                //If there was a schema created, it will return it here to update schema refs
+                if (res) {
+                    schemaReferences[res.name] = res;
                 }
             }
         }
@@ -337,50 +365,22 @@ const migrateSource = async (apiConfig, sourceJson) => {
             }
         }
 
-        /*
-         * Get all local schema templates and iterate them, check and see if there is a matching current
-         * schema in the deployed target source. If found, update it with a PUT, if not found, create a new
-         * schema. Also need to update the schema reference ID in the source itself as we update the referenced
-         * schema object
-        */
-        const localSchemaFiles = walk(`./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
-        if (localSchemaFiles) {
-            let schemaFilesToProcessLater = [];
+        //Attribute sync config
+        const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
+        for (const localAttrSyncFile of localAttrSyncFiles) {
+            let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
+            _.set(attrSyncCopy, "source.id", currentTartgetSource.id);
 
-            // Get all schemas from current target source
-            let currentTargetSchemasResponse = await sourcesApi.getSourceSchemas({
-                sourceId: currentTartgetSource.id,
-            }).catch(error => {
-                handleHttpException(error);
-            });
-
-            let schemaReferences = {};
-            if (currentTargetSchemasResponse.data) {
-                for (const currentSchema of currentTargetSchemasResponse.data) {
-                    schemaReferences[currentSchema.name] = currentSchema;
-                }
-            }
-
-            // First pass: Process schemas without references
-            for (const localSchemaFile of localSchemaFiles) {
-                let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
-                if (schemaCopy.attributes && schemaCopy.attributes.some(attr => attr.schema)) {
-                    schemaFilesToProcessLater.push(localSchemaFile);
-                } else {
-                    const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
-                    //If there was a schema created, it will return it here to update schema refs
-                    if (res) {
-                        schemaReferences[res.name] = res;
-                    }
-                }
-            }
-
-            // Second pass: Process schemas with references
-            for (const localSchemaFile of schemaFilesToProcessLater) {
-                const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
-                //If there was a schema created, it will return it here to update schema refs
-                if (res) {
-                    schemaReferences[res.name] = res;
+            //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
+            if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
+                try {
+                    winston.info(`Updating source attribute sync config`)
+                    await betaSourcesApi.putSourceAttrSyncConfig({
+                        id: currentTartgetSource.id,
+                        attrSyncSourceConfigBeta: attrSyncCopy
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
                 }
             }
         }
