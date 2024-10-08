@@ -13,7 +13,7 @@ The following object types are currently supported for export/deploy:
 - CLOUD_RULE (already approved and deployed by SailPoint)
 - CONNECTOR_RULE
 - TRANSFORM
-- SOURCE (includes correlation config, schemas, and provisioning policies. **Does not include password policy references**)
+- SOURCE (includes correlation config, schemas, provisioning policies, and referenced connector libraries (i.e. JDBC JAR files). **Does not include password policy references**)
 - SERVICE_DESK_INTEGRATION
 - IDENTITY_OBJECT_CONFIG
 - IDENTITY_PROFILE (includes lifecycle states tied to the identity profile. **Does not include security settings**)
@@ -160,6 +160,14 @@ npm run deploy -- --target_env=<env>
 > [!NOTE]
 > The deploy/import execution process will halt on errors return from ISC APIs. Errors will be recorded in the terminal if encountered. You must resolve any issues with configuration objects that are throwing errors during deployment or report at lower level tool bugs with the team so they can resolve them. We do this as opposed to continuing on errors due to object dependencies.
 
+### All Command Arguments
+Below is a reference for all arguments for the commands above
+```
+- src_env=<env> - Source environment for export command
+- target_env=<env> - Target environment for build/deploy commands
+- log_level=<level> - Sets winston log level
+- skip_connector_lib - Allows you to skip connector file upload if arg is present
+```
 
 
 ## Configuration Object Guidelines/Considerations
@@ -219,6 +227,14 @@ When lifecycle states are exported, access profile and source ID references will
 - The deployment process for rules injects the source code for the rule from the corresponding `<rule-name>.source.bsh` file created during an export.
 - The export process for rules will automatically exclude the `sourceCode.script` attribute for `CONNECTOR_RULES`
 - Cloud Rules (`CLOUD_RULE`) only which have been approved and deployed by SailPoint professional services can be deployed to other environments per SailPoint's processes. Cloud Rules do not have anything omitted from them during the export process because if any modifications are made to the file, the verification process during SP-Config import will fail for the rules
+
+### Source Connector Files/Dependencies
+Certain source types such as JDBC or SAP Direct require some sort of dependencies in order for them to operate correctly. This may be a JDBC driver for a JDBC source or some specific SAP Java binaries for an SAP Direct connector that SailPoint requires you to fetch and upload yourself. The deployment process supports uploading these connector file dependencies via the `v3/sources/:sourceId/upload-connector-file` endpoint. This is very useful when migrating these sources to higher environments so you do not need to manually remember to upload these dependencies per environment. You can tell if a source has connector library references by looking for the `connectorAttributes.connector_files` attribute. This is a comma-separated value of all the dependencies uploaded for that particular source. These dependencies are transferred to your VAs when you upload them through the source configuration UI or using the `/v3` endpoint mentioned before. The `connectorAttributes.connector_files` attribute is simply a pointer to the file name(s) on the VA. If this attribute exists, during the deployment process, it will look for these file names in `./connectorLib/` directory at the root of your project in order to upload the file via the API endpoint. If the file is not found, the process will fail with an error indicating that it could not find the dependency file.
+
+If you wish to skip the connector file upload process, pass the command like argument `--skip_connector_lib`. The full command would look like:
+```
+npm run deploy -- --target_env=<env> --skip_connector_lib
+```
 
 ### Deleting Objects
 There are two scenarios to consider when deleting objects:

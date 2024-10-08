@@ -133,7 +133,7 @@ const exportSources = async (apiConfig) => {
 * @param {Configuration} apiConfig  SailPoint API Config
 * @param {string} sourceJson        Raw JSON String of source to be deployed
 */
-const migrateSource = async (apiConfig, sourceJson) => {
+const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const betaSourcesApi = new SourcesBetaApi(apiConfig);
     let localSource = JSON.parse(sourceJson);
@@ -389,48 +389,52 @@ const migrateSource = async (apiConfig, sourceJson) => {
         }
 
         //Upload connector files. connector_files is a CSV of the referenced JAR files
-        const connectorFiles = localSource.connectorAttributes.connector_files;
-        if (connectorFiles) {
-            const connectorFileList = connectorFiles.split(",");
-            for (const connectorFileName of connectorFileList) {
-                const relativeFilePath = `connectorLib/${connectorFileName}`;
-                winston.info(`Uploading connector library file [${relativeFilePath}]`);
+        if (!skipConnectorLib) {
+            const connectorFiles = localSource.connectorAttributes.connector_files;
+            if (connectorFiles) {
+                const connectorFileList = connectorFiles.split(",");
+                for (const connectorFileName of connectorFileList) {
+                    const relativeFilePath = `connectorLib/${connectorFileName}`;
+                    winston.info(`Uploading connector library file [${relativeFilePath}]`);
 
-                if (!fs.existsSync(relativeFilePath)) {
-                    winston.error(`Could not find connector library dependency [${relativeFilePath}]. Put the file in the directory and try again`);
-                    process.exit(1);
+                    if (!fs.existsSync(relativeFilePath)) {
+                        winston.error(`Could not find connector library dependency [${relativeFilePath}]. Put the file in the directory and try again`);
+                        process.exit(1);
+                    }
+
+                    const fullFilePath = path.resolve(relativeFilePath);
+                    const fileStream = fs.createReadStream(fullFilePath);
+
+                    /* Couldn't get this working, had to make call ourselves below
+                    await sourcesApi.importConnectorFile({
+                        sourceId: currentTartgetSource.id,
+                        file: fileStream
+                    });
+                    */
+
+                    let data = new FormData();
+                    data.append('file', fileStream);
+
+                    let config = {
+                        method: 'post',
+                        maxBodyLength: Infinity,
+                        url: `${apiConfig.basePath}/v3/sources/${currentTartgetSource.id}/upload-connector-file`,
+                        headers: {
+                            'Authorization': `Bearer ${await apiConfig.accessToken}`,
+                            ...data.getHeaders()
+                        },
+                        data: data
+                    };
+
+                    try {
+                        await axios.request(config);
+                    } catch (error) {
+                        await handleHttpException(error);
+                    }
                 }
-
-                const fullFilePath = path.resolve(relativeFilePath);
-                const fileStream = fs.createReadStream(fullFilePath);
-                
-                /* Couldn't get this working, had to make call ourselves below
-                await sourcesApi.importConnectorFile({
-                    sourceId: currentTartgetSource.id,
-                    file: fileStream
-                });
-                */
-
-                let data = new FormData();
-                data.append('file', fileStream);
-
-                let config = {
-                    method: 'post',
-                    maxBodyLength: Infinity,
-                    url: `${apiConfig.basePath}/v3/sources/${currentTartgetSource.id}/upload-connector-file`,
-                    headers: {
-                        'Authorization': `Bearer ${await apiConfig.accessToken}`,
-                        ...data.getHeaders()
-                    },
-                    data: data
-                };
-
-                try {
-                    await axios.request(config);
-                } catch (error) {
-                    await handleHttpException(error);
-                }   
             }
+        } else {
+            winston.warn(clc.yellow("Connector dependency file upload set to be skipped"));
         }
 
         //Restore attributes from the currently deployed target source into our template source
@@ -523,7 +527,7 @@ const processSchema = async (api, localSource, currentTartgetSource, localSchema
 }
 
 
-const migrateSources = async (apiConfig) => {
+const migrateSources = async (apiConfig, skipConnectorLib) => {
     winston.info(clc.bgBlueBright("Starting Source Deployment"));
     //Only read one directory down where main source files are
     const sourceFilePaths = walk("./build/config/SOURCE", 1);
@@ -531,7 +535,7 @@ const migrateSources = async (apiConfig) => {
     //Iterate each source and pass it to migrateSource
     for (const sourceFilePath of sourceFilePaths) {
         const source = fs.readFileSync(sourceFilePath);
-        await migrateSource(apiConfig, source);
+        await migrateSource(apiConfig, source, skipConnectorLib);
     }
     winston.info(clc.bgGreen("Completed Source Deployment"));
 }

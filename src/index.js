@@ -52,9 +52,10 @@ let {
     build: isBuild,
     deploy: isDeploy,
     detokenize: isDetokenize,
-    src_env: srcEnvName,
-    target_env: targetEnvName,
-    log_level: logLevel
+    src_env: srcEnvName, //Source environment for export command
+    target_env: targetEnvName, //Target environment for build/deploy commands
+    log_level: logLevel, //Sets winston log level
+    skip_connector_lib: isSkipConnectorLib //Allows you to skip connector file upload if arg is present
 } = nodeArgs;
 
 //Global winston logger
@@ -228,7 +229,7 @@ if (isDeploy) {
     await migrateCloudRules(globalApiConfiguration);
     await migrateConnectorRules(globalApiConfiguration)
     await migrateTransforms(globalApiConfiguration);
-    await migrateSources(globalApiConfiguration);
+    await migrateSources(globalApiConfiguration, isSkipConnectorLib);
     await migrateServiceDeskIntegrations(globalApiConfiguration)
     await migrateIdentityAttributeConfig(globalApiConfiguration);
     await migrateIdentityProfiles(globalApiConfiguration);
