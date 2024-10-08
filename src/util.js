@@ -23,11 +23,28 @@ const sleep = (ms) => {
 */
 const handleHttpException = async (e) => {
     if (e.response) {
-        winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+        winston.error(isJson(e.config.data));
+        if (await isJson(e.config.data)) {
+            winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+        } else {
+            winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+        }
     } else {
         winston.error(clc.red(`Generic while executing request: ${e.message}\n${e.stack}`));
     }
     process.exit(1);
+}
+
+const isJson = async (input) => {
+    if (typeof input !== 'string') {
+        return false; // Not JSON if it's not a string
+    }
+    try {
+        JSON.parse(input);
+        return true;
+    } catch (e) {
+        return false;
+    }
 }
 
 /**
