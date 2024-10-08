@@ -426,7 +426,7 @@ const migrateSource = async (apiConfig, sourceJson) => {
                 };
 
                 try {
-                    axios.request(config);
+                    await axios.request(config);
                 } catch (error) {
                     await handleHttpException(error);
                 }   
