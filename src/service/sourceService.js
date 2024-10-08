@@ -1,5 +1,6 @@
 import clc from "cli-color";
 import * as fs from "fs";
+import axios from "axios";
 import _ from 'lodash';
 import { Configuration, Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
 import winston from "winston";
@@ -8,6 +9,8 @@ import { getAllClusters } from "./clusterService.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 import { getAllRules } from "./ruleService.js";
 import { getAllPasswordPolicies } from "./passwordPolicyService.js"
+import path from "path";
+import FormData from "form-data";
 
 const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
@@ -119,7 +122,7 @@ const exportSources = async (apiConfig) => {
 
         //Sort features alphabetically since the API outputs them in a different order every time
         if (sourceClone.features) sourceClone.features.sort();
-        
+
         //Write the actual source
         writeConfigFile("SOURCE", sourceName, sourceClone, `SOURCE/${sourceName}`);
     }
@@ -382,6 +385,51 @@ const migrateSource = async (apiConfig, sourceJson) => {
                 } catch (error) {
                     await handleHttpException(error);
                 }
+            }
+        }
+
+        //Upload connector files. connector_files is a CSV of the referenced JAR files
+        const connectorFiles = localSource.connectorAttributes.connector_files;
+        if (connectorFiles) {
+            const connectorFileList = connectorFiles.split(",");
+            for (const connectorFileName of connectorFileList) {
+                const relativeFilePath = `connectorLib/${connectorFileName}`;
+                winston.info(`Uploading connector library file [${relativeFilePath}]`);
+
+                if (!fs.existsSync(relativeFilePath)) {
+                    winston.error(`Could not find connector library dependency [${relativeFilePath}]. Put the file in the directory and try again`);
+                    process.exit(1);
+                }
+
+                const fullFilePath = path.resolve(relativeFilePath);
+                const fileStream = fs.createReadStream(fullFilePath);
+                
+                /* Couldn't get this working, had to make call ourselves below
+                await sourcesApi.importConnectorFile({
+                    sourceId: currentTartgetSource.id,
+                    file: fileStream
+                });
+                */
+
+                let data = new FormData();
+                data.append('file', fileStream);
+
+                let config = {
+                    method: 'post',
+                    maxBodyLength: Infinity,
+                    url: `${apiConfig.basePath}/v3/sources/${currentTartgetSource.id}/upload-connector-file`,
+                    headers: {
+                        'Authorization': `Bearer ${await apiConfig.accessToken}`,
+                        ...data.getHeaders()
+                    },
+                    data: data
+                };
+
+                try {
+                    axios.request(config);
+                } catch (error) {
+                    await handleHttpException(error);
+                }   
             }
         }
 
