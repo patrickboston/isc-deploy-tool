@@ -15,6 +15,7 @@
   "dependencies": {
     "axios-debug-log": "^1.0.0",
     "cli-color": "^2.0.4",
+    "form-data": "^4.0.0",
     "jsonpath": "^1.1.1",
     "jsonpath-plus": "^9.0.0",
     "lodash": "^4.17.21",
