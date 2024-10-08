@@ -82,7 +82,25 @@ export default
     ]
 ```
 
-
+## Project Structure
+Below outlines the project structure for an ISC ODT project:
+```
+📦isc-deploy-tool
+ ┣ 📂assets - Contains images for branding
+ ┣ 📂build - Contains built/tokenized config objects as a result of the build or deploy command
+ ┣ 📂config - Contains all config objects you want to manage with this process. Populated by the export command
+ ┣ 📂connectorLib - Contains 
+ ┃ ┗ 📜mysql-connector-j-8.3.0.jar - Example JAR file for a JDBC connector
+ ┣ 📜.gitignore - Default gitignore
+ ┣ 📜example.env.js - Example env.js file for connecting to a tenant. Should be copied and renamed i.e. sb.env.js
+ ┣ 📜example.target.js - Example target.js file for connecting to a tenant. Should be copied and renamed i.e. sb.target.js
+ ┣ 📜export-config.js - Global configuration file for export process
+ ┣ 📜export-ignore.js - Global configuration file for ignoring certain objects during export
+ ┣ 📜package-lock.json - nodejs package-lock. Do not touch unless you know what you are doing
+ ┣ 📜package.json - nodejs package. Do not touch unless you know what you are doing
+ ┣ 📜README.md - The readme you are reading
+ ┗ 📜reverse.target.js - Reverse tokenization properties
+```
 
 ## Config Directory Structure
 When the export command is run, it will automatically create a directory in the root of the project called `/config`. This is where all of the configuration JSON files from the export will be reverse-tokenized and stored. It will look something like this:
