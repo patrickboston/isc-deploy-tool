@@ -1,5 +1,6 @@
 # IDN Project Specific
 build/
+config/
 *.env.js
 *.secrets.js
 

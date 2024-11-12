@@ -71,7 +71,15 @@ export default
         "%%AD_PASSWORD%%": "StrongPassword1234"
     }
 ```
-- `export-config.js` - Contains import configuration items that pertain to the export process, particularly it holds `omitProperties` which has all of the JSON properties that should be omitted from objects such as `id` references, created/modified timestamps, rule `id` references, etc. Additional entries can be added/remove as needed per implementation requirements, but the standard set provided is meant to make objects repository-oriented
+- `<env>.ignore.js` - (Optional) Contains an array of specific objects to not deploy. This can be useful when deployment objects differ in ISC environments such as production integrating with prod and non-prod sources and sandbox integrating with only non-prod sources. See examples below:
+```js
+export default
+    [
+        "SOURCE:ProductionWebApplication",
+        "SOURCE:ProductionDatabaseApplication",
+    ]
+```
+- `export-config.js` - Contains import configuration items that pertain to the export process, particularly it holds `omitProperties` which has all of the JSON properties that should be omitted from objects such as `id` references, created/modified timestamps, rule `id` references, etc. Additional entries can be added/removed as needed per implementation requirements, but the standard set provided is meant to make objects repository-oriented
 - `export-ignore.js` - Contains an array of specific objects to ignore (not write to local config directory) when performing an export. Each entry must be in this specific format: `OBJECT_TYPE:Object Name`. If a file exists in your local `./config` directory and is then later added to this file, it will be deleted on the next export run See examples below:
 ```js
 export default
