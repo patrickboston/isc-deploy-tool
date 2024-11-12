@@ -246,7 +246,7 @@ const escapeString = (str) => {
 }
 
 const buildObjectsForEnvironment = async (env) => {
-    winston.info(clc.bgBlueBright(`Starting object tokenization for target environment: ${env}`))
+    winston.info(clc.bgBlueBright(`Starting object tokenization for target environment: ${env}`));
 
     //Standard Tokens
     const envTokenFileName = "./../" + env + ".target.js";
@@ -263,6 +263,16 @@ const buildObjectsForEnvironment = async (env) => {
         winston.info(clc.yellow(`No secrets file found for target environment [${env}]`));
     }
 
+    //Deploy Ignore - used to omit objects from deployment
+    const deployIgnoreFileName = "./../" + env + ".ignore.js";
+    let deployIgnore = [];
+    try {
+        const { default: ignore } = await import(deployIgnoreFileName);
+        deployIgnore = ignore;
+    } catch (e) {
+        winston.info(clc.yellow(`No ignore file found for target environment [${env}]`));
+    }
+
     //Create directory for object type if it does not exist yet
     if (!fs.existsSync("./build/config/")) {
         fs.mkdirSync("./build/config/", { recursive: true });
@@ -271,8 +281,25 @@ const buildObjectsForEnvironment = async (env) => {
     //Iterate each config file from export
     const configFileNames = walk("./config");
     for (const fileName of configFileNames) {
-        // build CONNECTOR_RULE separate to inject script from .bsh file
-        if (fileName.endsWith(".json")) {
+
+        if (fileName.endsWith(".json")) { // check if file is json to not process connector rule source files
+
+            
+            // get the object type and object name to be used later to check if the object should not be deployed
+            // remove config from path - ./config/TRANSFORM/example.json -> TRANSFORM/example.json
+            const objectPath = fileName.replace("./config/", "");
+            // extract object type from path - TRANSFORM/example.json -> TRANSFORM
+            const objectType = objectPath.substring(0, objectPath.indexOf("/"));
+            // remove object type from path - TRANSFORM/example.json > example.json
+            const objectNamePath = objectPath.replace(objectType + "/", "") ;
+            // extract the object name from the path by checking if the objectNamePath includes a top level directory - for sources
+            const objectName = objectNamePath.substring(0, objectNamePath.indexOf("/") != -1 ? objectNamePath.indexOf("/") : objectNamePath.length).replace(".json", "");
+            // check if deployIgnore includes object and don't build if so
+            if (deployIgnore.includes(`${objectType}:${objectName}`)) {
+                winston.info(clc.green(`Ignoring ${fileName} because of match ${objectType}:${objectName} found in ignore file`));
+                continue;
+            }
+
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
 
             // if this is a connector rule, then inject script from source file
@@ -310,7 +337,7 @@ const buildObjectsForEnvironment = async (env) => {
             //Write tokenized file to /build/[TYPE] directory
             const outputFileName = "./build/" + fileName.substring(2);
             const outputDir = outputFileName.substring(0, outputFileName.lastIndexOf('/'));
-
+            
             if (!fs.existsSync(outputDir)) {
                 fs.mkdirSync(outputDir, { recursive: true });
             }
