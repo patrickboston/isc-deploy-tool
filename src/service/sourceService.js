@@ -17,7 +17,7 @@ const PROVISIONING_POLICY = "PROVISIONING_POLICY";
 const ATTR_SYNC_SOURCE_CONFIG = "ATTR_SYNC_SOURCE_CONFIG";
 const CORRELATION_CONFIG = "CORRELATION_CONFIG";
 const existingAttributeToKeep = [
-    "id", "authoritative", "connectorAttributes.cloudExternalId", "passwordPolicies", "connectorAttributes.healthy", "healthy"
+    "id", "authoritative", "connectorAttributes.cloudExternalId", "passwordPolicies", "connectorAttributes.healthy", "healthy", "connectorAttributes.slpt-source-diagnostics"
 ];
 const ruleReferenceNames = [
     "accountCorrelationRule", "managerCorrelationRule", "beforeProvisioningRule"
