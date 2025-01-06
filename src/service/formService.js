@@ -1,90 +1,71 @@
 import clc from "cli-color";
 import * as fs from "fs";
 import _ from 'lodash';
-import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
+import { CustomFormsBetaApi, Paginator, WorkflowsBetaApi } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 
-const WORKFLOW = "WORKFLOW";
+const FORM = "FORM_DEFINITION";
 const existingAttributeToKeep = [
     "id"
 ];
-//Cache of workflows we fetch during imports
-let workflowCache = {};
 
-const getWorkflowById = async (apiConfig, workflowId) => {
-    if (workflowCache[workflowId]) return workflowCache[workflowId];
-
-    const workflowsApi = new WorkflowsApi(apiConfig);
-    const workflowResponse = await workflowsApi.getWorkflow({
-        id: workflowId
-    }).catch(error => {
+const exportForms = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Form Export"));
+    const formsApi = new CustomFormsBetaApi(apiConfig);
+    const formsResponse = await Paginator.paginate(formsApi, formsApi.exportFormDefinitionsByTenant, undefined, 250).catch(error => {
         handleHttpException(error);
     });
-
-    if (!workflowResponse) {
-        throw new Error(`Could not find workflow for id [${workflowId}] in tenant: ${apiConfig.basePath}`)
-    }
-
-    return workflowResponse.data;
-}
-
-const exportWorkflows = async (apiConfig) => {
-    winston.info(clc.bgBlueBright("Starting Workflow Export"));
-    const workflowsApi = new WorkflowsApi(apiConfig);
-    const workflows = await Paginator.paginate(workflowsApi, workflowsApi.listWorkflows, undefined, 250).catch(error => {
-        handleHttpException(error);
-    });
-    for (let workflow of workflows.data) {
-        winston.info(`Exporting Workflow: ${workflow.name} (${workflow.id})`);
-        //Update owner/creator/modifiedBy to alias for lookup when migrating
-        if (workflow.owner) {
-            const owner = await getIdentityById(apiConfig, workflow.owner.id);
-            workflow.owner.name = owner.alias;
+    //They get exported in sp-config format, but we will store just the object itself
+    for (let formContainer of formsResponse.data) {
+        const form = formContainer.object;
+        winston.info(`Exporting Form: ${form.name} (${form.id})`);
+        //Update owner to alias for lookup when migrating
+        if (form.owner) {
+            const owner = await getIdentityById(apiConfig, form.owner.id);
+            form.owner.name = owner.alias;
         }
 
-        writeConfigFile(WORKFLOW, workflow.name, workflow);
+        writeConfigFile(FORM, form.name, form);
     }
 }
 
-const migrateWorkflow = async (apiConfig, workflowJson) => {
-    //Using /beta/workflows here because /v3 seems to fail for no reason
-    const workflowsApi = new WorkflowsBetaApi(apiConfig);
-    let localWorkflow = JSON.parse(workflowJson);
+const migrateForm = async (apiConfig, formJson) => {
+    const formsApi = new CustomFormsBetaApi(apiConfig);
+    let localForm = JSON.parse(formJson);
 
     //Get corresponding owner by name and add id
-    const owner = await getIdentityByAlias(apiConfig, localWorkflow.owner.name);
-    _.set(localWorkflow, "owner.id", owner.id);
+    const owner = await getIdentityByAlias(apiConfig, localForm.owner.name);
+    _.set(localForm, "owner.id", owner.id);
 
     //Check and see if a workflow with this name already exists in the target environment
     //Current List Workflows endpoint does not allow filtering, so need to iterate all workflows
-    const currentWorkflowsResponse = await workflowsApi.listWorkflows();
-    let currentTargetWorkflow;
-    for (const currentWorkflow of currentWorkflowsResponse.data) {
-        if (currentWorkflow.name === localWorkflow.name) {
-            currentTargetWorkflow = currentWorkflow;
-        }
-    }
+    const currentFormsResponse = await formsApi.exportFormDefinitionsByTenant({
+        filters: `name eq "${localForm.name}"`
+    });
+    let currentTargetForm = currentFormsResponse.data.length == 1 ? currentFormsResponse.data[0].object : null;
 
-    if (!currentTargetWorkflow) {
-        winston.info(`Creating new workflow: ${localWorkflow.name}`);
+    if (!currentTargetForm) {
+        winston.info(`Creating new form: ${localForm.name}`);
 
         try {
-            const createWorkflowResponse = await workflowsApi.createWorkflow({
-                createWorkflowRequestBeta: {
-                    name: localWorkflow.name,
-                    owner: localWorkflow.owner,
-                    definition: localWorkflow.definition,
-                    description: localWorkflow.description,
-                    enabled: false, //Workflows cannot be created in an enabled state, so we have to create it disabled
-                    trigger: localWorkflow.trigger
-                }
+            /*
+            const createWorkflowResponse = await formsApi.createFormDefinition({
+                createFormDefinitionRequestBeta: {
+                    name: ,
+                    description: ,
+                    owner: ,
+                    formConditions: ,
+                    formElements: ,
+                    formInput: ,
+                },
             });
             currentTargetWorkflow = createWorkflowResponse.data;
+            */
 
             //If the local workflow was enabled, we will enable it now with a PATCH
-            if (localWorkflow.enabled) {
+            if (localForm.enabled) {
                 winston.info("Create completed and local workflow was marked as enabled, enabling it in target");
                 await sleep(1000);
                 //Patch workflow to disable so we can update
@@ -116,7 +97,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
          * it's been modified, so we won't re-enable it if it was enabled in the target, but the repo
          * has it set as disabled
         */
-        winston.info(`Updating existing workflow: ${currentTargetWorkflow.name} (${currentTargetWorkflow.id})`)
+        winston.info(`Updating existing form: ${currentTargetForm.name} (${currentTargetForm.id})`)
         if (currentTargetWorkflow.enabled) {
             winston.warn("Workflow is enabled, disabling it to allow modification");
             //Patch workflow to disable so we can update
@@ -141,14 +122,14 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
 
         //Restore attributes from the currently deployed target workflow into our template workflow
         for (const workflowKey of existingAttributeToKeep) {
-            _.set(localWorkflow, workflowKey, _.get(currentTargetWorkflow, workflowKey));
+            _.set(localForm, workflowKey, _.get(currentTargetWorkflow, workflowKey));
         }
 
         //Update the workflow with all config, references, etc.
         try {
             await workflowsApi.updateWorkflow({
-                id: localWorkflow.id,
-                workflowBodyBeta: localWorkflow
+                id: localForm.id,
+                workflowBodyBeta: localForm
             });
         } catch (error) {
             await handleHttpException(error);
@@ -170,9 +151,8 @@ const migrateWorkflows = async (apiConfig) => {
 }
 
 export {
-    exportWorkflows,
-    migrateWorkflow,
-    migrateWorkflows,
-    getWorkflowById
+    exportForms,
+    migrateForm,
+    migrateWorkflows
 };
 
