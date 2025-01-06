@@ -23,7 +23,6 @@ const sleep = (ms) => {
 */
 const handleHttpException = async (e) => {
     if (e.response) {
-        winston.error(isJson(e.config.data));
         if (await isJson(e.config.data)) {
             winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
         } else {
