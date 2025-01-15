@@ -169,7 +169,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     const rules = await getAllRules(apiConfig);
 
     //Check and see if an identity profile with this name already exists in the target environment
-    const currentIdentityProfileResponse = await identityProfilesApi.exportIdentityProfiles({
+    let currentIdentityProfileResponse = await identityProfilesApi.exportIdentityProfiles({
         filters: `name eq "${localIdentityProfile.object.name}"`
     }).catch(error => {
         handleHttpException(error);
@@ -257,12 +257,21 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                 localIdentityProfile
             ]
         });
-        //We need to fetch it now since it's not returned in the response
-        const currentIdentityProfileResponse = await identityProfilesApi.exportIdentityProfiles({
+
+        if (importResponse.data.errors.length > 0) {
+            winston.error(clc.red(JSON.stringify(importResponse.data, null, 4)));
+            process.exit(1);
+        }
+
+    } catch (error) {
+        await handleHttpException(error);
+    }
+
+    //We need to fetch it now since it's not returned in the response
+    try {
+        currentIdentityProfileResponse = await identityProfilesApi.exportIdentityProfiles({
             filters: `name eq "${localIdentityProfile.object.name}"`
-        }).catch(error => {
-            handleHttpException(error);
-        });
+        })
         currentTargetIdentityProfile = currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
         if (currentTargetIdentityProfile == null) {
             winston.error(clc.red(`Could not fetch identity profile by name [${localIdentityProfile.object.name}] after create/update`));
@@ -270,12 +279,6 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
         }
     } catch (error) {
         await handleHttpException(error);
-    }
-
-    //Since this is sp-config import, we need to check for errors manually in the body
-    if (importResponse.data.errors.length > 0) {
-        winston.error(clc.red(JSON.stringify(importResponse.data, null, 4)));
-        process.exit(1);
     }
 
     //If the initial profile is created/updated OK, move onto lifecycle states tied to it
