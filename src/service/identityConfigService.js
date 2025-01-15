@@ -114,7 +114,7 @@ const migrateIdentityAttributeConfig = async (apiConfig) => {
             }
 
             if (!currentTargetIdentityAttribute) {
-                winston.info(clc.bgBlueBright(`Creating new identity attribute for: ${localIdentityAttribute.name}`));
+                winston.info(`Creating new identity attribute for: ${localIdentityAttribute.name}`);
                 try {
                     const createIdentityAttributeResponse = await identityAttributesApi.createIdentityAttribute({
                         identityAttributeBeta: {
@@ -182,7 +182,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
             _.set(localIdentityProfile, key, _.get(currentTargetIdentityProfile, key));
         }
     } else {
-        winston.info(clc.bgBlueBright(`Creating new identity profile: ${localIdentityProfile.self.name}`));
+        winston.info(`Creating new identity profile: ${localIdentityProfile.self.name}`);
     }
 
     //Looks up owner identity by tokenized alias

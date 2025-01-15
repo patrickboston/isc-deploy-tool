@@ -14,13 +14,11 @@ export default
                 "$.attributes[*].schema.id"
             ],
             "FORM_DEFINITION": [
-                "$.self.id",
-                "$.object.id",
-                "$.object.created",
-                "$.object.modified",
-                "$.object.owner.id",
-                "$.object.owner.id",
-                "$.object.usedBy[*].id"
+                "$.id",
+                "$.created",
+                "$.modified",
+                "$.owner.id",
+                "$.usedBy"
             ],
             "GLOBAL": [
                 "$.id",

@@ -1,14 +1,14 @@
 import clc from "cli-color";
 import * as fs from "fs";
 import _ from 'lodash';
-import { CustomFormsBetaApi, Paginator, WorkflowsBetaApi } from "sailpoint-api-client";
+import { CustomFormsBetaApi, Paginator } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 
 const FORM = "FORM_DEFINITION";
 const existingAttributeToKeep = [
-    "object.id", "self.id"
+    "id"
 ];
 
 const exportForms = async (apiConfig) => {
@@ -19,17 +19,19 @@ const exportForms = async (apiConfig) => {
     });
     /* 
      * They get exported in sp-config format like identity profile export,
-     * we retain this format so they are easier to import and we do not have to perform PATCH operations
+     * but we will store just the object itself so we can use the other normal create/update endpoints
+     * For some reason the SDK does not have the normal GET endpoint, just the sp-config one is available
     */
     for (let formContainer of formsResponse.data) {
-        winston.info(`Exporting Form: ${formContainer.self.name} (${formContainer.self.id})`);
+        const form = formContainer.object;
+        winston.info(`Exporting Form: ${form.name} (${form.id})`);
         //Update owner to alias for lookup when migrating
-        if (formContainer.object.owner) {
-            const owner = await getIdentityById(apiConfig, formContainer.object.owner.id);
-            formContainer.object.owner.name = owner.alias;
+        if (form.owner) {
+            const owner = await getIdentityById(apiConfig, form.owner.id);
+            form.owner.name = owner.alias;
         }
 
-        writeConfigFile(FORM, formContainer.self.name, formContainer);
+        writeConfigFile(FORM, form.name, form);
     }
 }
 
@@ -38,72 +40,128 @@ const migrateForm = async (apiConfig, formJson) => {
     let localForm = JSON.parse(formJson);
 
     //Get corresponding owner by name and add id
-    const owner = await getIdentityByAlias(apiConfig, localForm.object.owner.name);
-    _.set(localForm, "object.owner.id", owner.id);
+    const owner = await getIdentityByAlias(apiConfig, localForm.owner.name);
+    _.set(localForm, "owner.id", owner.id);
 
-    //Check and see if a workflow with this name already exists in the target environment
-    //Current List Workflows endpoint does not allow filtering, so need to iterate all workflows
+    //Check and see if a form with this name already exists in the target environment
     const currentFormsResponse = await formsApi.exportFormDefinitionsByTenant({
-        filters: `name eq "${localForm.self.name}"`
+        filters: `name eq "${localForm.name}"`
     });
-    let currentTargetForm = currentFormsResponse.data.length == 1 ? currentFormsResponse.data[0] : null;
+    let currentTargetForm = currentFormsResponse.data.length == 1 ? currentFormsResponse.data[0].object : null;
 
-    if (currentTargetForm) {
-        winston.info(`Updating existing Form: ${localForm.self.name} (${currentTargetForm.self.id})`);
+    if (!currentTargetForm) {
+        winston.info(`Creating new form: ${localForm.name}`);
+        try {
+            const createFormResponse = await formsApi.createFormDefinition({
+                createFormDefinitionRequestBeta: {
+                    name: localForm.name,
+                    description: localForm.description,
+                    owner: localForm.owner,
+                    formConditions: localForm.formConditions,
+                    formElements: localForm.formElements,
+                    formInput: localForm.formInput,
+                    formButtons: localForm.formButtons,
+                    usedBy: localForm.usedBy
+                }
+            });
+            currentTargetForm = createFormResponse.data;
+        } catch (error) {
+            await handleHttpException(error);
+        }
+    } else {
+        winston.info(`Updating existing form: ${localForm.name} (${currentTargetForm.id})`);
         //Restore attributes from the currently deployed target object into our template object
         for (const key of existingAttributeToKeep) {
             _.set(localForm, key, _.get(currentTargetForm, key));
         }
-    } else {
-        winston.info(clc.bgBlueBright(`Creating new Form: ${localIdentityProfile.self.name}`));
-    }
 
-    //Create and update will both us sp-config type import endpoint
-    let importResponse;
-    try {
-        importResponse = await formsApi.importFormDefinitions({
-            body: [
-                localForm
-            ]
-        })
-        //We need to fetch it now since it's not returned in the response
-        const currentFormResponse = await formsApi.exportFormDefinitionsByTenant({
-            filters: `name eq "${localForm.self.name}"`
-        }).catch(error => {
-            handleHttpException(error);
-        });
-        currentTargetForm = currentFormResponse.data.length == 1 ? currentFormResponse.data[0] : null;
-        if (currentTargetForm == null) {
-            winston.error(clc.red(`Could not fetch form by name [${localForm.object.name}] after create/update`));
-            process.exit(1);
+        //Need to build carefully since it will not accept empty arrays, etc.
+        const patchOperations = [
+            {
+                op: "replace",
+                path: "/name",
+                value: localForm.name
+            },
+            {
+                op: "replace",
+                path: "/description",
+                value: localForm.description
+            },
+            {
+                op: "replace",
+                path: "/owner",
+                value: localForm.owner
+            },
+        ];
+
+        //Add in optional forms components if they exist
+        patchOperations.push(
+            {
+                op: "replace",
+                path: "/formConditions",
+                value: localForm.formConditions ? localForm.formConditions : []
+            }
+        )
+
+        patchOperations.push(
+            {
+                op: "replace",
+                path: "/formElements",
+                value: localForm.formElements ? localForm.formElements : []
+            }
+        )
+
+        patchOperations.push(
+            {
+                op: "replace",
+                path: "/formInput",
+                value: localForm.formInput ? localForm.formInput : []
+            }
+        )
+
+        patchOperations.push(
+            {
+                op: "replace",
+                path: "/formButtons",
+                value: localForm.formButtons ? localForm.formButtons : []
+            }
+        )
+
+        patchOperations.push(
+            {
+                op: "replace",
+                path: "/usedBy",
+                value: localForm.usedBy ? localForm.usedBy : []
+            }
+        )
+
+        try {
+            await formsApi.patchFormDefinition({
+                formDefinitionID: currentTargetForm.id,
+                body: patchOperations
+            })
+        } catch (error) {
+            await handleHttpException(error);
         }
-    } catch (error) {
-        await handleHttpException(error);
-    }
-
-    //Since this is sp-config import, we need to check for errors manually in the body
-    if (importResponse.data.errors.length > 0) {
-        winston.error(clc.red(JSON.stringify(importResponse.data, null, 4)));
-        process.exit(1);
     }
 }
 
-const migrateWorkflows = async (apiConfig) => {
-    winston.info(clc.bgBlueBright("Starting Workflow Deployment"));
+const migrateForms = async (apiConfig) => {
+    winston.info(clc.bgBlueBright("Starting Form Deployment"));
     //Only read one directory down where main source files are
-    const workflowFilePaths = walk("./build/config/WORKFLOW");
+    const formFilePaths = walk("./build/config/FORM_DEFINITION");
 
-    //Iterate each workflow and pass it to migrateSource
-    for (const workflowFilePath of workflowFilePaths) {
-        const workflow = fs.readFileSync(workflowFilePath);
-        await migrateWorkflow(apiConfig, workflow);
+    //Iterate each form and pass it to migrateSource
+    for (const formFilePath of formFilePaths) {
+        const form = fs.readFileSync(formFilePath);
+        await migrateForm(apiConfig, form);
     }
-    winston.info(clc.bgGreen("Completed Workflow Deployment"));
+    winston.info(clc.bgGreen("Completed Form Deployment"));
 }
 
 export {
     exportForms,
     migrateForm,
-    migrateWorkflows
+    migrateForms
 };
 

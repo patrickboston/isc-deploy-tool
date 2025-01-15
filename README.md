@@ -19,6 +19,7 @@ The following object types are currently supported for export/deploy:
 - IDENTITY_PROFILE (includes lifecycle states tied to the identity profile. **Does not include security settings**)
 - ACCESS_REQUEST_CONFIG
 - NOTIFICATION_TEMPLATE
+- FORM_DEFINITION
 - WORKFLOW
 - GOVERNANCE_GROUP
 - BRANDING_CONFIG

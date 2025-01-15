@@ -5,7 +5,7 @@ import { Configuration } from "sailpoint-api-client";
 import winston from "winston";
 import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestService.js";
 import { exportBranding, updateBranding } from "./service/brandingService.js";
-import { exportForms } from "./service/formService.js";
+import { exportForms, migrateForms } from "./service/formService.js";
 import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfiles } from "./service/identityConfigService.js";
 import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityService.js";
 import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationService.js";
@@ -223,8 +223,9 @@ if (isDeploy) {
      * 8. Identity Profile (including Lifecycle States, dependencies on sources)
      * 9. Access Request Config
      * 10. Notification Template
-     * 11. Workflow
-     * 12. Branding
+     * 11. Form
+     * 12. Workflow
+     * 13. Branding
     */
     await migrateGovernanceGroups(globalApiConfiguration);
     await migratePasswordPolicies(globalApiConfiguration);
@@ -237,6 +238,7 @@ if (isDeploy) {
     await migrateIdentityProfiles(globalApiConfiguration);
     await updateAccessRequestConfig(globalApiConfiguration);
     await migrateNotificationTemplates(globalApiConfiguration);
+    await migrateForms(globalApiConfiguration);
     await migrateWorkflows(globalApiConfiguration);
     await updateBranding(globalApiConfiguration, targetEnvName);
 }
