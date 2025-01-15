@@ -13,9 +13,14 @@ export default
             "CONNECTOR_SCHEMA": [
                 "$.attributes[*].schema.id"
             ],
-            "FORM": [
-                "$.owner.id",
-                "$.usedBy[*].id"
+            "FORM_DEFINITION": [
+                "$.self.id",
+                "$.object.id",
+                "$.object.created",
+                "$.object.modified",
+                "$.object.owner.id",
+                "$.object.owner.id",
+                "$.object.usedBy[*].id"
             ],
             "GLOBAL": [
                 "$.id",
