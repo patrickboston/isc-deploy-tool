@@ -27,6 +27,7 @@ const getWorkflowById = async (apiConfig, workflowId) => {
     if (!workflowResponse) {
         throw new Error(`Could not find workflow for id [${workflowId}] in tenant: ${apiConfig.basePath}`)
     }
+    workflowCache[workflowId] = workflowResponse.data;
 
     return workflowResponse.data;
 }
