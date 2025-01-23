@@ -10,6 +10,44 @@ const FORM = "FORM_DEFINITION";
 const existingAttributeToKeep = [
     "id"
 ];
+//Cache of forms we fetch during imports
+let formCache = {};
+
+const getFormById = async (apiConfig, formId) => {
+    if (formCache[formId]) return formCache[formId];
+
+    const formsApi = new CustomFormsBetaApi(apiConfig);
+    const formsResponse = await formsApi.getFormDefinitionByKey({
+        formDefinitionID: formId
+    }).catch(error => {
+        handleHttpException(error);
+    });
+
+    if (!formsResponse) {
+        throw new Error(`Could not find form for id [${formId}] in tenant: ${apiConfig.basePath}`)
+    }
+    formCache[formId] = formsResponse.data;
+
+    return formsResponse.data;
+}
+
+const getFormByName = async (apiConfig, formName) => {
+    if (formCache[formName]) return formCache[formName];
+
+    const formsApi = new CustomFormsBetaApi(apiConfig);
+    const formsResponse = await formsApi.exportFormDefinitionsByTenant({
+        filters: `name eq "${formName}"`
+    }).catch(error => {
+        handleHttpException(error);
+    });
+
+    if (!formsResponse || formsResponse.data.length === 0) {
+        throw new Error(`Could not find form for name [${formName}] in tenant: ${apiConfig.basePath}`)
+    }
+    formCache[formName] = formsResponse.data[0].object;
+
+    return formsResponse.data[0].object;
+}
 
 const exportForms = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Form Export"));
@@ -162,6 +200,8 @@ const migrateForms = async (apiConfig) => {
 export {
     exportForms,
     migrateForm,
-    migrateForms
+    migrateForms,
+    getFormById,
+    getFormByName
 };
 
