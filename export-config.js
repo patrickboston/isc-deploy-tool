@@ -47,6 +47,7 @@ export default {
       "$.status",
       "$.since",
       "$.healthy",
+      "$.accountsFile",
     ],
     WORKFLOW: ["$.modifiedBy", "$.creator", "$.owner.id"],
   },
