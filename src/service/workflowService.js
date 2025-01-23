@@ -160,8 +160,6 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         }
     }
 
-    console.log(JSON.stringify(localWorkflow, null, 4));
-
     if (!currentTargetWorkflow) {
         winston.info(`Creating new workflow: ${localWorkflow.name}`);
 
@@ -180,7 +178,6 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
 
             //After initial create, if this is an interactive process trigger, we need to update the filter with the new workflow id
             if (localWorkflow.trigger.attributes.id === "idn:interactive-process-launched") {
-                console.log("performing patch...");
                 const newFilterValue = localWorkflow.trigger.attributes["filter.$"].replace(localWorkflow.name, currentTargetWorkflow.id);
                 //Patch workflow to update the filter
                 try {
@@ -214,6 +211,28 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
                                 type: "WORKFLOW"
                             }
                         }
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
+                }
+            }
+
+            //If external trigger, need to update the URL to use the version with the ID
+            if (localWorkflow.trigger.type === "EXTERNAL" && localWorkflow.trigger.attributes.url) {
+                //Use currently deployed URL
+                const newExternalUrl = localWorkflow.trigger.attributes.url.replace(localWorkflow.name, currentTargetWorkflow.id);
+
+                //Patch workflow to update the url
+                try {
+                    await workflowsApi.patchWorkflow({
+                        id: currentTargetWorkflow.id,
+                        jsonPatchOperationBeta: [
+                            {
+                                op: "replace",
+                                path: "/trigger/attributes/url",
+                                value: newExternalUrl
+                            }
+                        ]
                     });
                 } catch (error) {
                     await handleHttpException(error);
@@ -282,7 +301,6 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         }
 
         //If external trigger, need to update the URL to use the version with the ID
-        //We only do this on update b/c if we are creating no OAuth entries exist yet so there should be no URL reference yet
         if (currentTargetWorkflow.trigger.type === "EXTERNAL" && currentTargetWorkflow.trigger.attributes.url) {
             //Use currently deployed URL
             localWorkflow.trigger.attributes.url = currentTargetWorkflow.trigger.attributes.url;
@@ -292,8 +310,6 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         if (localWorkflow.trigger.attributes.id === "idn:interactive-process-launched") {
             localWorkflow.trigger.attributes["filter.$"] = currentTargetWorkflow.trigger.attributes["filter.$"];
         }
-
-        console.log(JSON.stringify(localWorkflow, null, 4));
 
         //Update the workflow with all config, references, etc.
         try {
