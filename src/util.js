@@ -122,6 +122,27 @@ const omitPropertiesFromObject = (objectType, object) => {
 }
 
 /**
+ * Asynchronously replaces values of a specified key in a nested object.
+ * 
+ * @param {object} obj - The object to traverse.
+ * @param {string} targetKey - The key to find and replace values for.
+ * @param {function} fetchReplacement - An async function that takes the current value and key and returns the replacement value.
+ * @param {function} apiConfig - Optional, allows us to invoke the API in the callback function if needed to fetch the replacement value
+ */
+const replaceKeyValues = async (obj, targetKey, fetchReplacement, apiConfig) => {
+    for (const [key, value] of Object.entries(obj)) {
+        if (key === targetKey) {
+            obj[key] = await fetchReplacement(value, apiConfig);
+        }
+
+        if (_.isObject(value)) {
+            await replaceKeyValues(value, targetKey, fetchReplacement, apiConfig);
+        }
+    }
+};
+
+
+/**
 * Encrypts a password locally with a public key that could be retrieved from
 * a Virtual Appliance cluster.
 *
@@ -491,5 +512,5 @@ const runSpConfigImport = async (apiConfig, importObj) => {
 };
 
 
-export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, encrypt, handleHttpException, reverseTokenize, runSpConfigExport, runSpConfigImport, sleep, walk, writeConfigFile };
+export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, encrypt, handleHttpException, reverseTokenize, runSpConfigExport, runSpConfigImport, sleep, walk, writeConfigFile, replaceKeyValues };
 

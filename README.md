@@ -19,6 +19,7 @@ The following object types are currently supported for export/deploy:
 - IDENTITY_PROFILE (includes lifecycle states tied to the identity profile. **Does not include security settings**)
 - ACCESS_REQUEST_CONFIG
 - NOTIFICATION_TEMPLATE
+- FORM_DEFINITION
 - WORKFLOW
 - GOVERNANCE_GROUP
 - BRANDING_CONFIG
@@ -200,7 +201,30 @@ Below is a reference for all arguments for the commands above
 Follow these guidelines to ensure these object types are deployed successfully.
 
 ### Object References by `id`
-In ISC, majority of object references are by `id` as opposed to a softer reference such as `name`. As part of the export process, `id` and other environment specific data are omitted from objects to make objects more common/repository oriented. When you run the deployment process to a target environment, `id` references that are needed are dynamically inserted into objects by looking up objects by `name` in the target deployment environment. **You do not need to lookup and insert `id` references yourself before deployments**
+In ISC, majority of object references are by `id` as opposed to a softer reference such as `name`. As part of the export process, `id` and other environment specific data are omitted from objects to make objects more common/repository oriented. When you run the deployment process to a target environment, `id` references that are needed are dynamically inserted into objects by looking up objects by `name` in the target deployment environment. **You do not need to lookup and insert `id` references yourself before deployments**. This is true only for places in an object where we can expect an object/id reference. You may have workflows which make an HTTP request back to ISC which rely on an a hard-coded `id` for a source - this tool is not designed to detect those occurrences and it would probably be inappropriate to make certain assumptions something an ISC `id` reference when can not clearly identify it. This means there are still some cases you need to tokenize these sorts of things. An example would be a workflow action which uses the generic HTTP action back to ISC to get an account for a specific source based on the source's `id`.
+```json
+"Get Banner Account": {
+    "actionId": "sp:http",
+    "attributes": {
+        "authenticationType": "OAuth",
+        "method": "get",
+        "oAuthClientId": "5f33a932a4de45ec971009dfc370c9e4",
+        "oAuthClientSecret": "$.secrets.caced813-4e69-46eb-92a4-145edd04057b",
+        "oAuthCredentialLocation": "oAuthInHeader",
+        "oAuthTokenUrl": "%%BASE_API_URL%%/oauth/token",
+        "requestContentType": "json",
+        "url": "%%BASE_API_URL%%/v3/accounts",
+        "urlParams": {
+            "filters": "identityId eq \"{{$.trigger.identity.id}}\" and sourceId eq \"%%BANNER_SOURCE_ID%%\""
+        }
+    },
+    "displayName": "",
+    "nextStep": "Check If Has Banner Account",
+    "type": "action",
+    "versionNumber": 2
+},
+```
+
 
 ### Owner References
 There are many objects throughout ISC that have owner references which point to an identity that have created an object, modified an object, etc. It is very important that owners are properly set up in exported configuration objects.
@@ -244,6 +268,17 @@ When lifecycle states are exported, access profile and source ID references will
 ### Workflows
 - When workflows are being updated via the deployment process, if they are enabled, they will be temporarily disabled (1-2 seconds) to perform the update, and then the enabled status defined in the workflow in the repository will be the final state the workflow ends up in. It will not be automatically enabled after update just because it was already enabled before we updated it with the pipeline.
 - If your workflow has any secrets stored in it such as OAuth client secrets, when the workflow is saved via the UI, those secrets are encrypted and referenced via a special syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`). If you tokenize the actual secret values in your token files to be deployed, when you run the workflow it will error our saying the secret is not stored in the correct format as the secret with no be converted over to the other special encrypted format mentioned above until the workflow is saved from the UI again. To circumvent this, tokenize the special encrypted secret syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`), or after deployments you must go save the workflow in the UI again (**This may not always work from experience**).
+- Workflows which utilize the **External Trigger** trigger type have a reference to the workflow ID in the API URL to launch the workflow externally. This will automatically be exported with the workflow `name` and replaced with the workflow `id` on deployment. It also contains a `clientId` for a set of OAuth credentials that have been generated for that external trigger. The `clientId` will be different per environment and it not automatically omitted during the export process on purpose. You should be tokenizing this value per environment after a set of OAuth credentials have been generated for the trigger
+```json
+if type == EXTERNAL
+"trigger": {
+    "type": "EXTERNAL",
+    "attributes": {
+        "clientId": "c7f33278-03f9-4a2a-b390-d02c1d9058f9",
+        "url": "/beta/workflows/execute/external/796857e8-5352-4e7d-9c98-fd2c97dce1ae"
+    }
+}
+```
 
 ### Transforms
 - During the export process, only non-internal (`"internal": false`) transforms are exported since internal transforms (maintained by SailPoint) cannot be changed

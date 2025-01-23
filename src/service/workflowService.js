@@ -1,15 +1,48 @@
 import clc from "cli-color";
 import * as fs from "fs";
 import _ from 'lodash';
-import { Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
+import { LaunchersBetaApi, Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
 import winston from "winston";
-import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
+import { handleHttpException, replaceKeyValues, sleep, walk, writeConfigFile } from "../util.js";
+import { getFormById, getFormByName } from "./formService.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 
 const WORKFLOW = "WORKFLOW";
 const existingAttributeToKeep = [
     "id"
 ];
+//Cache of workflows we fetch during imports
+let workflowCache = {};
+
+const getWorkflowById = async (apiConfig, workflowId) => {
+    if (workflowCache[workflowId]) return workflowCache[workflowId];
+
+    const workflowsApi = new WorkflowsApi(apiConfig);
+    const workflowResponse = await workflowsApi.getWorkflow({
+        id: workflowId
+    }).catch(error => {
+        handleHttpException(error);
+    });
+
+    if (!workflowResponse) {
+        throw new Error(`Could not find workflow for id [${workflowId}] in tenant: ${apiConfig.basePath}`)
+    }
+    workflowCache[workflowId] = workflowResponse.data;
+
+    return workflowResponse.data;
+}
+
+const fetchFormNameReplacement = async (currentValue, apiConfig) => {
+    winston.info(`Fetching workflow form reference by id: ${currentValue}`);
+    const form = await getFormById(apiConfig, currentValue);
+    return form.name;
+};
+
+const fetchFormIdReplacement = async (currentValue, apiConfig) => {
+    winston.info(`Fetching workflow form reference by name: ${currentValue}`);
+    const form = await getFormByName(apiConfig, currentValue);
+    return form.id;
+};
 
 const exportWorkflows = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Workflow Export"));
@@ -23,6 +56,66 @@ const exportWorkflows = async (apiConfig) => {
         if (workflow.owner) {
             const owner = await getIdentityById(apiConfig, workflow.owner.id);
             workflow.owner.name = owner.alias;
+        }
+
+        //Replace formDefinitionId instances with the workflow name
+        await replaceKeyValues(workflow, "formDefinitionId", fetchFormNameReplacement, apiConfig);
+
+        /*
+         * Handle External Triggers type name/id replacement
+            "trigger": {
+                "type": "EXTERNAL",
+                "attributes": {
+                    "clientId": "c7f33278-03f9-4a2a-b390-d02c1d9058f9",
+                    "url": "/beta/workflows/execute/external/796857e8-5352-4e7d-9c98-fd2c97dce1ae"
+                }
+            }
+        */
+        if (workflow.trigger.type === "EXTERNAL" && workflow.trigger.attributes.url) {
+            //Replace workflow id with name
+            let externalUrl = workflow.trigger.attributes.url;
+            const workflowId = externalUrl.split("/").pop();
+            const workflowName = await getWorkflowById(apiConfig, workflowId);
+            workflow.trigger.attributes.url = externalUrl.replace(workflowId, workflowName.name);
+        }
+
+        /*
+         * Handle interactive launcher trigger type name/id replacement
+            "trigger": {
+            "type": "EVENT",
+            "attributes": {
+                "filter.$": "$[?(@.workflowId == '796857e8-5352-4e7d-9c98-fd2c97dce1ae')]",
+                "id": "idn:interactive-process-launched"
+            }
+        }
+        */
+        if (workflow.trigger.attributes.id === "idn:interactive-process-launched") {
+            workflow.trigger.attributes["filter.$"] = workflow.trigger.attributes["filter.$"].replace(workflow.id, workflow.name);
+        }
+
+        /*
+         * Handle form submitted trigger type name/id replacement
+            "trigger": {
+            "type": "EVENT",
+            "attributes": {
+                "filter.$": "$[?(@.formDefinitionId == '0d8fa517-b337-4d12-ad64-53d520c21d1b')]",
+                "formDefinitionId": "0d8fa517-b337-4d12-ad64-53d520c21d1b",
+                "id": "sp:form-submitted"
+            }
+        }
+        */
+        if (workflow.trigger.attributes.id === "sp:form-submitted") {
+            let filterString = workflow.trigger.attributes["filter.$"];
+            //Regular expression to match the workflow id between the two single quotes
+            const betweenQuotesRegex = /'([^']*)'/;
+            const match = filterString.match(betweenQuotesRegex);
+
+            if (match) {
+                const formId = match[1];
+                const form = await getFormById(apiConfig, formId);
+                filterString = filterString.replace(formId, form.name);
+                workflow.trigger.attributes["filter.$"] = filterString;
+            }
         }
 
         writeConfigFile(WORKFLOW, workflow.name, workflow);
@@ -48,6 +141,27 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         }
     }
 
+    //Replace formDefinitionId instances with the workflow id
+    await replaceKeyValues(localWorkflow, "formDefinitionId", fetchFormIdReplacement, apiConfig);
+
+    //Handle form submitted trigger type name/id replacement
+    if (localWorkflow.trigger.attributes.id === "sp:form-submitted") {
+        let filterString = localWorkflow.trigger.attributes["filter.$"];
+        //Regular expression to match the workflow id between the two single quotes
+        const betweenQuotesRegex = /'([^']*)'/;
+        const match = filterString.match(betweenQuotesRegex);
+
+        if (match) {
+            //Because this is the local version, should be a name reference
+            const formName = match[1];
+            const form = await getFormByName(apiConfig, formName);
+            filterString = filterString.replace(formName, form.id);
+            localWorkflow.trigger.attributes["filter.$"] = filterString;
+        }
+    }
+
+    console.log(JSON.stringify(localWorkflow, null, 4));
+
     if (!currentTargetWorkflow) {
         winston.info(`Creating new workflow: ${localWorkflow.name}`);
 
@@ -63,6 +177,48 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
                 }
             });
             currentTargetWorkflow = createWorkflowResponse.data;
+
+            //After initial create, if this is an interactive process trigger, we need to update the filter with the new workflow id
+            if (localWorkflow.trigger.attributes.id === "idn:interactive-process-launched") {
+                console.log("performing patch...");
+                const newFilterValue = localWorkflow.trigger.attributes["filter.$"].replace(localWorkflow.name, currentTargetWorkflow.id);
+                //Patch workflow to update the filter
+                try {
+                    await workflowsApi.patchWorkflow({
+                        id: currentTargetWorkflow.id,
+                        jsonPatchOperationBeta: [
+                            {
+                                op: "replace",
+                                path: "/trigger/attributes/filter.$",
+                                value: newFilterValue
+                            }
+                        ]
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
+                }
+
+                //Create the interactive trigger entitlement via beta/launchers (only for new, assume it exists if workflow is updated)
+                winston.info(`Creating interactive trigger entitlement for new workflow: ${localWorkflow.name}`);
+                const launchersApi = new LaunchersBetaApi(apiConfig);
+                try {
+                    await launchersApi.createLauncher({
+                        launcherRequestBeta: {
+                            config: "{}",
+                            description: localWorkflow.description,
+                            disabled: true,
+                            name: localWorkflow.name,
+                            type: "INTERACTIVE_PROCESS",
+                            reference: {
+                                id: currentTargetWorkflow.id,
+                                type: "WORKFLOW"
+                            }
+                        }
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
+                }
+            }
 
             //If the local workflow was enabled, we will enable it now with a PATCH
             if (localWorkflow.enabled) {
@@ -125,6 +281,20 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
             _.set(localWorkflow, workflowKey, _.get(currentTargetWorkflow, workflowKey));
         }
 
+        //If external trigger, need to update the URL to use the version with the ID
+        //We only do this on update b/c if we are creating no OAuth entries exist yet so there should be no URL reference yet
+        if (currentTargetWorkflow.trigger.type === "EXTERNAL" && currentTargetWorkflow.trigger.attributes.url) {
+            //Use currently deployed URL
+            localWorkflow.trigger.attributes.url = currentTargetWorkflow.trigger.attributes.url;
+        }
+
+        //Interactive trigger needs the currently deployed trigger value which contains the workflow's id
+        if (localWorkflow.trigger.attributes.id === "idn:interactive-process-launched") {
+            localWorkflow.trigger.attributes["filter.$"] = currentTargetWorkflow.trigger.attributes["filter.$"];
+        }
+
+        console.log(JSON.stringify(localWorkflow, null, 4));
+
         //Update the workflow with all config, references, etc.
         try {
             await workflowsApi.updateWorkflow({
@@ -151,8 +321,7 @@ const migrateWorkflows = async (apiConfig) => {
 }
 
 export {
-    exportWorkflows,
-    migrateWorkflow,
+    exportWorkflows, getWorkflowById, migrateWorkflow,
     migrateWorkflows
 };
 
