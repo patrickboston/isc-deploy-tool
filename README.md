@@ -270,7 +270,6 @@ When lifecycle states are exported, access profile and source ID references will
 - If your workflow has any secrets stored in it such as OAuth client secrets, when the workflow is saved via the UI, those secrets are encrypted and referenced via a special syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`). If you tokenize the actual secret values in your token files to be deployed, when you run the workflow it will error our saying the secret is not stored in the correct format as the secret with no be converted over to the other special encrypted format mentioned above until the workflow is saved from the UI again. To circumvent this, tokenize the special encrypted secret syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`), or after deployments you must go save the workflow in the UI again (**This may not always work from experience**).
 - Workflows which utilize the **External Trigger** trigger type have a reference to the workflow ID in the API URL to launch the workflow externally. This will automatically be exported with the workflow `name` and replaced with the workflow `id` on deployment. It also contains a `clientId` for a set of OAuth credentials that have been generated for that external trigger. The `clientId` will be different per environment and it not automatically omitted during the export process on purpose. You should be tokenizing this value per environment after a set of OAuth credentials have been generated for the trigger
 ```json
-if type == EXTERNAL
 "trigger": {
     "type": "EXTERNAL",
     "attributes": {
