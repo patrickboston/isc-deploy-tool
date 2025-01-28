@@ -9,6 +9,8 @@ import { exportForms, migrateForms } from "./service/formService.js";
 import { exportIdentityAttributeConfig, exportIdentityProfiles, migrateIdentityAttributeConfig, migrateIdentityProfiles } from "./service/identityConfigService.js";
 import { exportGovernanceGroups, migrateGovernanceGroups } from "./service/identityService.js";
 import { exportNotificationTemplates, migrateNotificationTemplates } from "./service/notificationService.js";
+import { exportOrgConfigs, migrateOrgConfigs } from "./service/orgConfigService.js";
+import { exportPasswordInstructions, migratePasswordInstructions } from "./service/passwordInstructionService.js";
 import { exportPasswordPolicies, migratePasswordPolicies } from "./service/passwordPolicyService.js";
 import { exportCloudRules, exportConnectorRules, migrateCloudRules, migrateConnectorRules } from "./service/ruleService.js";
 import { exportServiceDeskIntegrations, migrateServiceDeskIntegrations } from "./service/serviceDeskIntegrationService.js";
@@ -168,6 +170,7 @@ if (isExport && isDetokenize) {
         }
     }
 
+    await exportOrgConfigs(globalApiConfiguration);
     await exportGovernanceGroups(globalApiConfiguration);
     await exportPasswordPolicies(globalApiConfiguration);
     await exportCloudRules(globalApiConfiguration);
@@ -182,6 +185,7 @@ if (isExport && isDetokenize) {
     await exportForms(globalApiConfiguration);
     await exportWorkflows(globalApiConfiguration);
     await exportBranding(globalApiConfiguration);
+    await exportPasswordInstructions(globalApiConfiguration);
 
     //Perform reverse tokenization on all exported files
     await reverseTokenize();
@@ -213,20 +217,23 @@ if (isDeploy) {
 
     /**
      * Objects need to be migrated in a specific order for reference sake. That order is:
-     * 1. Governance Groups
-     * 2. Password Policies
-     * 3. Rules (Connector + Already Approved Cloud)
-     * 4. Transforms
-     * 5. Sources (dependencies on rules, transforms, password policies)
-     * 6. Service Desk Integrations (dependencies on rules, sources)
-     * 7. Identity Object Config (dependencies on sources, rules, transforms)
-     * 8. Identity Profile (including Lifecycle States, dependencies on sources)
-     * 9. Access Request Config
-     * 10. Notification Template
-     * 11. Form
-     * 12. Workflow
-     * 13. Branding
+     * 1. Org Configs
+     * 2. Governance Groups
+     * 3. Password Policies
+     * 4. Rules (Connector + Already Approved Cloud)
+     * 5. Transforms
+     * 6. Sources (dependencies on rules, transforms, password policies)
+     * 7. Service Desk Integrations (dependencies on rules, sources)
+     * 8. Identity Object Config (dependencies on sources, rules, transforms)
+     * 9. Identity Profile (including Lifecycle States, dependencies on sources)
+     * 10. Access Request Config
+     * 11. Notification Template
+     * 12. Form
+     * 13. Workflow
+     * 14. Branding
+     * 15. Custom Password Instructions
     */
+    await migrateOrgConfigs(globalApiConfiguration, targetEnvName);
     await migrateGovernanceGroups(globalApiConfiguration);
     await migratePasswordPolicies(globalApiConfiguration);
     await migrateCloudRules(globalApiConfiguration);
@@ -241,6 +248,7 @@ if (isDeploy) {
     await migrateForms(globalApiConfiguration);
     await migrateWorkflows(globalApiConfiguration);
     await updateBranding(globalApiConfiguration, targetEnvName);
+    await migratePasswordInstructions(globalApiConfiguration, targetEnvName);
 }
 
 const end = Date.now();
