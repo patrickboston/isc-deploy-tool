@@ -26,7 +26,9 @@ const exportPasswordInstructions = async (apiConfig) => {
     /*
      * There is no endpoint for getting all custom password instructions, so we need to
      * pass each available pageId one by one and whatever one does not return a 404 can
-     * be written as a config file
+     * be written as a config file. If custom customInstructionsEnabled is not enabled via
+     * beta/password-org-config, then we will get a 400 for all of them which we also account for
+     * 
     */
     const customPasswordInstructionsApi = new CustomPasswordInstructionsBetaApi(apiConfig);
     for (const pageId of availablePageIds) {
@@ -37,7 +39,7 @@ const exportPasswordInstructions = async (apiConfig) => {
             winston.info(`Exporting Password Instruction for pageId: ${pageId}`);
             writeConfigFile(PASSWORD_INSTRUCTION, pageId, customPasswordInstructionsResponse.data);
         } catch (error) {
-            if (error.response.status !== 404) {
+            if (error.response.status !== 404 && error.response.status !== 400) {
                 handleHttpException(error);
             }
         }
