@@ -10,6 +10,7 @@ It offers the following features:
 
 ## Supported Object Types
 The following object types are currently supported for export/deploy:
+- ORG_CONFIG (includes multiple org configurations such as security, lockout, service provider, etc.)
 - CLOUD_RULE (already approved and deployed by SailPoint)
 - CONNECTOR_RULE
 - TRANSFORM
@@ -24,6 +25,7 @@ The following object types are currently supported for export/deploy:
 - GOVERNANCE_GROUP
 - BRANDING_CONFIG
 - PASSWORD_POLICY
+- PASSWORD_INSTRUCTION (custom UI instructions for self-service password reset, etc.)
 
 
 
