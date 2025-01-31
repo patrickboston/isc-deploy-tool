@@ -28,6 +28,7 @@ export default {
             "$.object.identityCount",
         ],
         LIFECYCLE_STATE: ["identityCount"],
+        ORG_CONFIG: ["$.modifiedBy"],
         PASSWORD_POLICY: ["$.dateCreated", "$.lastUpdated"],
         SERVICE_DESK_INTEGRATION: [
             "$.ownerRef.id",
