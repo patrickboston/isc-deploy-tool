@@ -71,7 +71,7 @@ const exportWorkflows = async (apiConfig) => {
                 }
             }
         */
-        if (workflow.trigger.type === "EXTERNAL" && workflow.trigger.attributes.url) {
+        if (workflow.trigger && workflow.trigger.type === "EXTERNAL" && workflow.trigger.attributes.url) {
             //Replace workflow id with name
             let externalUrl = workflow.trigger.attributes.url;
             const workflowId = externalUrl.split("/").pop();
@@ -89,7 +89,7 @@ const exportWorkflows = async (apiConfig) => {
             }
         }
         */
-        if (workflow.trigger.attributes.id === "idn:interactive-process-launched") {
+        if (workflow.trigger && workflow.trigger.attributes.id === "idn:interactive-process-launched") {
             workflow.trigger.attributes["filter.$"] = workflow.trigger.attributes["filter.$"].replace(workflow.id, workflow.name);
         }
 
@@ -104,7 +104,7 @@ const exportWorkflows = async (apiConfig) => {
             }
         }
         */
-        if (workflow.trigger.attributes.id === "sp:form-submitted") {
+        if (workflow.trigger && workflow.trigger.attributes.id === "sp:form-submitted") {
             let filterString = workflow.trigger.attributes["filter.$"];
             //Regular expression to match the workflow id between the two single quotes
             const betweenQuotesRegex = /'([^']*)'/;
