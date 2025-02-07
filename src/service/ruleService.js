@@ -76,8 +76,8 @@ const exportConnectorRules = async (apiConfig) => {
         // write rule file
         writeConfigFile(CONNECTOR_RULE, connectorRule.name, connectorRule);
 
-        //Write separate bsh file with source code for easy reference
-        const ruleSourceFileName = `./config/${CONNECTOR_RULE}/${connectorRule.name}.source.bsh`;
+        //Write separate file with source code for easy reference
+        const ruleSourceFileName = `./config/${CONNECTOR_RULE}/${connectorRule.name}.src`;
         fs.writeFileSync(ruleSourceFileName, unescape(script), null, 4);
     }
 }
@@ -112,6 +112,12 @@ const migrateCloudRules = async (apiConfig) => {
 const migrateConnectorRule = async (apiConfig, connectorRuleJson) => {
     const connectorRuleManagementBetaApi = new ConnectorRuleManagementBetaApi(apiConfig);
     let localConnectorRule = JSON.parse(connectorRuleJson);
+
+    // skip rule if empty source code - api rejects create/update if empty string
+    if (!localConnectorRule.sourceCode.script) {
+        winston.warn(clc.yellow(`Connector rule [${localConnectorRule.name}] missing source code script. Skipping.`));
+        return;
+    }
 
     //Check and see if a connector rule already exists in the target environment, no filtering need to iterate
     let currentTargetConnectorRule;
