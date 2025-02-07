@@ -326,8 +326,8 @@ const buildObjectsForEnvironment = async (env) => {
             if (fileName.startsWith("./config/CONNECTOR_RULE/")) {
                 winston.debug(`Injecting source script for rule ${fileName}`);
 
-                // get a copy of the script from the .bsh file
-                let scriptFileName = fileName.replace(".json", ".source.bsh");
+                // get a copy of the script from the .src file
+                let scriptFileName = fileName.replace(".json", ".src");
                 let scriptSource = fs.readFileSync(scriptFileName, { encoding: "utf8" });
 
                 // convert fileSource to JSON and set sourceCode.script
