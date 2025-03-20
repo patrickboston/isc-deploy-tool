@@ -35,10 +35,10 @@ const getSourceByName = async (apiConfig, sourceName) => {
         handleHttpException(error);
     });
 
-    const currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
+    const currentTargetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
 
-    if (!currentTartgetSource) throw new Error(`Could not find source by name [${sourceName}] in tenant: ${apiConfig.basePath}`);
-    return currentTartgetSource;
+    if (!currentTargetSource) throw new Error(`Could not find source by name [${sourceName}] in tenant: ${apiConfig.basePath}`);
+    return currentTargetSource;
 }
 
 const getSourceById = async (apiConfig, sourceId) => {
@@ -52,11 +52,11 @@ const getSourceById = async (apiConfig, sourceId) => {
         handleHttpException(error);
     });
 
-    const currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
+    const currentTargetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
 
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
-    if (!currentTartgetSource) throw new Error(`Could not find source by id [${sourceId}] in tenant: ${apiConfig.basePath}`);
-    return currentTartgetSource;
+    if (!currentTargetSource) throw new Error(`Could not find source by id [${sourceId}] in tenant: ${apiConfig.basePath}`);
+    return currentTargetSource;
 }
 
 /**
@@ -172,10 +172,10 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
         handleHttpException(error);
     });
 
-    let currentTartgetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
+    let currentTargetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
 
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
-    if (!currentTartgetSource) {
+    if (!currentTargetSource) {
         const csvSource = localSource.type === "DelimitedFile";
 
         //Remove accountCorrelationConfig on create since we have no way of finding the reference
@@ -225,16 +225,16 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                 provisionAsCsv: csvSource
             });
 
-            currentTartgetSource = createSourceResponse.data;
+            currentTargetSource = createSourceResponse.data;
         } catch (error) {
             await handleHttpException(error);
         }
     } else {
-        winston.info(`Updating existing source: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
+        winston.info(`Updating existing source: ${currentTargetSource.name} (${currentTargetSource.id})`)
     }
 
     //A source needs to exist to perform all the updates properly
-    if (currentTartgetSource) {
+    if (currentTargetSource) {
         if (isSaaS && saasSourceConnectorAttributesCopy) {
             //Restore connectorAttributes we removed during initial create
             localSource.connectorAttributes = saasSourceConnectorAttributesCopy;
@@ -246,8 +246,8 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
         * on the source since we cannot fetch it before hand, there is no endpoint to get this private
         * backend cluster
         */
-        if (isSaaS && currentTartgetSource.cluster) {
-            _.set(localSource, "cluster.id", currentTartgetSource.cluster.id);
+        if (isSaaS && currentTargetSource.cluster) {
+            _.set(localSource, "cluster.id", currentTargetSource.cluster.id);
         }
 
         //Correlation Config needs to be updated from target source if exists
@@ -258,7 +258,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
             winston.info(`Updating source correlation configuration`);
             try {
                 const sourceCorrelationConfigResponse = await betaSourcesApi.putCorrelationConfig({
-                    id: currentTartgetSource.id,
+                    id: currentTargetSource.id,
                     correlationConfigBeta: correlationConfigCopy
                 });
 
@@ -271,8 +271,8 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                 handleHttpException(error);
 
                 //Make sure we still update the correlation reference if there was a failure or else the source will fail to update
-                if (currentTartgetSource.accountCorrelationConfig) {
-                    localSource.accountCorrelationConfig.id = currentTartgetSource.accountCorrelationConfig.id;
+                if (currentTargetSource.accountCorrelationConfig) {
+                    localSource.accountCorrelationConfig.id = currentTargetSource.accountCorrelationConfig.id;
                 }
             }
         }
@@ -323,7 +323,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
 
             // Get all schemas from current target source
             let currentTargetSchemasResponse = await sourcesApi.getSourceSchemas({
-                sourceId: currentTartgetSource.id,
+                sourceId: currentTargetSource.id,
             }).catch(error => {
                 handleHttpException(error);
             });
@@ -341,7 +341,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                 if (schemaCopy.attributes && schemaCopy.attributes.some(attr => attr.schema)) {
                     schemaFilesToProcessLater.push(localSchemaFile);
                 } else {
-                    const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
+                    const res = await processSchema(sourcesApi, localSource, currentTargetSource, localSchemaFile, schemaReferences);
                     //If there was a schema created, it will return it here to update schema refs
                     if (res) {
                         schemaReferences[res.name] = res;
@@ -351,7 +351,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
 
             // Second pass: Process schemas with references
             for (const localSchemaFile of schemaFilesToProcessLater) {
-                const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
+                const res = await processSchema(sourcesApi, localSource, currentTargetSource, localSchemaFile, schemaReferences);
                 //If there was a schema created, it will return it here to update schema refs
                 if (res) {
                     schemaReferences[res.name] = res;
@@ -368,7 +368,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
             //Get all policies from current target source
             let currentTargetPolicyResponse;
             currentTargetPolicyResponse = await sourcesApi.listProvisioningPolicies({
-                sourceId: currentTartgetSource.id,
+                sourceId: currentTargetSource.id,
             }).catch(error => {
                 handleHttpException(error);
             });
@@ -381,7 +381,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                         winston.info(`Updating existing source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
                         try {
                             await sourcesApi.putProvisioningPolicy({
-                                sourceId: currentTartgetSource.id,
+                                sourceId: currentTargetSource.id,
                                 usageType: currentPolicy.usageType,
                                 provisioningPolicyDto: policyCopy
                             });
@@ -401,7 +401,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                 winston.info(`Creating new source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
                 try {
                     await sourcesApi.createProvisioningPolicy({
-                        sourceId: currentTartgetSource.id,
+                        sourceId: currentTargetSource.id,
                         provisioningPolicyDto: policyCopy
                     });
                 } catch (error) {
@@ -414,14 +414,14 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
         const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
         for (const localAttrSyncFile of localAttrSyncFiles) {
             let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
-            _.set(attrSyncCopy, "source.id", currentTartgetSource.id);
+            _.set(attrSyncCopy, "source.id", currentTargetSource.id);
 
             //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
             if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
                 try {
                     winston.info(`Updating source attribute sync config`)
                     await betaSourcesApi.putSourceAttrSyncConfig({
-                        id: currentTartgetSource.id,
+                        id: currentTargetSource.id,
                         attrSyncSourceConfigBeta: attrSyncCopy
                     });
                 } catch (error) {
@@ -449,7 +449,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
 
                     /* Couldn't get this working, had to make call ourselves below
                     await sourcesApi.importConnectorFile({
-                        sourceId: currentTartgetSource.id,
+                        sourceId: currentTargetSource.id,
                         file: fileStream
                     });
                     */
@@ -460,7 +460,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                     let config = {
                         method: 'post',
                         maxBodyLength: Infinity,
-                        url: `${apiConfig.basePath}/v3/sources/${currentTartgetSource.id}/upload-connector-file`,
+                        url: `${apiConfig.basePath}/v3/sources/${currentTargetSource.id}/upload-connector-file`,
                         headers: {
                             'Authorization': `Bearer ${await apiConfig.accessToken}`,
                             ...data.getHeaders()
@@ -481,15 +481,15 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
 
         //Restore attributes from the currently deployed target source into our template source
         for (const sourceKey of existingAttributeToKeep) {
-            _.set(localSource, sourceKey, _.get(currentTartgetSource, sourceKey));
+            _.set(localSource, sourceKey, _.get(currentTargetSource, sourceKey));
         }
 
         //Update the source with all config, references, etc.
-        winston.info(`Updating existing source: ${currentTartgetSource.name} (${currentTartgetSource.id})`)
+        winston.info(`Updating existing source: ${currentTargetSource.name} (${currentTargetSource.id})`)
         winston.debug(JSON.stringify(localSource, null, 4));
         try {
             await sourcesApi.putSource({
-                id: currentTartgetSource.id,
+                id: currentTargetSource.id,
                 source: localSource
             });
         } catch (error) {
@@ -501,7 +501,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
 }
 
 
-const processSchema = async (api, localSource, currentTartgetSource, localSchemaFile, schemaReferences) => {
+const processSchema = async (api, localSource, currentTargetSource, localSchemaFile, schemaReferences) => {
     let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
     let createSchema = true;
 
@@ -525,7 +525,7 @@ const processSchema = async (api, localSource, currentTartgetSource, localSchema
             await api.putSourceSchema({
                 schema: schemaCopy,
                 schemaId: currentSchema.id,
-                sourceId: currentTartgetSource.id
+                sourceId: currentTargetSource.id
             });
 
             if (localSource.schemas) {
@@ -547,7 +547,7 @@ const processSchema = async (api, localSource, currentTartgetSource, localSchema
         try {
             const createSchemaResponse = await api.createSourceSchema({
                 schema: schemaCopy,
-                sourceId: currentTartgetSource.id
+                sourceId: currentTargetSource.id
             });
 
             const schemaRef = {
