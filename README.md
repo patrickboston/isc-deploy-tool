@@ -2,27 +2,30 @@
 The Identity Security Cloud Object Deployment Tool (**ISC ODT**) is a NodeJS command-line utility that allows you to export configuration objects such as Sources, Transforms, Rules, and more out of one Identity Security Cloud environment and import/deploy them to other Identity Security Cloud environments. It utilizes various v3/beta API endpoints to perform all export and import operations. One of the main benefits of using this tool is the ability to maintain single configuration objects that can be deployed to any environment via tokenization. This allows Source Code Management to actually make sense for ISC implementations and this process could easily be plugged into a CI/CD pipeline.
 
 It offers the following features:
-- Export objects and perform reverse-tokenization via JSONPath which replaces actual configuration values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any target Identity Security Cloud environment
-- Tokenize and build objects for a target Identity Security Cloud environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual target configuration values which are needed for a specific target environment (i.e. IQService host for an Active Directory Source)
-- Tokenize and deploy objects to a target Identity Security Cloud environment with dynamic object reference lookup and insertion
+- **EXPORT:** Export objects and perform reverse-tokenization via JSONPath which replaces actual configuration values with a token in the format of `%%TOKEN_NAME%%`. This allows a single object to be maintained in a code repository which can be "built" for any target Identity Security Cloud environment
+- **BUILD/TOKENIZE:** Tokenize and build objects for a target Identity Security Cloud environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual target configuration values which are needed for a specific target environment (i.e. IQService host for an Active Directory Source)
+- **DEPLOY:** Deploy built/tokenized objects to a target Identity Security Cloud environment with dynamic object reference lookup and insertion (i.e. owners, source schemas, etc.)
 
 
 
 ## Supported Object Types
 The following object types are currently supported for export/deploy:
+- ORG_CONFIG (includes multiple org configurations such as session, lockout, network, service provider, global password, and public identities)
 - CLOUD_RULE (already approved and deployed by SailPoint)
 - CONNECTOR_RULE
 - TRANSFORM
-- SOURCE (includes correlation config, schemas, and provisioning policies. **Does not include password policy references**)
+- SOURCE (includes correlation config, schemas, provisioning policies, and referenced connector libraries (i.e. JDBC JAR files). **Does not include password policy references**)
 - SERVICE_DESK_INTEGRATION
 - IDENTITY_OBJECT_CONFIG
 - IDENTITY_PROFILE (includes lifecycle states tied to the identity profile. **Does not include security settings**)
 - ACCESS_REQUEST_CONFIG
 - NOTIFICATION_TEMPLATE
+- FORM_DEFINITION
 - WORKFLOW
 - GOVERNANCE_GROUP
 - BRANDING_CONFIG
 - PASSWORD_POLICY
+- PASSWORD_INSTRUCTION (custom UI instructions for self-service password reset, etc.)
 
 
 
@@ -71,7 +74,15 @@ export default
         "%%AD_PASSWORD%%": "StrongPassword1234"
     }
 ```
-- `export-config.js` - Contains import configuration items that pertain to the export process, particularly it holds `omitProperties` which has all of the JSON properties that should be omitted from objects such as `id` references, created/modified timestamps, rule `id` references, etc. Additional entries can be added/remove as needed per implementation requirements, but the standard set provided is meant to make objects repository-oriented
+- `<env>.ignore.js` - (Optional) Contains an array of specific objects to not deploy. This can be useful when deployment objects differ in ISC environments such as production integrating with prod and non-prod sources and sandbox integrating with only non-prod sources. See examples below:
+```js
+export default
+    [
+        "SOURCE:ProductionWebApplication",
+        "SOURCE:ProductionDatabaseApplication",
+    ]
+```
+- `export-config.js` - Contains import configuration items that pertain to the export process, particularly it holds `omitProperties` which has all of the JSON properties that should be omitted from objects such as `id` references, created/modified timestamps, rule `id` references, etc. Additional entries can be added/removed as needed per implementation requirements, but the standard set provided is meant to make objects repository-oriented
 - `export-ignore.js` - Contains an array of specific objects to ignore (not write to local config directory) when performing an export. Each entry must be in this specific format: `OBJECT_TYPE:Object Name`. If a file exists in your local `./config` directory and is then later added to this file, it will be deleted on the next export run See examples below:
 ```js
 export default
@@ -82,7 +93,25 @@ export default
     ]
 ```
 
-
+## Project Structure
+Below outlines the project structure for an ISC ODT project:
+```
+📦isc-deploy-tool
+ ┣ 📂assets - Contains images for branding
+ ┣ 📂build - Contains built/tokenized config objects as a result of the build or deploy command
+ ┣ 📂config - Contains all config objects you want to manage with this process. Populated by the export command
+ ┣ 📂connectorLib - Contains 
+ ┃ ┗ 📜mysql-connector-j-8.3.0.jar - Example JAR file for a JDBC connector
+ ┣ 📜.gitignore - Default gitignore
+ ┣ 📜example.env.js - Example env.js file for connecting to a tenant. Should be copied and renamed i.e. sb.env.js
+ ┣ 📜example.target.js - Example target.js file for connecting to a tenant. Should be copied and renamed i.e. sb.target.js
+ ┣ 📜export-config.js - Global configuration file for export process
+ ┣ 📜export-ignore.js - Global configuration file for ignoring certain objects during export
+ ┣ 📜package-lock.json - nodejs package-lock. Do not touch unless you know what you are doing
+ ┣ 📜package.json - nodejs package. Do not touch unless you know what you are doing
+ ┣ 📜README.md - The readme you are reading
+ ┗ 📜reverse.target.js - Reverse tokenization properties
+```
 
 ## Config Directory Structure
 When the export command is run, it will automatically create a directory in the root of the project called `/config`. This is where all of the configuration JSON files from the export will be reverse-tokenized and stored. It will look something like this:
@@ -160,13 +189,44 @@ npm run deploy -- --target_env=<env>
 > [!NOTE]
 > The deploy/import execution process will halt on errors return from ISC APIs. Errors will be recorded in the terminal if encountered. You must resolve any issues with configuration objects that are throwing errors during deployment or report at lower level tool bugs with the team so they can resolve them. We do this as opposed to continuing on errors due to object dependencies.
 
+### All Command Arguments
+Below is a reference for all arguments for the commands above
+```
+- src_env=<env> - Source environment for export command
+- target_env=<env> - Target environment for build/deploy commands
+- log_level=<level> - Sets winston log level
+- skip_connector_lib - Allows you to skip connector file upload if arg is present
+```
 
 
 ## Configuration Object Guidelines/Considerations
 Follow these guidelines to ensure these object types are deployed successfully.
 
 ### Object References by `id`
-In ISC, majority of object references are by `id` as opposed to a softer reference such as `name`. As part of the export process, `id` and other environment specific data are omitted from objects to make objects more common/repository oriented. When you run the deployment process to a target environment, `id` references that are needed are dynamically inserted into objects by looking up objects by `name` in the target deployment environment. **You do not need to lookup and insert `id` references yourself before deployments**
+In ISC, majority of object references are by `id` as opposed to a softer reference such as `name`. As part of the export process, `id` and other environment specific data are omitted from objects to make objects more common/repository oriented. When you run the deployment process to a target environment, `id` references that are needed are dynamically inserted into objects by looking up objects by `name` in the target deployment environment. **You do not need to lookup and insert `id` references yourself before deployments**. This is true only for places in an object where we can expect an object/id reference. You may have workflows which make an HTTP request back to ISC which rely on an a hard-coded `id` for a source - this tool is not designed to detect those occurrences and it would probably be inappropriate to make certain assumptions something an ISC `id` reference when can not clearly identify it. This means there are still some cases you need to tokenize these sorts of things. An example would be a workflow action which uses the generic HTTP action back to ISC to get an account for a specific source based on the source's `id`.
+```json
+"Get Banner Account": {
+    "actionId": "sp:http",
+    "attributes": {
+        "authenticationType": "OAuth",
+        "method": "get",
+        "oAuthClientId": "5f33a932a4de45ec971009dfc370c9e4",
+        "oAuthClientSecret": "$.secrets.caced813-4e69-46eb-92a4-145edd04057b",
+        "oAuthCredentialLocation": "oAuthInHeader",
+        "oAuthTokenUrl": "%%BASE_API_URL%%/oauth/token",
+        "requestContentType": "json",
+        "url": "%%BASE_API_URL%%/v3/accounts",
+        "urlParams": {
+            "filters": "identityId eq \"{{$.trigger.identity.id}}\" and sourceId eq \"%%BANNER_SOURCE_ID%%\""
+        }
+    },
+    "displayName": "",
+    "nextStep": "Check If Has Banner Account",
+    "type": "action",
+    "versionNumber": 2
+},
+```
+
 
 ### Owner References
 There are many objects throughout ISC that have owner references which point to an identity that have created an object, modified an object, etc. It is very important that owners are properly set up in exported configuration objects.
@@ -210,6 +270,16 @@ When lifecycle states are exported, access profile and source ID references will
 ### Workflows
 - When workflows are being updated via the deployment process, if they are enabled, they will be temporarily disabled (1-2 seconds) to perform the update, and then the enabled status defined in the workflow in the repository will be the final state the workflow ends up in. It will not be automatically enabled after update just because it was already enabled before we updated it with the pipeline.
 - If your workflow has any secrets stored in it such as OAuth client secrets, when the workflow is saved via the UI, those secrets are encrypted and referenced via a special syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`). If you tokenize the actual secret values in your token files to be deployed, when you run the workflow it will error our saying the secret is not stored in the correct format as the secret with no be converted over to the other special encrypted format mentioned above until the workflow is saved from the UI again. To circumvent this, tokenize the special encrypted secret syntax (i.e. `$.secrets.d3b98a91-1060-471f-a255-fa8766eb56b5`), or after deployments you must go save the workflow in the UI again (**This may not always work from experience**).
+- Workflows which utilize the **External Trigger** trigger type have a reference to the workflow ID in the API URL to launch the workflow externally. This will automatically be exported with the workflow `name` and replaced with the workflow `id` on deployment. It also contains a `clientId` for a set of OAuth credentials that have been generated for that external trigger. The `clientId` will be different per environment and it not automatically omitted during the export process on purpose. You should be tokenizing this value per environment after a set of OAuth credentials have been generated for the trigger
+```json
+"trigger": {
+    "type": "EXTERNAL",
+    "attributes": {
+        "clientId": "c7f33278-03f9-4a2a-b390-d02c1d9058f9",
+        "url": "/beta/workflows/execute/external/796857e8-5352-4e7d-9c98-fd2c97dce1ae"
+    }
+}
+```
 
 ### Transforms
 - During the export process, only non-internal (`"internal": false`) transforms are exported since internal transforms (maintained by SailPoint) cannot be changed
@@ -219,6 +289,14 @@ When lifecycle states are exported, access profile and source ID references will
 - The deployment process for rules injects the source code for the rule from the corresponding `<rule-name>.source.bsh` file created during an export.
 - The export process for rules will automatically exclude the `sourceCode.script` attribute for `CONNECTOR_RULES`
 - Cloud Rules (`CLOUD_RULE`) only which have been approved and deployed by SailPoint professional services can be deployed to other environments per SailPoint's processes. Cloud Rules do not have anything omitted from them during the export process because if any modifications are made to the file, the verification process during SP-Config import will fail for the rules
+
+### Source Connector Files/Dependencies
+Certain source types such as JDBC or SAP Direct require some sort of dependencies in order for them to operate correctly. This may be a JDBC driver for a JDBC source or some specific SAP Java binaries for an SAP Direct connector that SailPoint requires you to fetch and upload yourself. The deployment process supports uploading these connector file dependencies via the `v3/sources/:sourceId/upload-connector-file` endpoint. This is very useful when migrating these sources to higher environments so you do not need to manually remember to upload these dependencies per environment. You can tell if a source has connector library references by looking for the `connectorAttributes.connector_files` attribute. This is a comma-separated value of all the dependencies uploaded for that particular source. These dependencies are transferred to your VAs when you upload them through the source configuration UI or using the `/v3` endpoint mentioned before. The `connectorAttributes.connector_files` attribute is simply a pointer to the file name(s) on the VA. If this attribute exists, during the deployment process, it will look for these file names in `./connectorLib/` directory at the root of your project in order to upload the file via the API endpoint. If the file is not found, the process will fail with an error indicating that it could not find the dependency file.
+
+If you wish to skip the connector file upload process, pass the command like argument `--skip_connector_lib`. The full command would look like:
+```
+npm run deploy -- --target_env=<env> --skip_connector_lib
+```
 
 ### Deleting Objects
 There are two scenarios to consider when deleting objects:
@@ -233,6 +311,7 @@ When you are deploying to a clean environment for the first time (i.e. first tim
 - A Virtual Appliance cluster needs to be configured in the target tenant. Virtual appliance cluster names will most likely be different, so be sure to analyze all cluster references in sources, etc. and tokenize them as needed
 - All owner references should be analyzed and tokenized as needed. Owner references may fail if aggregations have not occurred yet in the target environment. You can a standard identity such as `slpt.services` as the default owner on objects to avoid this issue. Another option would be to manually migrate your authoritative source and perform an aggregation to get your baseline identities created which could be referenced as owners (assuming their `alias` would be the same in both environments)
 - Source attribute sync configurations may failed to deploy initially if an identity profile with the corresponding identity attributes does not exist yet. There is no real workaround for this at the moment. Some identity profiles rely on sources to exist before being created, so we are prioritizing that over attribute sync. You must run another import after identity profiles are created to allow attribute sync configs to be updated properly
+  - To get around this, you can set the `enabled` property for each attribute you are syncing to `false` for the first deployment. This will avoid any validation checks against the identity profile attributes. Once the identity profile attributes exist after the initial deployment, reset the `enabled` property back to `true` for each attribute desired and then run the deployment process again
 
 
 

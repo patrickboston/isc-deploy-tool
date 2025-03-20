@@ -1,4 +1,5 @@
 import clc from "cli-color";
+import * as crypto from 'crypto';
 import * as fs from "fs";
 import { JSONPath } from "jsonpath-plus";
 import _ from 'lodash';
@@ -22,11 +23,27 @@ const sleep = (ms) => {
 */
 const handleHttpException = async (e) => {
     if (e.response) {
-        winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+        if (await isJson(e.config.data)) {
+            winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+        } else {
+            winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+        }
     } else {
         winston.error(clc.red(`Generic while executing request: ${e.message}\n${e.stack}`));
     }
     process.exit(1);
+}
+
+const isJson = async (input) => {
+    if (typeof input !== 'string') {
+        return false; // Not JSON if it's not a string
+    }
+    try {
+        JSON.parse(input);
+        return true;
+    } catch (e) {
+        return false;
+    }
 }
 
 /**
@@ -103,6 +120,59 @@ const omitPropertiesFromObject = (objectType, object) => {
     }
     return object;
 }
+
+/**
+ * Asynchronously replaces values of a specified key in a nested object.
+ * 
+ * @param {object} obj - The object to traverse.
+ * @param {string} targetKey - The key to find and replace values for.
+ * @param {function} fetchReplacement - An async function that takes the current value and key and returns the replacement value.
+ * @param {function} apiConfig - Optional, allows us to invoke the API in the callback function if needed to fetch the replacement value
+ */
+const replaceKeyValues = async (obj, targetKey, fetchReplacement, apiConfig) => {
+    for (const [key, value] of Object.entries(obj)) {
+        if (key === targetKey) {
+            obj[key] = await fetchReplacement(value, apiConfig);
+        }
+
+        if (_.isObject(value)) {
+            await replaceKeyValues(value, targetKey, fetchReplacement, apiConfig);
+        }
+    }
+};
+
+
+/**
+* Encrypts a password locally with a public key that could be retrieved from
+* a Virtual Appliance cluster.
+*
+* @param {string} publicKey publicKey from the Virtual Appliance cluster, should not contain -----BEGIN PUBLIC KEY----- or -----END PUBLIC KEY-----, although will be stripped beforehand if it does exist
+* @param {string} toEncrypt Secret you want to encrypt
+*/
+const encrypt = async (publicKey, toEncrypt) => {
+    publicKey = publicKey.replace("-----BEGIN PUBLIC KEY-----", "");
+    publicKey = publicKey.replace("-----END PUBLIC KEY-----", "");
+
+    const publicKeyBytes = Buffer.from(publicKey, 'base64');
+    const encryptedBytes = await encryptRsa(publicKeyBytes, Buffer.from(toEncrypt, 'utf-8'));
+    return encryptedBytes.toString('base64');
+};
+
+const encryptRsa = async (publicKeyBytes, toEncryptBytes) => {
+    const key = crypto.createPublicKey({
+        key: publicKeyBytes,
+        format: 'der',
+        type: 'spki'
+    });
+
+    const encrypted = crypto.publicEncrypt({
+        key: key,
+        padding: crypto.constants.RSA_PKCS1_PADDING
+    }, toEncryptBytes);
+
+    return encrypted;
+};
+
 
 /**
 * Writes a IDN Config file to the specified location
@@ -196,7 +266,7 @@ const escapeString = (str) => {
 }
 
 const buildObjectsForEnvironment = async (env) => {
-    winston.info(clc.bgBlueBright(`Starting object tokenization for target environment: ${env}`))
+    winston.info(clc.bgBlueBright(`Starting object tokenization for target environment: ${env}`));
 
     //Standard Tokens
     const envTokenFileName = "./../" + env + ".target.js";
@@ -213,6 +283,16 @@ const buildObjectsForEnvironment = async (env) => {
         winston.info(clc.yellow(`No secrets file found for target environment [${env}]`));
     }
 
+    //Deploy Ignore - used to omit objects from deployment
+    const deployIgnoreFileName = "./../" + env + ".ignore.js";
+    let deployIgnore = [];
+    try {
+        const { default: ignore } = await import(deployIgnoreFileName);
+        deployIgnore = ignore;
+    } catch (e) {
+        winston.info(clc.yellow(`No ignore file found for target environment [${env}]`));
+    }
+
     //Create directory for object type if it does not exist yet
     if (!fs.existsSync("./build/config/")) {
         fs.mkdirSync("./build/config/", { recursive: true });
@@ -221,16 +301,33 @@ const buildObjectsForEnvironment = async (env) => {
     //Iterate each config file from export
     const configFileNames = walk("./config");
     for (const fileName of configFileNames) {
-        // build CONNECTOR_RULE separate to inject script from .bsh file
-        if (fileName.endsWith(".json")) {
+
+        if (fileName.endsWith(".json")) { // check if file is json to not process connector rule source files
+
+            
+            // get the object type and object name to be used later to check if the object should not be deployed
+            // remove config from path - ./config/TRANSFORM/example.json -> TRANSFORM/example.json
+            const objectPath = fileName.replace("./config/", "");
+            // extract object type from path - TRANSFORM/example.json -> TRANSFORM
+            const objectType = objectPath.substring(0, objectPath.indexOf("/"));
+            // remove object type from path - TRANSFORM/example.json > example.json
+            const objectNamePath = objectPath.replace(objectType + "/", "") ;
+            // extract the object name from the path by checking if the objectNamePath includes a top level directory - for sources
+            const objectName = objectNamePath.substring(0, objectNamePath.indexOf("/") != -1 ? objectNamePath.indexOf("/") : objectNamePath.length).replace(".json", "");
+            // check if deployIgnore includes object and don't build if so
+            if (deployIgnore.includes(`${objectType}:${objectName}`)) {
+                winston.info(clc.green(`Ignoring ${fileName} because of match ${objectType}:${objectName} found in ignore file`));
+                continue;
+            }
+
             let fileSource = fs.readFileSync(fileName, { encoding: "utf8" });
 
             // if this is a connector rule, then inject script from source file
             if (fileName.startsWith("./config/CONNECTOR_RULE/")) {
                 winston.debug(`Injecting source script for rule ${fileName}`);
 
-                // get a copy of the script from the .bsh file
-                let scriptFileName = fileName.replace(".json", ".source.bsh");
+                // get a copy of the script from the .src file
+                let scriptFileName = fileName.replace(".json", ".src");
                 let scriptSource = fs.readFileSync(scriptFileName, { encoding: "utf8" });
 
                 // convert fileSource to JSON and set sourceCode.script
@@ -260,7 +357,7 @@ const buildObjectsForEnvironment = async (env) => {
             //Write tokenized file to /build/[TYPE] directory
             const outputFileName = "./build/" + fileName.substring(2);
             const outputDir = outputFileName.substring(0, outputFileName.lastIndexOf('/'));
-
+            
             if (!fs.existsSync(outputDir)) {
                 fs.mkdirSync(outputDir, { recursive: true });
             }
@@ -415,5 +512,5 @@ const runSpConfigImport = async (apiConfig, importObj) => {
 };
 
 
-export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, handleHttpException, reverseTokenize, runSpConfigExport, runSpConfigImport, sleep, walk, writeConfigFile };
+export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, encrypt, handleHttpException, reverseTokenize, runSpConfigExport, runSpConfigImport, sleep, walk, writeConfigFile, replaceKeyValues };
 

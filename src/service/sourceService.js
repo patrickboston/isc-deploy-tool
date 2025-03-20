@@ -1,5 +1,6 @@
 import clc from "cli-color";
 import * as fs from "fs";
+import axios from "axios";
 import _ from 'lodash';
 import { Configuration, Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
 import winston from "winston";
@@ -8,13 +9,15 @@ import { getAllClusters } from "./clusterService.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 import { getAllRules } from "./ruleService.js";
 import { getAllPasswordPolicies } from "./passwordPolicyService.js"
+import path from "path";
+import FormData from "form-data";
 
 const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
 const ATTR_SYNC_SOURCE_CONFIG = "ATTR_SYNC_SOURCE_CONFIG";
 const CORRELATION_CONFIG = "CORRELATION_CONFIG";
 const existingAttributeToKeep = [
-    "id", "authoritative", "connectorAttributes.cloudExternalId", "passwordPolicies", "connectorAttributes.healthy", "healthy"
+    "id", "authoritative", "connectorAttributes.cloudExternalId", "passwordPolicies", "connectorAttributes.healthy", "healthy", "connectorAttributes.slpt-source-diagnostics"
 ];
 const ruleReferenceNames = [
     "accountCorrelationRule", "managerCorrelationRule", "beforeProvisioningRule"
@@ -130,7 +133,7 @@ const exportSources = async (apiConfig) => {
 * @param {Configuration} apiConfig  SailPoint API Config
 * @param {string} sourceJson        Raw JSON String of source to be deployed
 */
-const migrateSource = async (apiConfig, sourceJson) => {
+const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const betaSourcesApi = new SourcesBetaApi(apiConfig);
     let localSource = JSON.parse(sourceJson);
@@ -274,26 +277,6 @@ const migrateSource = async (apiConfig, sourceJson) => {
             }
         }
 
-        //Attribute sync config
-        const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
-        for (const localAttrSyncFile of localAttrSyncFiles) {
-            let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
-            _.set(attrSyncCopy, "source.id", currentTartgetSource.id);
-
-            //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
-            if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
-                try {
-                    winston.info(`Updating source attribute sync config`)
-                    await betaSourcesApi.putSourceAttrSyncConfig({
-                        id: currentTartgetSource.id,
-                        attrSyncSourceConfigBeta: attrSyncCopy
-                    });
-                } catch (error) {
-                    await handleHttpException(error);
-                }
-            }
-        }
-
         //Password Policy References - we can't filter by name in API so need to iterate each and check
         /* This doesn't actually work for whatever reason, if you attach a policy in the UI, it uses
         PATCH /beta/sources/:id/password-policies which is not a documented endpoint so there is no
@@ -324,6 +307,54 @@ const migrateSource = async (apiConfig, sourceJson) => {
                         ruleRef.id = rule.self.id;
                         _.set(localSource, ruleReferenceName, ruleRef);
                     }
+                }
+            }
+        }
+
+        /*
+         * Get all local schema templates and iterate them, check and see if there is a matching current
+         * schema in the deployed target source. If found, update it with a PUT, if not found, create a new
+         * schema. Also need to update the schema reference ID in the source itself as we update the referenced
+         * schema object
+        */
+        const localSchemaFiles = walk(`./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
+        if (localSchemaFiles) {
+            let schemaFilesToProcessLater = [];
+
+            // Get all schemas from current target source
+            let currentTargetSchemasResponse = await sourcesApi.getSourceSchemas({
+                sourceId: currentTartgetSource.id,
+            }).catch(error => {
+                handleHttpException(error);
+            });
+
+            let schemaReferences = {};
+            if (currentTargetSchemasResponse.data) {
+                for (const currentSchema of currentTargetSchemasResponse.data) {
+                    schemaReferences[currentSchema.name] = currentSchema;
+                }
+            }
+
+            // First pass: Process schemas without references
+            for (const localSchemaFile of localSchemaFiles) {
+                let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
+                if (schemaCopy.attributes && schemaCopy.attributes.some(attr => attr.schema)) {
+                    schemaFilesToProcessLater.push(localSchemaFile);
+                } else {
+                    const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
+                    //If there was a schema created, it will return it here to update schema refs
+                    if (res) {
+                        schemaReferences[res.name] = res;
+                    }
+                }
+            }
+
+            // Second pass: Process schemas with references
+            for (const localSchemaFile of schemaFilesToProcessLater) {
+                const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
+                //If there was a schema created, it will return it here to update schema refs
+                if (res) {
+                    schemaReferences[res.name] = res;
                 }
             }
         }
@@ -379,52 +410,73 @@ const migrateSource = async (apiConfig, sourceJson) => {
             }
         }
 
-        /*
-         * Get all local schema templates and iterate them, check and see if there is a matching current
-         * schema in the deployed target source. If found, update it with a PUT, if not found, create a new
-         * schema. Also need to update the schema reference ID in the source itself as we update the referenced
-         * schema object
-        */
-        const localSchemaFiles = walk(`./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
-        if (localSchemaFiles) {
-            let schemaFilesToProcessLater = [];
+        //Attribute sync config
+        const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
+        for (const localAttrSyncFile of localAttrSyncFiles) {
+            let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
+            _.set(attrSyncCopy, "source.id", currentTartgetSource.id);
 
-            // Get all schemas from current target source
-            let currentTargetSchemasResponse = await sourcesApi.getSourceSchemas({
-                sourceId: currentTartgetSource.id,
-            }).catch(error => {
-                handleHttpException(error);
-            });
-
-            let schemaReferences = {};
-            if (currentTargetSchemasResponse.data) {
-                for (const currentSchema of currentTargetSchemasResponse.data) {
-                    schemaReferences[currentSchema.name] = currentSchema;
+            //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
+            if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
+                try {
+                    winston.info(`Updating source attribute sync config`)
+                    await betaSourcesApi.putSourceAttrSyncConfig({
+                        id: currentTartgetSource.id,
+                        attrSyncSourceConfigBeta: attrSyncCopy
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
                 }
             }
+        }
 
-            // First pass: Process schemas without references
-            for (const localSchemaFile of localSchemaFiles) {
-                let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
-                if (schemaCopy.attributes && schemaCopy.attributes.some(attr => attr.schema)) {
-                    schemaFilesToProcessLater.push(localSchemaFile);
-                } else {
-                    const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
-                    //If there was a schema created, it will return it here to update schema refs
-                    if (res) {
-                        schemaReferences[res.name] = res;
+        //Upload connector files. connector_files is a CSV of the referenced JAR files
+        if (!skipConnectorLib) {
+            const connectorFiles = localSource.connectorAttributes.connector_files;
+            if (connectorFiles) {
+                const connectorFileList = connectorFiles.split(",");
+                for (const connectorFileName of connectorFileList) {
+                    const relativeFilePath = `connectorLib/${connectorFileName}`;
+                    winston.info(`Uploading connector library file [${relativeFilePath}]`);
+
+                    if (!fs.existsSync(relativeFilePath)) {
+                        winston.error(`Could not find connector library dependency [${relativeFilePath}]. Put the file in the directory and try again`);
+                        process.exit(1);
+                    }
+
+                    const fullFilePath = path.resolve(relativeFilePath);
+                    const fileStream = fs.createReadStream(fullFilePath);
+
+                    /* Couldn't get this working, had to make call ourselves below
+                    await sourcesApi.importConnectorFile({
+                        sourceId: currentTartgetSource.id,
+                        file: fileStream
+                    });
+                    */
+
+                    let data = new FormData();
+                    data.append('file', fileStream);
+
+                    let config = {
+                        method: 'post',
+                        maxBodyLength: Infinity,
+                        url: `${apiConfig.basePath}/v3/sources/${currentTartgetSource.id}/upload-connector-file`,
+                        headers: {
+                            'Authorization': `Bearer ${await apiConfig.accessToken}`,
+                            ...data.getHeaders()
+                        },
+                        data: data
+                    };
+
+                    try {
+                        await axios.request(config);
+                    } catch (error) {
+                        await handleHttpException(error);
                     }
                 }
             }
-
-            // Second pass: Process schemas with references
-            for (const localSchemaFile of schemaFilesToProcessLater) {
-                const res = await processSchema(sourcesApi, localSource, currentTartgetSource, localSchemaFile, schemaReferences);
-                //If there was a schema created, it will return it here to update schema refs
-                if (res) {
-                    schemaReferences[res.name] = res;
-                }
-            }
+        } else {
+            winston.warn(clc.yellow("Connector dependency file upload set to be skipped"));
         }
 
         //Restore attributes from the currently deployed target source into our template source
@@ -517,7 +569,7 @@ const processSchema = async (api, localSource, currentTartgetSource, localSchema
 }
 
 
-const migrateSources = async (apiConfig) => {
+const migrateSources = async (apiConfig, skipConnectorLib) => {
     winston.info(clc.bgBlueBright("Starting Source Deployment"));
     //Only read one directory down where main source files are
     const sourceFilePaths = walk("./build/config/SOURCE", 1);
@@ -525,7 +577,7 @@ const migrateSources = async (apiConfig) => {
     //Iterate each source and pass it to migrateSource
     for (const sourceFilePath of sourceFilePaths) {
         const source = fs.readFileSync(sourceFilePath);
-        await migrateSource(apiConfig, source);
+        await migrateSource(apiConfig, source, skipConnectorLib);
     }
     winston.info(clc.bgGreen("Completed Source Deployment"));
 }

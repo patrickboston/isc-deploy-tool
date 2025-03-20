@@ -50,7 +50,7 @@ const updateBranding = async (apiConfig, targetEnvName) => {
             }
 
             if (!currentTargetBrandingConfig) {
-                winston.info(clc.bgBlueBright(`Creating new branding config for: ${localBrandingConfig.name}`));
+                winston.info(`Creating new branding config for: ${localBrandingConfig.name}`);
                 try {
                     const createBrandingConfigResponse = await brandingApi.createBrandingItem({
                         name: localBrandingConfig.name,
