@@ -15,6 +15,9 @@ export default {
         ],
         GLOBAL: ["$.id", "$.created", "$.modified"],
         GOVERNANCE_GROUP: ["$.owner.id"],
+        IDENTITY_OBJECT_CONFIG: [
+            "$[?(@.name == 'manager')]"
+        ],
         IDENTITY_PROFILE: [
             "$.self.id",
             "$.object.id",
