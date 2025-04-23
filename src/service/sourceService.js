@@ -269,6 +269,9 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                 if (connectorResponse.data.length === 1) {
                     const connectorTypeId = connectorResponse.data[0].type;
                     _.set(localSource, "connector", connectorTypeId);
+                } else if (connectorResponse.data.length === 0) {
+                    winston.error(`Could not find connector type via GET /beta/connectors for custom SaaS source type [${connectorName}]`);
+                    process.exit(1);
                 }
             }
         }
