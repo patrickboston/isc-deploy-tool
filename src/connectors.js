@@ -85,15 +85,4 @@ const buildAndDeployConnectors = async (apiConfig) => {
     };
 }
 
-/*TODO: When deploying a SaaS source, follow these rules:
- * New source is deployed with attribute "connector" like so: connector: "7a74eb93-bff6-4c70-80c1-9d800ac793cd" 
- * the value is the ID of the tag that the source is going to reference via the GET /platform-connectors/:connectorId/tags endpoint
- * All the other attributes related to the connector then reference the same value (i.e. connectorId, connectorImplementationId, etc.)
- * 
- * The challenge here is that the connector value will be different per value, unless it also works with the name which i need to test
- * 
- * spConnectorInstanceId is the only attribute that is not the tag id but it generated when the source is created, so we just need to
- * make sure this is one that we retain during deployment if the source already exists
-*/
-
 export { buildAndDeployConnectors };

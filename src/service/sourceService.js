@@ -2,7 +2,7 @@ import clc from "cli-color";
 import * as fs from "fs";
 import axios from "axios";
 import _ from 'lodash';
-import { Configuration, Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
+import { Configuration, ConnectorsBetaApi, Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
 import { getAllClusters } from "./clusterService.js";
@@ -17,7 +17,21 @@ const PROVISIONING_POLICY = "PROVISIONING_POLICY";
 const ATTR_SYNC_SOURCE_CONFIG = "ATTR_SYNC_SOURCE_CONFIG";
 const CORRELATION_CONFIG = "CORRELATION_CONFIG";
 const existingAttributeToKeep = [
-    "id", "authoritative", "connectorAttributes.cloudExternalId", "passwordPolicies", "connectorAttributes.healthy", "healthy", "connectorAttributes.slpt-source-diagnostics"
+    "id",
+    "authoritative",
+    "connectorAttributes.cloudExternalId",
+    "passwordPolicies",
+    "connectorAttributes.healthy",
+    "healthy",
+    "connectorAttributes.slpt-source-diagnostics",
+    //These are were added for custom SaaS connector deployment support
+    "type",
+    "connector",
+    "connectorId",
+    "connectorImplementationId",
+    "connectorAttributes.spConnectorSpecId",
+    "connectorAttributes.spConnectorInstanceId",
+    "connectorAttributes.spConnectorInstanceName",
 ];
 const ruleReferenceNames = [
     "accountCorrelationRule", "managerCorrelationRule", "beforeProvisioningRule"
@@ -136,6 +150,8 @@ const exportSources = async (apiConfig) => {
 const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const betaSourcesApi = new SourcesBetaApi(apiConfig);
+    const connectorsApi = new ConnectorsBetaApi(apiConfig);
+
     let localSource = JSON.parse(sourceJson);
     let saasSourceConnectorAttributesCopy;
     let saasClusterCopy;
@@ -214,6 +230,47 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
         if (isSaaS) {
             if (localSource.cluster) _.unset(localSource, "cluster");
             if (localSource.connectorAttributes) _.unset(localSource, "connectorAttributes");
+
+            /* When deploying a custom SaaS source, follow these rules:
+            * New source is deployed with attribute "connector" like so: connector: "7a74eb93-bff6-4c70-80c1-9d800ac793cd" 
+            * the value is the 'type' in the connector entry via the GET /beta/connectors endpoint
+            * All the other attributes related to the connector then reference the same value (i.e. connectorId, connectorImplementationId, etc.)
+            * These are not omitted on export, but are  retained on import if source exists already
+            * 
+            * 
+            * Here is the payload required for create:
+            *  {
+                    "name": "asaas",
+                    "description": "asaas",
+                    "connector": "7a74eb93-bff6-4c70-80c1-9d800ac793cd",
+                    "owner": {
+                        "id": "87b682d779e2419cb1875b759b7fc2af",
+                        "name": "pboston.pboston",
+                        "type": "IDENTITY"
+                    }
+                }
+            * 
+            * spConnectorInstanceId is the only attribute that is not the connector id from above, so that will be omitted on export
+            * and retained during import as well.
+            */
+
+            /*
+            * If this is SaaS, we need to check and see if it is a custom connector by checking 
+            * the connector id, if it is a guid and not a friendly name like 'oktasaas', we assume custom
+            * I can't find a better indicator at the moment. This only needs to happen on create, if it
+            * already exists we will just retain the current values for custom saas connectors
+            */
+            const customConnectorIdRegex = /^[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12}$/;
+            if (customConnectorIdRegex.test(localSource.connector)) {
+                const connectorResponse = await connectorsApi.getConnectorList({
+                    limit: 1,
+                    filters: `name sw "${localSource.connectorName}"` //Endpoint only supports sw, not eq
+                })
+                if (connectorResponse.data.length === 1) {
+                    const connectorTypeId = connectorResponse.data[0].type;
+                    _.set(localSource, "connector", connectorTypeId);
+                }
+            }
         }
 
         winston.info(`Creating new source: ${localSource.name}`);
