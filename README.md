@@ -201,7 +201,7 @@ Below is a reference for all arguments for the commands above
 ```
 
 ## Custom SaaS Connectors
-ODT supports compiling and deploy custom TypeScript SaaS connectors per [SailPoint's SaaS connector framework](https://developer.sailpoint.com/docs/connectivity/saas-connectivity). The presence of a TypeScript/NodeJS project inside of the `./connectors` directory within your ODT repository will automatically include it for compilation and deployment. Source deployments are also automated to lookup the connector deployed and referenced it when possible.
+ODT supports compiling and deploying custom TypeScript SaaS connectors per [SailPoint's SaaS connector framework](https://developer.sailpoint.com/docs/connectivity/saas-connectivity). The presence of a TypeScript/NodeJS project inside of the `./connectors` directory within your ODT repository will automatically include it for compilation and deployment. Source deployments are also automated to lookup the connector deployed and referenced it when possible.
 
 
 ## Configuration Object Guidelines/Considerations
