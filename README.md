@@ -14,7 +14,9 @@ The following object types are currently supported for export/deploy:
 - CLOUD_RULE (already approved and deployed by SailPoint)
 - CONNECTOR_RULE
 - TRANSFORM
-- SOURCE (includes correlation config, schemas, provisioning policies, and referenced connector libraries (i.e. JDBC JAR files). **Does not include password policy references**)
+- SOURCE
+  - Includes correlation config, schemas, provisioning policies, and referenced connector libraries (i.e. JDBC JAR files). **Does not include password policy references**
+  - Custom SaaS connectors can also be compiled for custom SaaS sources
 - SERVICE_DESK_INTEGRATION
 - IDENTITY_OBJECT_CONFIG
 - IDENTITY_PROFILE (includes lifecycle states tied to the identity profile. **Does not include security settings**)
@@ -26,7 +28,6 @@ The following object types are currently supported for export/deploy:
 - BRANDING_CONFIG
 - PASSWORD_POLICY
 - PASSWORD_INSTRUCTION (custom UI instructions for self-service password reset, etc.)
-
 
 
 ## Setup/Configuration Files
@@ -100,8 +101,9 @@ Below outlines the project structure for an ISC ODT project:
  ┣ 📂assets - Contains images for branding
  ┣ 📂build - Contains built/tokenized config objects as a result of the build or deploy command
  ┣ 📂config - Contains all config objects you want to manage with this process. Populated by the export command
- ┣ 📂connectorLib - Contains 
+ ┣ 📂connectorLib - Contains connector dependencies (primarily JDBC jars, but could support other dependencies)
  ┃ ┗ 📜mysql-connector-j-8.3.0.jar - Example JAR file for a JDBC connector
+ ┣ 📂connectors - Contains any custom SaaS connectors you wish to compile and deploy
  ┣ 📜.gitignore - Default gitignore
  ┣ 📜example.env.js - Example env.js file for connecting to a tenant. Should be copied and renamed i.e. sb.env.js
  ┣ 📜example.target.js - Example target.js file for connecting to a tenant. Should be copied and renamed i.e. sb.target.js
@@ -197,6 +199,9 @@ Below is a reference for all arguments for the commands above
 - log_level=<level> - Sets winston log level
 - skip_connector_lib - Allows you to skip connector file upload if arg is present
 ```
+
+## Custom SaaS Connectors
+ODT supports compiling and deploying custom TypeScript SaaS connectors per [SailPoint's SaaS connector framework](https://developer.sailpoint.com/docs/connectivity/saas-connectivity). The presence of a TypeScript/NodeJS project inside of the `./connectors` directory within your ODT repository will automatically include it for compilation and deployment. Source deployments are also automated to lookup the connector deployed and referenced it when possible.
 
 
 ## Configuration Object Guidelines/Considerations

@@ -18,6 +18,7 @@ import { exportSources, migrateSources } from "./service/sourceService.js";
 import { exportTransforms, migrateTransforms } from "./service/transformService.js";
 import { exportWorkflows, migrateWorkflows } from "./service/workflowService.js";
 import { buildObjectsForEnvironment, reverseTokenize } from "./util.js";
+import { buildAndDeployConnectors } from "./connectors.js";
 
 const start = Date.now();
 
@@ -211,6 +212,9 @@ if (isDeploy) {
             process.exit(1);
         }
     }
+
+    //Deploy SaaS Connectors
+    await buildAndDeployConnectors(globalApiConfiguration);
 
     //Perform tokenization
     await buildObjectsForEnvironment(targetEnvName);

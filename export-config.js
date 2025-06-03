@@ -58,6 +58,8 @@ export default {
             "$.connectorAttributes.accountDeltaToken",
             "$.connectorAttributes.groupMembershipDeltaToken",
             "$.connectorAttributes.subscribedSkus",
+            "$.connectorAttributes.spConnectorInstanceId",
+            "$.connectorAttributes.spConnectorSpecId",
             "$.status",
             "$.since",
             "$.healthy",
