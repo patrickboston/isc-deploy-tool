@@ -118,6 +118,12 @@ const omitPropertiesFromObject = (objectType, object) => {
             _.unset(object, correctPointer);
         }
     }
+    // lodash replaces elements at array indexes with 'null'
+    // compact removes these
+    // e.g. IDENTITY_OBJECT_CONFIG
+    if (Array.isArray(object)) {
+        object = _.compact(object);
+    }
     return object;
 }
 
