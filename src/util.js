@@ -29,7 +29,7 @@ const handleHttpException = async (e) => {
             winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
         }
     } else {
-        winston.error(clc.red(`Generic while executing request: ${e.message}\n${e.stack}`));
+        winston.error(clc.red(`Generic error while executing request: ${e.message}\n${e.stack}`));
     }
     process.exit(1);
 }
