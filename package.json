@@ -19,7 +19,7 @@
     "jsonpath": "^1.1.1",
     "jsonpath-plus": "^10.2.0",
     "lodash": "^4.17.21",
-    "sailpoint-api-client": "1.4.11",
+    "sailpoint-api-client": "1.6.8",
     "typescript": "^5.5.2",
     "winston": "^3.13.0"
   },
