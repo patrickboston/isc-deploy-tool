@@ -94,7 +94,7 @@ const exportSources = async (apiConfig) => {
 
         //Get and write referenced correlation config on source (non-sdk at the moment)
         const sourceCorrelationConfigResponse = await sourcesApiBeta.getCorrelationConfig({
-            id: source.id
+            sourceId: source.id
         });
 
         const sourceCorrelationConfig = sourceCorrelationConfigResponse.data;
