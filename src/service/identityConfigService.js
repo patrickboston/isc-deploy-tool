@@ -346,8 +346,6 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                         accountAction.excludeSourceIds = excludeSourceIds;
                     }
                 }
-                //localLifecycleState.accountActions = actions;
-                winston.info(JSON.stringify(localLifecycleState,null,4));
             }
 
             let existsInTarget = false;
