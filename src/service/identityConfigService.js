@@ -58,12 +58,23 @@ const exportIdentityProfiles = async (apiConfig) => {
             for (let lifecycleState of lifecycleStatesResponse.data) {
                 if (lifecycleState.accountActions) {
                     for (let accountAction of lifecycleState.accountActions) {
-                        let sourceNames = [];
-                        for (const sourceId of accountAction.sourceIds) {
-                            const source = await getSourceById(apiConfig, sourceId);
-                            sourceNames.push(source.name);
+                        let includeSourceNames = [];
+                        if (accountAction.sourceIds) {
+                            for (const sourceId of accountAction.sourceIds) {
+                                const source = await getSourceById(apiConfig, sourceId);
+                                includeSourceNames.push(source.name);
+                            }
+                            accountAction.sourceIds = includeSourceNames;
                         }
-                        accountAction.sourceIds = sourceNames;
+
+                        let excludeSourceNames = [];
+                        if (accountAction.excludeSourceIds) {
+                            for (const sourceId of accountAction.excludeSourceIds) {
+                                const source = await getSourceById(apiConfig, sourceId);
+                                excludeSourceNames.push(source.name);
+                            }
+                            accountAction.excludeSourceIds = excludeSourceNames;
+                        }
                     }
                 }
 
