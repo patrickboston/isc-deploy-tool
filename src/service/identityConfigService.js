@@ -323,36 +323,31 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                 localLifecycleState.accessProfileIds = accessProfileIds;
             }
 
-            let enableSourceIds = [];
-            let disableSourceIds = [];
+            
             if (localLifecycleState.accountActions && localLifecycleState.accountActions.length > 0) {
-                let actions = [];
                 for (const accountAction of localLifecycleState.accountActions) {
-                    if (accountAction.action === "ENABLE") {
+                    //Include Sources
+                    if (accountAction.sourceIds) {
+                        let includeSourceIds = [];
                         for (const sourceName of accountAction.sourceIds) {
                             const targetSource = await getSourceByName(apiConfig, sourceName);
-                            enableSourceIds.push(targetSource.id);
+                            includeSourceIds.push(targetSource.id);
                         }
-                        actions.push(
-                            {
-                                "action": "ENABLE",
-                                "sourceIds": enableSourceIds
-                            }
-                        )
-                    } else if (accountAction.action === "DISABLE") {
-                        for (const sourceName of accountAction.sourceIds) {
+                        accountAction.sourceIds = includeSourceIds;
+                    }
+
+                    //Exclude Sources
+                    if (accountAction.excludeSourceIds) {
+                        let excludeSourceIds = [];
+                        for (const sourceName of accountAction.excludeSourceIds) {
                             const targetSource = await getSourceByName(apiConfig, sourceName);
-                            disableSourceIds.push(targetSource.id);
+                            excludeSourceIds.push(targetSource.id);
                         }
-                        actions.push(
-                            {
-                                "action": "DISABLE",
-                                "sourceIds": disableSourceIds
-                            }
-                        )
+                        accountAction.excludeSourceIds = excludeSourceIds;
                     }
                 }
-                localLifecycleState.accountActions = actions;
+                //localLifecycleState.accountActions = actions;
+                winston.info(JSON.stringify(localLifecycleState,null,4));
             }
 
             let existsInTarget = false;
@@ -406,32 +401,13 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                             )
                         }
 
-                        if (enableSourceIds.length > 0 || disableSourceIds.length > 0) {
-                            let accountOperations = [];
-                            if (enableSourceIds.length > 0) {
-                                accountOperations.push(
-                                    {
-                                        "action": "ENABLE",
-                                        "sourceIds": enableSourceIds
-                                    }
-                                )
+                        patchOperations.push(
+                            {
+                                op: "replace",
+                                path: "/accountActions",
+                                value: localLifecycleState.accountActions
                             }
-                            if (disableSourceIds.length > 0) {
-                                accountOperations.push(
-                                    {
-                                        "action": "DISABLE",
-                                        "sourceIds": disableSourceIds
-                                    }
-                                )
-                            }
-                            patchOperations.push(
-                                {
-                                    op: "replace",
-                                    path: "/accountActions",
-                                    value: accountOperations
-                                }
-                            );
-                        }
+                        );
 
                         //Update lifecycle state
                         try {
