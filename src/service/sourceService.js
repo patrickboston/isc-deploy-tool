@@ -94,7 +94,7 @@ const exportSources = async (apiConfig) => {
 
         //Get and write referenced correlation config on source (non-sdk at the moment)
         const sourceCorrelationConfigResponse = await sourcesApiBeta.getCorrelationConfig({
-            id: source.id
+            sourceId: source.id
         });
 
         const sourceCorrelationConfig = sourceCorrelationConfigResponse.data;
@@ -318,7 +318,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
             winston.info(`Updating source correlation configuration`);
             try {
                 const sourceCorrelationConfigResponse = await betaSourcesApi.putCorrelationConfig({
-                    id: currentTargetSource.id,
+                    sourceId: currentTargetSource.id,
                     correlationConfigBeta: correlationConfigCopy
                 });
 

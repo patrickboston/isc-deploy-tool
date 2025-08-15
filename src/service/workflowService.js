@@ -145,18 +145,20 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
     await replaceKeyValues(localWorkflow, "formDefinitionId", fetchFormIdReplacement, apiConfig);
 
     //Handle form submitted trigger type name/id replacement
-    if (localWorkflow.trigger.attributes.id === "sp:form-submitted") {
-        let filterString = localWorkflow.trigger.attributes["filter.$"];
-        //Regular expression to match the workflow id between the two single quotes
-        const betweenQuotesRegex = /'([^']*)'/;
-        const match = filterString.match(betweenQuotesRegex);
+    if (localWorkflow.trigger && localWorkflow.trigger.attributes) {
+        if (localWorkflow.trigger.attributes.id === "sp:form-submitted") {
+            let filterString = localWorkflow.trigger.attributes["filter.$"];
+            //Regular expression to match the workflow id between the two single quotes
+            const betweenQuotesRegex = /'([^']*)'/;
+            const match = filterString.match(betweenQuotesRegex);
 
-        if (match) {
-            //Because this is the local version, should be a name reference
-            const formName = match[1];
-            const form = await getFormByName(apiConfig, formName);
-            filterString = filterString.replace(formName, form.id);
-            localWorkflow.trigger.attributes["filter.$"] = filterString;
+            if (match) {
+                //Because this is the local version, should be a name reference
+                const formName = match[1];
+                const form = await getFormByName(apiConfig, formName);
+                filterString = filterString.replace(formName, form.id);
+                localWorkflow.trigger.attributes["filter.$"] = filterString;
+            }
         }
     }
 
@@ -177,7 +179,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
             currentTargetWorkflow = createWorkflowResponse.data;
 
             //After initial create, if this is an interactive process trigger, we need to update the filter with the new workflow id
-            if (localWorkflow.trigger.attributes.id === "idn:interactive-process-launched") {
+            if (localWorkflow.trigger && localWorkflow.trigger.attributes.id === "idn:interactive-process-launched") {
                 const newFilterValue = localWorkflow.trigger.attributes["filter.$"].replace(localWorkflow.name, currentTargetWorkflow.id);
                 //Patch workflow to update the filter
                 try {
@@ -218,7 +220,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
             }
 
             //If external trigger, need to update the URL to use the version with the ID
-            if (localWorkflow.trigger.type === "EXTERNAL" && localWorkflow.trigger.attributes.url) {
+            if (localWorkflow.trigger && localWorkflow.trigger.type === "EXTERNAL" && localWorkflow.trigger.attributes.url) {
                 //Use currently deployed URL
                 const newExternalUrl = localWorkflow.trigger.attributes.url.replace(localWorkflow.name, currentTargetWorkflow.id);
 
@@ -301,19 +303,19 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         }
 
         //If external trigger, need to update the URL to use the version with the ID
-        if (currentTargetWorkflow.trigger.type === "EXTERNAL" && currentTargetWorkflow.trigger.attributes.url) {
+        if (localWorkflow.trigger && currentTargetWorkflow.trigger.type === "EXTERNAL" && currentTargetWorkflow.trigger.attributes.url) {
             //Use currently deployed URL
             localWorkflow.trigger.attributes.url = currentTargetWorkflow.trigger.attributes.url;
         }
 
         //Interactive trigger needs the currently deployed trigger value which contains the workflow's id
-        if (localWorkflow.trigger.attributes.id === "idn:interactive-process-launched") {
+        if (localWorkflow.trigger && localWorkflow.trigger.attributes.id === "idn:interactive-process-launched") {
             localWorkflow.trigger.attributes["filter.$"] = currentTargetWorkflow.trigger.attributes["filter.$"];
         }
 
         //Update the workflow with all config, references, etc.
         try {
-            await workflowsApi.updateWorkflow({
+            await workflowsApi.putWorkflow({
                 id: localWorkflow.id,
                 workflowBodyBeta: localWorkflow
             });
