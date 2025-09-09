@@ -8,6 +8,7 @@ import {
     Paginator,
     SourcesApi,
     SourcesBetaApi,
+    SourcesV2025Api,
 } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
@@ -22,7 +23,7 @@ const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
 const ATTR_SYNC_SOURCE_CONFIG = "ATTR_SYNC_SOURCE_CONFIG";
 const CORRELATION_CONFIG = "CORRELATION_CONFIG";
-const SCHEDULE = "SCHEDULE";
+const AGGREGATION_SCHEDULE = "AGGREGATION_SCHEDULE";
 const existingAttributeToKeep = [
     "id",
     "authoritative",
@@ -107,6 +108,7 @@ const exportSources = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Source Export"));
     const sourcesApi = new SourcesApi(apiConfig);
     const sourcesApiBeta = new SourcesBetaApi(apiConfig);
+    const sourcesV2025Api = new SourcesV2025Api(apiConfig);
 
     const sources = await Paginator.paginate(
         sourcesApi,
@@ -195,6 +197,22 @@ const exportSources = async (apiConfig) => {
         }
 
         //Aggregation Schedule
+        const sourceSchedules = await sourcesV2025Api
+            .getSourceSchedules({ sourceId: source.id })
+            .catch((error) => {
+                handleHttpException(error);
+            });
+        for (const schedule of sourceSchedules.data) {
+            winston.info(
+                `Exporting schedule for source: ${sourceName} - ${schedule.type}`
+            );
+            writeConfigFile(
+                AGGREGATION_SCHEDULE,
+                schedule.type,
+                schedule,
+                `SOURCE/${sourceName}/${AGGREGATION_SCHEDULE}`
+            );
+        }
 
         //Update source owner to alias for lookup when migrating
         const owner = await getIdentityById(apiConfig, source.owner.id);
@@ -222,6 +240,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const betaSourcesApi = new SourcesBetaApi(apiConfig);
     const connectorsApi = new ConnectorsBetaApi(apiConfig);
+    const sourcesV2025Api = new SourcesV2025Api(apiConfig);
 
     let localSource = JSON.parse(sourceJson);
     let saasSourceConnectorAttributesCopy;
@@ -619,6 +638,76 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                     await betaSourcesApi.putSourceAttrSyncConfig({
                         id: currentTargetSource.id,
                         attrSyncSourceConfigBeta: attrSyncCopy,
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
+                }
+            }
+        }
+
+        //Aggregation schedule
+        const localScheduleFiles = walk(
+            `./build/config/SOURCE/${localSource.name}/${AGGREGATION_SCHEDULE}`
+        );
+        for (const localScheduleFile of localScheduleFiles) {
+            let scheduleCopy = JSON.parse(
+                fs.readFileSync(localScheduleFile, { encoding: "utf8" })
+            );
+            let createSchedule = true;
+
+            //Get all schedules from current target source
+            let currentTargetScheduleResponse;
+            currentTargetScheduleResponse = await sourcesV2025Api
+                .getSourceSchedules({
+                    sourceId: currentTargetSource.id,
+                })
+                .catch((error) => {
+                    handleHttpException(error);
+                });
+
+            if (currentTargetScheduleResponse) {
+                for (const currentSchedule of currentTargetScheduleResponse.data) {
+                    //Need to compare the types till we find a match
+                    if (currentSchedule.type === scheduleCopy.type) {
+                        //Update schedule
+                        winston.info(
+                            `Updating existing source schedule: ${localSource.name} - ${scheduleCopy.type}`
+                        );
+                        try {
+                            await sourcesV2025Api.updateSourceSchedule({
+                                sourceId: currentTargetSource.id,
+                                scheduleType: currentSchedule.type,
+                                jsonPatchOperationV2025: [
+                                    {
+                                        op: "replace",
+                                        path: "/cronExpression",
+                                        value: scheduleCopy.cronExpression,
+                                    },
+                                ],
+                            });
+                        } catch (error) {
+                            await handleHttpException(error);
+                        }
+
+                        //schedule exists already in target, set flag
+                        createSchedule = false;
+                        break;
+                    }
+                }
+            }
+
+            //Only create if it wasn't found in the target
+            if (createSchedule) {
+                winston.info(
+                    `Creating new source schedule: ${localSource.name} - ${scheduleCopy.type}`
+                );
+                try {
+                    await sourcesV2025Api.createSourceSchedule({
+                        sourceId: currentTargetSource.id,
+                        schedule1V2025: {
+                            type: scheduleCopy.type,
+                            cronExpression: scheduleCopy.cronExpression,
+                        },
                     });
                 } catch (error) {
                     await handleHttpException(error);
