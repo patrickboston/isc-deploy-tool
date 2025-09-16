@@ -32,6 +32,8 @@ const existingAttributeToKeep = [
     "connectorAttributes.spConnectorSpecId",
     "connectorAttributes.spConnectorInstanceId",
     "connectorAttributes.spConnectorInstanceName",
+    "connectorAttributes.status",
+    "status"
 ];
 const ruleReferenceNames = [
     "accountCorrelationRule", "managerCorrelationRule", "beforeProvisioningRule"
