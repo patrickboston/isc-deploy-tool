@@ -1,14 +1,21 @@
 import clc from "cli-color";
 import * as fs from "fs";
 import axios from "axios";
-import _ from 'lodash';
-import { Configuration, ConnectorsBetaApi, Paginator, SourcesApi, SourcesBetaApi } from "sailpoint-api-client";
+import _ from "lodash";
+import {
+    Configuration,
+    ConnectorsBetaApi,
+    Paginator,
+    SourcesApi,
+    SourcesBetaApi,
+    SourcesV2025Api,
+} from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
 import { getAllClusters } from "./clusterService.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 import { getAllRules } from "./ruleService.js";
-import { getAllPasswordPolicies } from "./passwordPolicyService.js"
+import { getAllPasswordPolicies } from "./passwordPolicyService.js";
 import path from "path";
 import FormData from "form-data";
 
@@ -16,6 +23,7 @@ const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
 const ATTR_SYNC_SOURCE_CONFIG = "ATTR_SYNC_SOURCE_CONFIG";
 const CORRELATION_CONFIG = "CORRELATION_CONFIG";
+const AGGREGATION_SCHEDULE = "AGGREGATION_SCHEDULE";
 const existingAttributeToKeep = [
     "id",
     "authoritative",
@@ -36,7 +44,9 @@ const existingAttributeToKeep = [
     "status"
 ];
 const ruleReferenceNames = [
-    "accountCorrelationRule", "managerCorrelationRule", "beforeProvisioningRule"
+    "accountCorrelationRule",
+    "managerCorrelationRule",
+    "beforeProvisioningRule",
 ];
 let sourceCache = {};
 
@@ -44,48 +54,70 @@ const getSourceByName = async (apiConfig, sourceName) => {
     if (sourceCache[sourceName]) return sourceCache[sourceName];
 
     const sourcesApi = new SourcesApi(apiConfig);
-    const currentSourceResponse = await sourcesApi.listSources({
-        filters: `name eq "${sourceName}"`,
-        limit: 1
-    }).catch(error => {
-        handleHttpException(error);
-    });
+    const currentSourceResponse = await sourcesApi
+        .listSources({
+            filters: `name eq "${sourceName}"`,
+            limit: 1,
+        })
+        .catch((error) => {
+            handleHttpException(error);
+        });
 
-    const currentTargetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
+    const currentTargetSource =
+        currentSourceResponse.data.length == 1
+            ? currentSourceResponse.data[0]
+            : null;
 
-    if (!currentTargetSource) throw new Error(`Could not find source by name [${sourceName}] in tenant: ${apiConfig.basePath}`);
+    if (!currentTargetSource)
+        throw new Error(
+            `Could not find source by name [${sourceName}] in tenant: ${apiConfig.basePath}`
+        );
     return currentTargetSource;
-}
+};
 
 const getSourceById = async (apiConfig, sourceId) => {
     if (sourceCache[sourceId]) return sourceCache[sourceId];
 
     const sourcesApi = new SourcesApi(apiConfig);
-    const currentSourceResponse = await sourcesApi.listSources({
-        filters: `id eq "${sourceId}"`,
-        limit: 1
-    }).catch(error => {
-        handleHttpException(error);
-    });
+    const currentSourceResponse = await sourcesApi
+        .listSources({
+            filters: `id eq "${sourceId}"`,
+            limit: 1,
+        })
+        .catch((error) => {
+            handleHttpException(error);
+        });
 
-    const currentTargetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
+    const currentTargetSource =
+        currentSourceResponse.data.length == 1
+            ? currentSourceResponse.data[0]
+            : null;
 
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
-    if (!currentTargetSource) throw new Error(`Could not find source by id [${sourceId}] in tenant: ${apiConfig.basePath}`);
+    if (!currentTargetSource)
+        throw new Error(
+            `Could not find source by id [${sourceId}] in tenant: ${apiConfig.basePath}`
+        );
     return currentTargetSource;
-}
+};
 
 /**
-* Gets all sources via v3/sources and write appropriate 
-* Source files and referenced objects
-* @param {Configuration} apiConfig
-*/
+ * Gets all sources via v3/sources and write appropriate
+ * Source files and referenced objects
+ * @param {Configuration} apiConfig
+ */
 const exportSources = async (apiConfig) => {
     winston.info(clc.bgBlueBright("Starting Source Export"));
     const sourcesApi = new SourcesApi(apiConfig);
     const sourcesApiBeta = new SourcesBetaApi(apiConfig);
+    const sourcesV2025Api = new SourcesV2025Api(apiConfig);
 
-    const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSources, undefined, 250).catch(error => {
+    const sources = await Paginator.paginate(
+        sourcesApi,
+        sourcesApi.listSources,
+        undefined,
+        250
+    ).catch((error) => {
         handleHttpException(error);
     });
     for (const source of sources.data) {
@@ -95,41 +127,93 @@ const exportSources = async (apiConfig) => {
         winston.info(`Exporting Source: ${source.name} (${source.id})`);
 
         //Get and write referenced correlation config on source (non-sdk at the moment)
-        const sourceCorrelationConfigResponse = await sourcesApiBeta.getCorrelationConfig({
-            sourceId: source.id
-        });
+        const sourceCorrelationConfigResponse =
+            await sourcesApiBeta.getCorrelationConfig({
+                sourceId: source.id,
+            });
 
         const sourceCorrelationConfig = sourceCorrelationConfigResponse.data;
         if (sourceCorrelationConfig && sourceCorrelationConfig.name) {
-            winston.info(`Exporting correlation config for source: ${sourceName}`);
-            writeConfigFile(CORRELATION_CONFIG, sourceCorrelationConfig.name, sourceCorrelationConfig, `SOURCE/${sourceName}/CORRELATION_CONFIG`);
+            winston.info(
+                `Exporting correlation config for source: ${sourceName}`
+            );
+            writeConfigFile(
+                CORRELATION_CONFIG,
+                sourceCorrelationConfig.name,
+                sourceCorrelationConfig,
+                `SOURCE/${sourceName}/CORRELATION_CONFIG`
+            );
         }
 
         //Get and write referenced schemas on source
-        const sourceSchemas = await sourcesApi.getSourceSchemas({ sourceId: source.id }).catch(error => {
-            handleHttpException(error);
-        });
+        const sourceSchemas = await sourcesApi
+            .getSourceSchemas({ sourceId: source.id })
+            .catch((error) => {
+                handleHttpException(error);
+            });
         for (const schema of sourceSchemas.data) {
-            winston.info(`Exporting schema for source: ${sourceName} - ${schema.name}`);
-            writeConfigFile(CONNECTOR_SCHEMA, schema.name, schema, `SOURCE/${sourceName}/CONNECTOR_SCHEMA`);
+            winston.info(
+                `Exporting schema for source: ${sourceName} - ${schema.name}`
+            );
+            writeConfigFile(
+                CONNECTOR_SCHEMA,
+                schema.name,
+                schema,
+                `SOURCE/${sourceName}/CONNECTOR_SCHEMA`
+            );
         }
 
         //Get and write referenced policies on source
-        const sourcePolicies = await sourcesApi.listProvisioningPolicies({ sourceId: source.id }).catch(error => {
-            handleHttpException(error);
-        });
+        const sourcePolicies = await sourcesApi
+            .listProvisioningPolicies({ sourceId: source.id })
+            .catch((error) => {
+                handleHttpException(error);
+            });
         for (const policy of sourcePolicies.data) {
             const policyFileName = policy.name + "_" + policy.usageType;
-            winston.info(`Exporting policy for source: ${sourceName} - ${policy.name} (${policy.usageType})`);
-            writeConfigFile(PROVISIONING_POLICY, policyFileName, policy, `SOURCE/${sourceName}/PROVISIONING_POLICY`);
+            winston.info(
+                `Exporting policy for source: ${sourceName} - ${policy.name} (${policy.usageType})`
+            );
+            writeConfigFile(
+                PROVISIONING_POLICY,
+                policyFileName,
+                policy,
+                `SOURCE/${sourceName}/PROVISIONING_POLICY`
+            );
         }
 
         //Attribute Sync Config
-        const attrSyncConfigResponse = await sourcesApiBeta.getSourceAttrSyncConfig({ id: source.id });
+        const attrSyncConfigResponse =
+            await sourcesApiBeta.getSourceAttrSyncConfig({ id: source.id });
         if (attrSyncConfigResponse.data) {
-            winston.info(`Exporting attribute sync config for source: ${sourceName}`);
+            winston.info(
+                `Exporting attribute sync config for source: ${sourceName}`
+            );
             const attrSyncFileName = sourceName + "_ATTR_SYNC";
-            writeConfigFile(ATTR_SYNC_SOURCE_CONFIG, attrSyncFileName, attrSyncConfigResponse.data, `SOURCE/${sourceName}/${ATTR_SYNC_SOURCE_CONFIG}`);
+            writeConfigFile(
+                ATTR_SYNC_SOURCE_CONFIG,
+                attrSyncFileName,
+                attrSyncConfigResponse.data,
+                `SOURCE/${sourceName}/${ATTR_SYNC_SOURCE_CONFIG}`
+            );
+        }
+
+        //Aggregation Schedule
+        const sourceSchedules = await sourcesV2025Api
+            .getSourceSchedules({ sourceId: source.id })
+            .catch((error) => {
+                handleHttpException(error);
+            });
+        for (const schedule of sourceSchedules.data) {
+            winston.info(
+                `Exporting schedule for source: ${sourceName} - ${schedule.type}`
+            );
+            writeConfigFile(
+                AGGREGATION_SCHEDULE,
+                schedule.type,
+                schedule,
+                `SOURCE/${sourceName}/${AGGREGATION_SCHEDULE}`
+            );
         }
 
         //Update source owner to alias for lookup when migrating
@@ -140,19 +224,25 @@ const exportSources = async (apiConfig) => {
         if (sourceClone.features) sourceClone.features.sort();
 
         //Write the actual source
-        writeConfigFile("SOURCE", sourceName, sourceClone, `SOURCE/${sourceName}`);
+        writeConfigFile(
+            "SOURCE",
+            sourceName,
+            sourceClone,
+            `SOURCE/${sourceName}`
+        );
     }
 };
 
 /**
-* Creates or updates a source in the target tenant
-* @param {Configuration} apiConfig  SailPoint API Config
-* @param {string} sourceJson        Raw JSON String of source to be deployed
-*/
+ * Creates or updates a source in the target tenant
+ * @param {Configuration} apiConfig  SailPoint API Config
+ * @param {string} sourceJson        Raw JSON String of source to be deployed
+ */
 const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const betaSourcesApi = new SourcesBetaApi(apiConfig);
     const connectorsApi = new ConnectorsBetaApi(apiConfig);
+    const sourcesV2025Api = new SourcesV2025Api(apiConfig);
 
     let localSource = JSON.parse(sourceJson);
     let saasSourceConnectorAttributesCopy;
@@ -172,25 +262,33 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
             const clusters = await getAllClusters(apiConfig);
             for (const cluster of clusters) {
                 if (localSource.cluster.name === cluster.name) {
-                    _.set(localSource, "cluster.id", cluster.id)
+                    _.set(localSource, "cluster.id", cluster.id);
                 }
             }
         }
     }
 
     //Get corresponding owner by name and add id
-    const owner = await getIdentityByAlias(apiConfig, _.get(localSource, "owner.name"));
+    const owner = await getIdentityByAlias(
+        apiConfig,
+        _.get(localSource, "owner.name")
+    );
     _.set(localSource, "owner.id", owner.id);
 
     //Check and see if a source with this name already exists in the target environment
-    const currentSourceResponse = await sourcesApi.listSources({
-        filters: `name eq "${localSource.name}"`,
-        limit: 1
-    }).catch(error => {
-        handleHttpException(error);
-    });
+    const currentSourceResponse = await sourcesApi
+        .listSources({
+            filters: `name eq "${localSource.name}"`,
+            limit: 1,
+        })
+        .catch((error) => {
+            handleHttpException(error);
+        });
 
-    let currentTargetSource = currentSourceResponse.data.length == 1 ? currentSourceResponse.data[0] : null;
+    let currentTargetSource =
+        currentSourceResponse.data.length == 1
+            ? currentSourceResponse.data[0]
+            : null;
 
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
     if (!currentTargetSource) {
@@ -224,14 +322,15 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
         /*
          * If this is a SaaS type source, we need to remove the cluster since we cannot
          * look up the id of it since the cluster is some backend proxy cluster for SaaS connectors
-         * 
+         *
          * We also need to remove the connectorAttributes. If you include them, you get back some generic
          * 500 internal fault, without them, it works. Perhaps some kind of lookup for the connectorImplementationId.
          * They will get added back after the update happens later on in this method
-        */
+         */
         if (isSaaS) {
             if (localSource.cluster) _.unset(localSource, "cluster");
-            if (localSource.connectorAttributes) _.unset(localSource, "connectorAttributes");
+            if (localSource.connectorAttributes)
+                _.unset(localSource, "connectorAttributes");
 
             /* When deploying a custom SaaS source, follow these rules:
             * New source is deployed with attribute "connector" like so: connector: "7a74eb93-bff6-4c70-80c1-9d800ac793cd" 
@@ -257,22 +356,25 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
             */
 
             /*
-            * If this is SaaS, we need to check and see if it is a custom connector by checking 
-            * the connector id, if it is a guid and not a friendly name like 'oktasaas', we assume custom
-            * I can't find a better indicator at the moment. This only needs to happen on create, if it
-            * already exists we will just retain the current values for custom saas connectors
-            */
-            const customConnectorIdRegex = /^[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12}$/;
+             * If this is SaaS, we need to check and see if it is a custom connector by checking
+             * the connector id, if it is a guid and not a friendly name like 'oktasaas', we assume custom
+             * I can't find a better indicator at the moment. This only needs to happen on create, if it
+             * already exists we will just retain the current values for custom saas connectors
+             */
+            const customConnectorIdRegex =
+                /^[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12}$/;
             if (customConnectorIdRegex.test(localSource.connector)) {
                 const connectorResponse = await connectorsApi.getConnectorList({
                     limit: 1,
-                    filters: `name sw "${localSource.connectorName}"` //Endpoint only supports sw, not eq
-                })
+                    filters: `name sw "${localSource.connectorName}"`, //Endpoint only supports sw, not eq
+                });
                 if (connectorResponse.data.length === 1) {
                     const connectorTypeId = connectorResponse.data[0].type;
                     _.set(localSource, "connector", connectorTypeId);
                 } else if (connectorResponse.data.length === 0) {
-                    winston.error(`Could not find connector type via GET /beta/connectors for custom SaaS source type [${connectorName}]`);
+                    winston.error(
+                        `Could not find connector type via GET /beta/connectors for custom SaaS source type [${connectorName}]`
+                    );
                     process.exit(1);
                 }
             }
@@ -284,7 +386,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
         try {
             const createSourceResponse = await sourcesApi.createSource({
                 source: localSource,
-                provisionAsCsv: csvSource
+                provisionAsCsv: csvSource,
             });
 
             currentTargetSource = createSourceResponse.data;
@@ -292,7 +394,9 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
             await handleHttpException(error);
         }
     } else {
-        winston.info(`Updating existing source: ${currentTargetSource.name} (${currentTargetSource.id})`)
+        winston.info(
+            `Updating existing source: ${currentTargetSource.name} (${currentTargetSource.id})`
+        );
     }
 
     //A source needs to exist to perform all the updates properly
@@ -304,37 +408,50 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
         }
 
         /*
-        * If this is a SaaS source, we need to inject the id of the proxy cluster that is currently set
-        * on the source since we cannot fetch it before hand, there is no endpoint to get this private
-        * backend cluster
-        */
+         * If this is a SaaS source, we need to inject the id of the proxy cluster that is currently set
+         * on the source since we cannot fetch it before hand, there is no endpoint to get this private
+         * backend cluster
+         */
         if (isSaaS && currentTargetSource.cluster) {
             _.set(localSource, "cluster.id", currentTargetSource.cluster.id);
         }
 
         //Correlation Config needs to be updated from target source if exists
-        const localCorrelationConfigFiles = walk(`./build/config/SOURCE/${localSource.name}/${CORRELATION_CONFIG}`);
+        const localCorrelationConfigFiles = walk(
+            `./build/config/SOURCE/${localSource.name}/${CORRELATION_CONFIG}`
+        );
         for (const localCorrelationConfigFile of localCorrelationConfigFiles) {
-            let correlationConfigCopy = JSON.parse(fs.readFileSync(localCorrelationConfigFile, { encoding: "utf8" }));
+            let correlationConfigCopy = JSON.parse(
+                fs.readFileSync(localCorrelationConfigFile, {
+                    encoding: "utf8",
+                })
+            );
 
             winston.info(`Updating source correlation configuration`);
             try {
-                const sourceCorrelationConfigResponse = await betaSourcesApi.putCorrelationConfig({
-                    sourceId: currentTargetSource.id,
-                    correlationConfigBeta: correlationConfigCopy
-                });
+                const sourceCorrelationConfigResponse =
+                    await betaSourcesApi.putCorrelationConfig({
+                        sourceId: currentTargetSource.id,
+                        correlationConfigBeta: correlationConfigCopy,
+                    });
 
                 sleep(1000);
 
-                const sourceCorrelationConfig = sourceCorrelationConfigResponse.data;
-                _.set(localSource, "accountCorrelationConfig.id", sourceCorrelationConfig.id);
+                const sourceCorrelationConfig =
+                    sourceCorrelationConfigResponse.data;
+                _.set(
+                    localSource,
+                    "accountCorrelationConfig.id",
+                    sourceCorrelationConfig.id
+                );
                 //localSource.accountCorrelationConfig.id = sourceCorrelationConfig.id;
             } catch (error) {
                 handleHttpException(error);
 
                 //Make sure we still update the correlation reference if there was a failure or else the source will fail to update
                 if (currentTargetSource.accountCorrelationConfig) {
-                    localSource.accountCorrelationConfig.id = currentTargetSource.accountCorrelationConfig.id;
+                    localSource.accountCorrelationConfig.id =
+                        currentTargetSource.accountCorrelationConfig.id;
                 }
             }
         }
@@ -378,17 +495,21 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
          * schema in the deployed target source. If found, update it with a PUT, if not found, create a new
          * schema. Also need to update the schema reference ID in the source itself as we update the referenced
          * schema object
-        */
-        const localSchemaFiles = walk(`./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`);
+         */
+        const localSchemaFiles = walk(
+            `./build/config/SOURCE/${localSource.name}/CONNECTOR_SCHEMA`
+        );
         if (localSchemaFiles) {
             let schemaFilesToProcessLater = [];
 
             // Get all schemas from current target source
-            let currentTargetSchemasResponse = await sourcesApi.getSourceSchemas({
-                sourceId: currentTargetSource.id,
-            }).catch(error => {
-                handleHttpException(error);
-            });
+            let currentTargetSchemasResponse = await sourcesApi
+                .getSourceSchemas({
+                    sourceId: currentTargetSource.id,
+                })
+                .catch((error) => {
+                    handleHttpException(error);
+                });
 
             let schemaReferences = {};
             if (currentTargetSchemasResponse.data) {
@@ -399,11 +520,22 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
 
             // First pass: Process schemas without references
             for (const localSchemaFile of localSchemaFiles) {
-                let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
-                if (schemaCopy.attributes && schemaCopy.attributes.some(attr => attr.schema)) {
+                let schemaCopy = JSON.parse(
+                    fs.readFileSync(localSchemaFile, { encoding: "utf8" })
+                );
+                if (
+                    schemaCopy.attributes &&
+                    schemaCopy.attributes.some((attr) => attr.schema)
+                ) {
                     schemaFilesToProcessLater.push(localSchemaFile);
                 } else {
-                    const res = await processSchema(sourcesApi, localSource, currentTargetSource, localSchemaFile, schemaReferences);
+                    const res = await processSchema(
+                        sourcesApi,
+                        localSource,
+                        currentTargetSource,
+                        localSchemaFile,
+                        schemaReferences
+                    );
                     //If there was a schema created, it will return it here to update schema refs
                     if (res) {
                         schemaReferences[res.name] = res;
@@ -413,7 +545,13 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
 
             // Second pass: Process schemas with references
             for (const localSchemaFile of schemaFilesToProcessLater) {
-                const res = await processSchema(sourcesApi, localSource, currentTargetSource, localSchemaFile, schemaReferences);
+                const res = await processSchema(
+                    sourcesApi,
+                    localSource,
+                    currentTargetSource,
+                    localSchemaFile,
+                    schemaReferences
+                );
                 //If there was a schema created, it will return it here to update schema refs
                 if (res) {
                     schemaReferences[res.name] = res;
@@ -422,30 +560,41 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
         }
 
         //Create/Update all Provisioning Policies
-        const localPolicyFiles = walk(`./build/config/SOURCE/${localSource.name}/PROVISIONING_POLICY`);
+        const localPolicyFiles = walk(
+            `./build/config/SOURCE/${localSource.name}/PROVISIONING_POLICY`
+        );
         for (const localPolicyFile of localPolicyFiles) {
-            let policyCopy = JSON.parse(fs.readFileSync(localPolicyFile, { encoding: "utf8" }));
+            let policyCopy = JSON.parse(
+                fs.readFileSync(localPolicyFile, { encoding: "utf8" })
+            );
             let createPolicy = true;
 
             //Get all policies from current target source
             let currentTargetPolicyResponse;
-            currentTargetPolicyResponse = await sourcesApi.listProvisioningPolicies({
-                sourceId: currentTargetSource.id,
-            }).catch(error => {
-                handleHttpException(error);
-            });
+            currentTargetPolicyResponse = await sourcesApi
+                .listProvisioningPolicies({
+                    sourceId: currentTargetSource.id,
+                })
+                .catch((error) => {
+                    handleHttpException(error);
+                });
 
             if (currentTargetPolicyResponse) {
                 for (const currentPolicy of currentTargetPolicyResponse.data) {
                     //Need to compare the names till we find a match
-                    if (currentPolicy.name === policyCopy.name && currentPolicy.usageType === policyCopy.usageType) {
+                    if (
+                        currentPolicy.name === policyCopy.name &&
+                        currentPolicy.usageType === policyCopy.usageType
+                    ) {
                         //Update policy itself
-                        winston.info(`Updating existing source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
+                        winston.info(
+                            `Updating existing source provisioning policy: ${localSource.name} - ${policyCopy.name}`
+                        );
                         try {
                             await sourcesApi.putProvisioningPolicy({
                                 sourceId: currentTargetSource.id,
                                 usageType: currentPolicy.usageType,
-                                provisioningPolicyDto: policyCopy
+                                provisioningPolicyDto: policyCopy,
                             });
                         } catch (error) {
                             await handleHttpException(error);
@@ -460,11 +609,13 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
 
             //Only create if it wasn't found in the target
             if (createPolicy) {
-                winston.info(`Creating new source provisioning policy: ${localSource.name} - ${policyCopy.name}`)
+                winston.info(
+                    `Creating new source provisioning policy: ${localSource.name} - ${policyCopy.name}`
+                );
                 try {
                     await sourcesApi.createProvisioningPolicy({
                         sourceId: currentTargetSource.id,
-                        provisioningPolicyDto: policyCopy
+                        provisioningPolicyDto: policyCopy,
                     });
                 } catch (error) {
                     await handleHttpException(error);
@@ -473,18 +624,92 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
         }
 
         //Attribute sync config
-        const localAttrSyncFiles = walk(`./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`);
+        const localAttrSyncFiles = walk(
+            `./build/config/SOURCE/${localSource.name}/${ATTR_SYNC_SOURCE_CONFIG}`
+        );
         for (const localAttrSyncFile of localAttrSyncFiles) {
-            let attrSyncCopy = JSON.parse(fs.readFileSync(localAttrSyncFile, { encoding: "utf8" }));
+            let attrSyncCopy = JSON.parse(
+                fs.readFileSync(localAttrSyncFile, { encoding: "utf8" })
+            );
             _.set(attrSyncCopy, "source.id", currentTargetSource.id);
 
-            //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail 
+            //Only attempt to deploy it if it has "attributes" (things checked off) or else it will fail
             if (attrSyncCopy.attributes && attrSyncCopy.attributes.length > 0) {
                 try {
-                    winston.info(`Updating source attribute sync config`)
+                    winston.info(`Updating source attribute sync config`);
                     await betaSourcesApi.putSourceAttrSyncConfig({
                         id: currentTargetSource.id,
-                        attrSyncSourceConfigBeta: attrSyncCopy
+                        attrSyncSourceConfigBeta: attrSyncCopy,
+                    });
+                } catch (error) {
+                    await handleHttpException(error);
+                }
+            }
+        }
+
+        //Aggregation schedule
+        const localScheduleFiles = walk(
+            `./build/config/SOURCE/${localSource.name}/${AGGREGATION_SCHEDULE}`
+        );
+        for (const localScheduleFile of localScheduleFiles) {
+            let scheduleCopy = JSON.parse(
+                fs.readFileSync(localScheduleFile, { encoding: "utf8" })
+            );
+            let createSchedule = true;
+
+            //Get all schedules from current target source
+            let currentTargetScheduleResponse;
+            currentTargetScheduleResponse = await sourcesV2025Api
+                .getSourceSchedules({
+                    sourceId: currentTargetSource.id,
+                })
+                .catch((error) => {
+                    handleHttpException(error);
+                });
+
+            if (currentTargetScheduleResponse) {
+                for (const currentSchedule of currentTargetScheduleResponse.data) {
+                    //Need to compare the types till we find a match
+                    if (currentSchedule.type === scheduleCopy.type) {
+                        //Update schedule
+                        winston.info(
+                            `Updating existing source schedule: ${localSource.name} - ${scheduleCopy.type}`
+                        );
+                        try {
+                            await sourcesV2025Api.updateSourceSchedule({
+                                sourceId: currentTargetSource.id,
+                                scheduleType: currentSchedule.type,
+                                jsonPatchOperationV2025: [
+                                    {
+                                        op: "replace",
+                                        path: "/cronExpression",
+                                        value: scheduleCopy.cronExpression,
+                                    },
+                                ],
+                            });
+                        } catch (error) {
+                            await handleHttpException(error);
+                        }
+
+                        //schedule exists already in target, set flag
+                        createSchedule = false;
+                        break;
+                    }
+                }
+            }
+
+            //Only create if it wasn't found in the target
+            if (createSchedule) {
+                winston.info(
+                    `Creating new source schedule: ${localSource.name} - ${scheduleCopy.type}`
+                );
+                try {
+                    await sourcesV2025Api.createSourceSchedule({
+                        sourceId: currentTargetSource.id,
+                        schedule1V2025: {
+                            type: scheduleCopy.type,
+                            cronExpression: scheduleCopy.cronExpression,
+                        },
                     });
                 } catch (error) {
                     await handleHttpException(error);
@@ -494,15 +719,20 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
 
         //Upload connector files. connector_files is a CSV of the referenced JAR files
         if (!skipConnectorLib) {
-            const connectorFiles = localSource.connectorAttributes.connector_files;
+            const connectorFiles =
+                localSource.connectorAttributes.connector_files;
             if (connectorFiles) {
                 const connectorFileList = connectorFiles.split(",");
                 for (const connectorFileName of connectorFileList) {
                     const relativeFilePath = `connectorLib/${connectorFileName}`;
-                    winston.info(`Uploading connector library file [${relativeFilePath}]`);
+                    winston.info(
+                        `Uploading connector library file [${relativeFilePath}]`
+                    );
 
                     if (!fs.existsSync(relativeFilePath)) {
-                        winston.error(`Could not find connector library dependency [${relativeFilePath}]. Put the file in the directory and try again`);
+                        winston.error(
+                            `Could not find connector library dependency [${relativeFilePath}]. Put the file in the directory and try again`
+                        );
                         process.exit(1);
                     }
 
@@ -517,17 +747,17 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                     */
 
                     let data = new FormData();
-                    data.append('file', fileStream);
+                    data.append("file", fileStream);
 
                     let config = {
-                        method: 'post',
+                        method: "post",
                         maxBodyLength: Infinity,
                         url: `${apiConfig.basePath}/v3/sources/${currentTargetSource.id}/upload-connector-file`,
                         headers: {
-                            'Authorization': `Bearer ${await apiConfig.accessToken}`,
-                            ...data.getHeaders()
+                            Authorization: `Bearer ${await apiConfig.accessToken}`,
+                            ...data.getHeaders(),
                         },
-                        data: data
+                        data: data,
                     };
 
                     try {
@@ -538,33 +768,50 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                 }
             }
         } else {
-            winston.warn(clc.yellow("Connector dependency file upload set to be skipped"));
+            winston.warn(
+                clc.yellow("Connector dependency file upload set to be skipped")
+            );
         }
 
         //Restore attributes from the currently deployed target source into our template source
         for (const sourceKey of existingAttributeToKeep) {
-            _.set(localSource, sourceKey, _.get(currentTargetSource, sourceKey));
+            _.set(
+                localSource,
+                sourceKey,
+                _.get(currentTargetSource, sourceKey)
+            );
         }
 
         //Update the source with all config, references, etc.
-        winston.info(`Updating existing source: ${currentTargetSource.name} (${currentTargetSource.id})`)
+        winston.info(
+            `Updating existing source: ${currentTargetSource.name} (${currentTargetSource.id})`
+        );
         winston.debug(JSON.stringify(localSource, null, 4));
         try {
             await sourcesApi.putSource({
                 id: currentTargetSource.id,
-                source: localSource
+                source: localSource,
             });
         } catch (error) {
             await handleHttpException(error);
         }
     } else {
-        winston.error(`Source [${localSource.name}] does not exist and did not get created properly in the target tenant. Schemas, policies, etc. cannot be processed`);
+        winston.error(
+            `Source [${localSource.name}] does not exist and did not get created properly in the target tenant. Schemas, policies, etc. cannot be processed`
+        );
     }
-}
+};
 
-
-const processSchema = async (api, localSource, currentTargetSource, localSchemaFile, schemaReferences) => {
-    let schemaCopy = JSON.parse(fs.readFileSync(localSchemaFile, { encoding: "utf8" }));
+const processSchema = async (
+    api,
+    localSource,
+    currentTargetSource,
+    localSchemaFile,
+    schemaReferences
+) => {
+    let schemaCopy = JSON.parse(
+        fs.readFileSync(localSchemaFile, { encoding: "utf8" })
+    );
     let createSchema = true;
 
     if (schemaReferences[schemaCopy.name]) {
@@ -575,19 +822,22 @@ const processSchema = async (api, localSource, currentTargetSource, localSchemaF
             for (let schemaAttribute of schemaCopy.attributes) {
                 if (schemaAttribute.schema) {
                     if (schemaReferences[schemaAttribute.schema.name]) {
-                        const refSchema = schemaReferences[schemaAttribute.schema.name];
+                        const refSchema =
+                            schemaReferences[schemaAttribute.schema.name];
                         schemaAttribute.schema.id = refSchema.id;
                     }
                 }
             }
         }
 
-        winston.info(`Updating existing source schema: ${localSource.name} - ${schemaCopy.name}`);
+        winston.info(
+            `Updating existing source schema: ${localSource.name} - ${schemaCopy.name}`
+        );
         try {
             await api.putSourceSchema({
                 schema: schemaCopy,
                 schemaId: currentSchema.id,
-                sourceId: currentTargetSource.id
+                sourceId: currentTargetSource.id,
             });
 
             if (localSource.schemas) {
@@ -605,17 +855,19 @@ const processSchema = async (api, localSource, currentTargetSource, localSchemaF
     }
 
     if (createSchema) {
-        winston.info(`Creating new source schema: ${localSource.name} - ${schemaCopy.name}`);
+        winston.info(
+            `Creating new source schema: ${localSource.name} - ${schemaCopy.name}`
+        );
         try {
             const createSchemaResponse = await api.createSourceSchema({
                 schema: schemaCopy,
-                sourceId: currentTargetSource.id
+                sourceId: currentTargetSource.id,
             });
 
             const schemaRef = {
                 type: CONNECTOR_SCHEMA,
                 name: schemaCopy.name,
-                id: createSchemaResponse.data.id
+                id: createSchemaResponse.data.id,
             };
 
             let currentSchemas = localSource.schemas;
@@ -628,8 +880,7 @@ const processSchema = async (api, localSource, currentTargetSource, localSchemaF
             await handleHttpException(error);
         }
     }
-}
-
+};
 
 const migrateSources = async (apiConfig, skipConnectorLib) => {
     winston.info(clc.bgBlueBright("Starting Source Deployment"));
@@ -642,9 +893,12 @@ const migrateSources = async (apiConfig, skipConnectorLib) => {
         await migrateSource(apiConfig, source, skipConnectorLib);
     }
     winston.info(clc.bgGreen("Completed Source Deployment"));
-}
-
-export {
-    exportSources, getSourceById, getSourceByName, migrateSource, migrateSources
 };
 
+export {
+    exportSources,
+    getSourceById,
+    getSourceByName,
+    migrateSource,
+    migrateSources,
+};
