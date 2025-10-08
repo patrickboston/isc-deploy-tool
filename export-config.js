@@ -69,6 +69,13 @@ export default {
             "$.healthy",
             "$.accountsFile",
         ],
+        MACHINE_MAPPING: [
+            "$.[*].transformDefinition.attributes.input.attributes.sourceId",
+            "$.[*].transformDefinition.attributes.sourceId"
+        ],
+        MACHINE_CLASSIFICATION: [
+            "$.sourceId"
+        ],
         WORKFLOW: ["$.modifiedBy", "$.creator", "$.owner.id"],
     },
 };

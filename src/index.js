@@ -113,7 +113,7 @@ if (BASE_URL && TOKEN_URL && CLIENT_ID && CLIENT_SECRET) {
         baseurl: BASE_URL,
         tokenUrl: TOKEN_URL,
         clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
+        clientSecret: CLIENT_SECRET
     });
     globalApiConfiguration.retriesConfig = globalRetryConfig;
 
@@ -122,7 +122,12 @@ if (BASE_URL && TOKEN_URL && CLIENT_ID && CLIENT_SECRET) {
         winston.error(clc.bgRed("FAILED: baseurl or tokenUrl provided does not contain .api. in the endpoint URI"));
         process.exit(1);
     }
+
+    //Need to set experimental to true to use some newer APIs and also need to add header since it's not documented in specs sometimes
+    globalApiConfiguration.experimental = true;
 }
+
+
 
 //Process input args
 srcEnvName = srcEnvName && srcEnvName.toLowerCase();
