@@ -15,7 +15,7 @@ The following object types are currently supported for export/deploy:
 - CONNECTOR_RULE
 - TRANSFORM
 - SOURCE
-  - Includes correlation config, schemas, provisioning policies, and referenced connector libraries (i.e. JDBC JAR files). **Does not include password policy references**
+  - Includes correlation config, schemas, provisioning policies, aggregation schedules, machine classification/mapping configs and referenced connector libraries (i.e. JDBC JAR files). **Does not include password policy references**
   - Custom SaaS connectors can also be compiled for custom SaaS sources
 - SERVICE_DESK_INTEGRATION
 - IDENTITY_OBJECT_CONFIG
