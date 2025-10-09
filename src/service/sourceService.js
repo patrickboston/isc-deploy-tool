@@ -24,6 +24,7 @@ import FormData from "form-data";
 const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
 const ATTR_SYNC_SOURCE_CONFIG = "ATTR_SYNC_SOURCE_CONFIG";
+const NATIVE_CHANGE_DETECTION = "NATIVE_CHANGE_DETECTION";
 const MACHINE_CLASSIFICATION = "MACHINE_CLASSIFICATION";
 const MACHINE_MAPPING = "MACHINE_MAPPING";
 const CORRELATION_CONFIG = "CORRELATION_CONFIG";
@@ -202,6 +203,14 @@ const exportSources = async (apiConfig) => {
                 attrSyncConfigResponse.data,
                 `SOURCE/${sourceName}/${ATTR_SYNC_SOURCE_CONFIG}`
             );
+        }
+
+        //Native Change Config
+        const nativeChangeConfigResponse = await sourcesApiBeta.getNativeChangeDetectionConfig({ sourceId: source.id });
+        if (nativeChangeConfigResponse.data) {
+            winston.info(`Exporting native change detection config for source: ${sourceName}`);
+            const nativeChangeFileName = `${sourceName}_${NATIVE_CHANGE_DETECTION}`;
+            writeConfigFile(NATIVE_CHANGE_DETECTION, nativeChangeFileName, nativeChangeConfigResponse.data, `SOURCE/${sourceName}/${NATIVE_CHANGE_DETECTION}`);
         }
 
         //Aggregation Schedule
@@ -692,6 +701,22 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                 } catch (error) {
                     await handleHttpException(error);
                 }
+            }
+        }
+
+        //Native change detection config
+        const localNativeChangeFiles = walk(`./build/config/SOURCE/${localSource.name}/${NATIVE_CHANGE_DETECTION}`);
+        for (const localNativeChangeFile of localNativeChangeFiles) {
+            let nativeChangeCopy = JSON.parse(fs.readFileSync(localNativeChangeFile, { encoding: "utf8" }));
+
+            try {
+                winston.info(`Updating source native change detection config`);
+                await betaSourcesApi.putNativeChangeDetectionConfig({
+                    sourceId: currentTargetSource.id,
+                    nativeChangeDetectionConfigBeta: nativeChangeCopy
+                });
+            } catch (error) {
+                await handleHttpException(error);
             }
         }
 
