@@ -833,7 +833,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                         handleHttpException(error);
                     });
                     let currentMappingSource = mappingSourceResponse.data.length == 1 ? mappingSourceResponse.data[0] : null;
-                    if (!currentMappingSource) throw new Error(`Cannot find source [${mappingSourceName}] for attribute mapping [${attributeMapping.identityAttributeName}] for Identity Profile [${localIdentityProfile.self.name}] in target environment`);
+                    if (!currentMappingSource) throw new Error(`Cannot find source [${mappingSourceName}] for attribute mapping [${mapping.target.attributeName}] for machine mapping on source [${localSource.name}] in target environment`);
 
                     //Update source ID reference
                     if (definitionType === "accountAttribute") {
