@@ -9,6 +9,8 @@ import {
     SourcesApi,
     SourcesBetaApi,
     SourcesV2025Api,
+    MachineClassificationConfigV2025Api,
+    MachineAccountMappingsV2025Api
 } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
@@ -22,6 +24,9 @@ import FormData from "form-data";
 const CONNECTOR_SCHEMA = "CONNECTOR_SCHEMA";
 const PROVISIONING_POLICY = "PROVISIONING_POLICY";
 const ATTR_SYNC_SOURCE_CONFIG = "ATTR_SYNC_SOURCE_CONFIG";
+const NATIVE_CHANGE_DETECTION = "NATIVE_CHANGE_DETECTION";
+const MACHINE_CLASSIFICATION = "MACHINE_CLASSIFICATION";
+const MACHINE_MAPPING = "MACHINE_MAPPING";
 const CORRELATION_CONFIG = "CORRELATION_CONFIG";
 const AGGREGATION_SCHEDULE = "AGGREGATION_SCHEDULE";
 const existingAttributeToKeep = [
@@ -111,6 +116,8 @@ const exportSources = async (apiConfig) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const sourcesApiBeta = new SourcesBetaApi(apiConfig);
     const sourcesV2025Api = new SourcesV2025Api(apiConfig);
+    const machineClassificationApi = new MachineClassificationConfigV2025Api(apiConfig);
+    const machineMappingApi = new MachineAccountMappingsV2025Api(apiConfig);
 
     const sources = await Paginator.paginate(
         sourcesApi,
@@ -198,6 +205,14 @@ const exportSources = async (apiConfig) => {
             );
         }
 
+        //Native Change Config
+        const nativeChangeConfigResponse = await sourcesApiBeta.getNativeChangeDetectionConfig({ sourceId: source.id });
+        if (nativeChangeConfigResponse.data) {
+            winston.info(`Exporting native change detection config for source: ${sourceName}`);
+            const nativeChangeFileName = `${sourceName}_${NATIVE_CHANGE_DETECTION}`;
+            writeConfigFile(NATIVE_CHANGE_DETECTION, nativeChangeFileName, nativeChangeConfigResponse.data, `SOURCE/${sourceName}/${NATIVE_CHANGE_DETECTION}`);
+        }
+
         //Aggregation Schedule
         const sourceSchedules = await sourcesV2025Api
             .getSourceSchedules({ sourceId: source.id })
@@ -214,6 +229,48 @@ const exportSources = async (apiConfig) => {
                 schedule,
                 `SOURCE/${sourceName}/${AGGREGATION_SCHEDULE}`
             );
+        }
+
+        //Machine classification config
+        //Bug in sdk, have to do this manually. machineClassificationApi.getMachineClassificationConfig({ id: source.id });
+        try {
+            const machineClassificationConfigResponse = await axios.request({
+                method: "get",
+                url: `${apiConfig.basePath}/v2025/sources/${source.id}/machine-classification-config`,
+                headers: {
+                    Authorization: `Bearer ${await apiConfig.accessToken}`,
+                    "X-SailPoint-Experimental": "true"
+                }
+            });
+
+            if (machineClassificationConfigResponse.data) {
+                winston.info(`Exporting machine classification config for source: ${sourceName}`);
+                const machineClassificationFileName = sourceName + "_MACHINE_CLASSIFICATION";
+                writeConfigFile(MACHINE_CLASSIFICATION, machineClassificationFileName, machineClassificationConfigResponse.data, `SOURCE/${sourceName}/${MACHINE_CLASSIFICATION}`);
+            }
+        } catch (error) {
+            await handleHttpException(error);
+        }
+
+
+        //Machine mapping config
+        try {
+            const machineMappingConfigResponse = await axios.request({
+                method: "get",
+                url: `${apiConfig.basePath}/v2025/sources/${source.id}/machine-account-mappings`,
+                headers: {
+                    Authorization: `Bearer ${await apiConfig.accessToken}`,
+                    "X-SailPoint-Experimental": "true"
+                }
+            });
+
+            if (machineMappingConfigResponse.data && machineMappingConfigResponse.data.length > 0) {
+                winston.info(`Exporting machine mapping config for source: ${sourceName}`);
+                const machineMappingFileName = sourceName + "_MACHINE_MAPPING";
+                writeConfigFile(MACHINE_MAPPING, machineMappingFileName, machineMappingConfigResponse.data, `SOURCE/${sourceName}/${MACHINE_MAPPING}`);
+            }
+        } catch (error) {
+            await handleHttpException(error);
         }
 
         //Update source owner to alias for lookup when migrating
@@ -647,6 +704,22 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
             }
         }
 
+        //Native change detection config
+        const localNativeChangeFiles = walk(`./build/config/SOURCE/${localSource.name}/${NATIVE_CHANGE_DETECTION}`);
+        for (const localNativeChangeFile of localNativeChangeFiles) {
+            let nativeChangeCopy = JSON.parse(fs.readFileSync(localNativeChangeFile, { encoding: "utf8" }));
+
+            try {
+                winston.info(`Updating source native change detection config`);
+                await betaSourcesApi.putNativeChangeDetectionConfig({
+                    sourceId: currentTargetSource.id,
+                    nativeChangeDetectionConfigBeta: nativeChangeCopy
+                });
+            } catch (error) {
+                await handleHttpException(error);
+            }
+        }
+
         //Aggregation schedule
         const localScheduleFiles = walk(
             `./build/config/SOURCE/${localSource.name}/${AGGREGATION_SCHEDULE}`
@@ -714,6 +787,75 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                 } catch (error) {
                     await handleHttpException(error);
                 }
+            }
+        }
+
+        //Machine classification config
+        winston.info(`Updating source machine classification config`);
+        const localMachineClassificationFiles = walk(`./build/config/SOURCE/${localSource.name}/${MACHINE_CLASSIFICATION}`);
+        for (const localMachineClassificationFile of localMachineClassificationFiles) {
+            let machineClassificationCopy = JSON.parse(fs.readFileSync(localMachineClassificationFile, { encoding: "utf8" }));
+            _.set(machineClassificationCopy, "sourceId", currentTargetSource.id);
+
+            try {
+                await axios.request({
+                    method: "put",
+                    url: `${apiConfig.basePath}/v2025/sources/${currentTargetSource.id}/machine-classification-config`,
+                    headers: {
+                        Authorization: `Bearer ${await apiConfig.accessToken}`,
+                        "X-SailPoint-Experimental": "true"
+                    },
+                    data: machineClassificationCopy
+                });
+            } catch (error) {
+                await handleHttpException(error);
+            }
+        }
+
+        //Machine mapping config
+        winston.info(`Updating source machine mapping config`);
+        const localMachineMappingFiles = walk(`./build/config/SOURCE/${localSource.name}/${MACHINE_MAPPING}`);
+        for (const localMachineMappingFile of localMachineMappingFiles) {
+            let machineMappingsCopy = JSON.parse(fs.readFileSync(localMachineMappingFile, { encoding: "utf8" }));
+
+            //Iterate each identity attribute mapping and update references
+            for (let mapping of machineMappingsCopy) {
+                let transformDefinition = mapping.transformDefinition;
+                const definitionType = transformDefinition.type;
+
+                if (definitionType === "accountAttribute" || definitionType === "reference") {
+                    //Looks for accountAttribute source first, if not truthy, assumes it's a transform reference and dives deeper for source reference
+                    const mappingSourceName = !!transformDefinition.attributes.sourceName ? transformDefinition.attributes.sourceName : transformDefinition.attributes.input.attributes.sourceName;
+                    const mappingSourceResponse = await sourcesApi.listSources({
+                        filters: `name eq "${mappingSourceName}"`,
+                        limit: 1
+                    }).catch(error => {
+                        handleHttpException(error);
+                    });
+                    let currentMappingSource = mappingSourceResponse.data.length == 1 ? mappingSourceResponse.data[0] : null;
+                    if (!currentMappingSource) throw new Error(`Cannot find source [${mappingSourceName}] for attribute mapping [${mapping.target.attributeName}] for machine mapping on source [${localSource.name}] in target environment`);
+
+                    //Update source ID reference
+                    if (definitionType === "accountAttribute") {
+                        mapping.transformDefinition.attributes.sourceId = currentMappingSource.id;
+                    } else if (definitionType === "reference") {
+                        mapping.transformDefinition.attributes.input.attributes.sourceId = currentMappingSource.id;
+                    }
+                }
+            }
+
+            try {
+                await axios.request({
+                    method: "put",
+                    url: `${apiConfig.basePath}/v2025/sources/${currentTargetSource.id}/machine-account-mappings`,
+                    headers: {
+                        Authorization: `Bearer ${await apiConfig.accessToken}`,
+                        "X-SailPoint-Experimental": "true"
+                    },
+                    data: machineMappingsCopy
+                });
+            } catch (error) {
+                await handleHttpException(error);
             }
         }
 
