@@ -76,6 +76,12 @@ export default {
         MACHINE_CLASSIFICATION: [
             "$.sourceId"
         ],
+        MACHINE_SUBTYPES: [
+            "$.[*].id",
+            "$.[*].created",
+            "$.[*].modified",
+            "$.[*].sourceId"
+        ],
         WORKFLOW: ["$.modifiedBy", "$.creator", "$.owner.id"],
     },
 };

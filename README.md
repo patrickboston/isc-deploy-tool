@@ -15,7 +15,7 @@ The following object types are currently supported for export/deploy:
 - CONNECTOR_RULE
 - TRANSFORM
 - SOURCE
-  - Includes correlation config, schemas, provisioning policies, aggregation schedules, native change detection, machine classification/mapping configs and referenced connector libraries (i.e. JDBC JAR files). **Does not include password policy references**
+  - Includes correlation config, schemas, provisioning policies, aggregation schedules, native change detection, machine classification/mapping/subtype configs and referenced connector libraries (i.e. JDBC JAR files). **Does not include password policy references**
   - Custom SaaS connectors can also be compiled for custom SaaS sources
 - SERVICE_DESK_INTEGRATION
 - IDENTITY_OBJECT_CONFIG
@@ -93,6 +93,8 @@ export default
         "IDENTITY_OBJECT_CONFIG:IDENTITY_OBJECT_CONFIG" //Doesn't have a name so we put the type twice
     ]
 ```
+- `tenant-features.js` - Holds entries for any special licensed features which may break export or deployment processes due to APIs not being available. The following entries are supported (with `true`/`false` values):
+  - machineIdentity - Machine Identity Security (MIS) feature support
 
 ## Project Structure
 Below outlines the project structure for an ISC ODT project:
