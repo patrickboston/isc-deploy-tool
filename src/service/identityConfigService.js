@@ -87,7 +87,7 @@ const exportIdentityProfiles = async (apiConfig) => {
                     lifecycleState.accessProfileIds = accessProfileNames;
                 }
 
-                writeConfigFile(LIFECYCLE_STATE, lifecycleState.name, lifecycleState, `IDENTITY_PROFILE/${profile.self.name}/LIFECYCLE_STATE`);
+                writeConfigFile(LIFECYCLE_STATE, lifecycleState.technicalName, lifecycleState, `IDENTITY_PROFILE/${profile.self.name}/LIFECYCLE_STATE`);
             }
         }
 
@@ -376,6 +376,21 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                                 op: "replace",
                                 path: "/identityState",
                                 value: localLifecycleState.identityState
+                            },
+                            {
+                                op: "replace",
+                                path: "/priority",
+                                value: localLifecycleState.priority
+                            },
+                            {
+                                op: "replace",
+                                path: "/accessActionConfiguration",
+                                value: localLifecycleState.accessActionConfiguration
+                            },
+                            {
+                                op: "replace",
+                                path: "/accountActions",
+                                value: localLifecycleState.accountActions
                             }
                         ];
 
@@ -399,17 +414,9 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                             )
                         }
 
-                        patchOperations.push(
-                            {
-                                op: "replace",
-                                path: "/accountActions",
-                                value: localLifecycleState.accountActions
-                            }
-                        );
-
                         //Update lifecycle state
                         try {
-                            winston.info(`Updating existing lifecycle state: ${currentTargetLifecycleState.name} (${currentTargetLifecycleState.id})`)
+                            winston.info(`Updating existing lifecycle state: ${currentTargetLifecycleState.technicalName} (${currentTargetLifecycleState.id})`)
                             await lifecycleStateApi.updateLifecycleStates({
                                 identityProfileId: currentTargetIdentityProfile.self.id,
                                 lifecycleStateId: currentTargetLifecycleState.id,
