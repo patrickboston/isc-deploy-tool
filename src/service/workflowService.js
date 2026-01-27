@@ -361,6 +361,6 @@ const migrateWorkflows = async (apiConfig) => {
 
 export {
     exportWorkflows, getWorkflowById, migrateWorkflow,
-    migrateWorkflows
+    migrateWorkflows, getWorkflowByName
 };
 
