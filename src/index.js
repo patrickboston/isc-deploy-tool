@@ -254,22 +254,22 @@ if (isExport && isDetokenize) {
         }
     }
 
-    // await exportOrgConfigs(globalApiConfiguration);
-    // await exportGovernanceGroups(globalApiConfiguration);
-    // await exportPasswordPolicies(globalApiConfiguration);
-    // await exportCloudRules(globalApiConfiguration);
-    // await exportConnectorRules(globalApiConfiguration);
-    // await exportTransforms(globalApiConfiguration);
-    // await exportSources(globalApiConfiguration);
-    // await exportServiceDeskIntegrations(globalApiConfiguration);
-    // await exportIdentityAttributeConfig(globalApiConfiguration);
-    // await exportIdentityProfiles(globalApiConfiguration);
-    // await exportAccessRequestConfig(globalApiConfiguration);
-    // await exportNotificationTemplates(globalApiConfiguration);
-    // await exportForms(globalApiConfiguration);
-    // await exportWorkflows(globalApiConfiguration);
-    // await exportBranding(globalApiConfiguration);
-    // await exportPasswordInstructions(globalApiConfiguration);
+    await exportOrgConfigs(globalApiConfiguration);
+    await exportGovernanceGroups(globalApiConfiguration);
+    await exportPasswordPolicies(globalApiConfiguration);
+    await exportCloudRules(globalApiConfiguration);
+    await exportConnectorRules(globalApiConfiguration);
+    await exportTransforms(globalApiConfiguration);
+    await exportSources(globalApiConfiguration);
+    await exportServiceDeskIntegrations(globalApiConfiguration);
+    await exportIdentityAttributeConfig(globalApiConfiguration);
+    await exportIdentityProfiles(globalApiConfiguration);
+    await exportAccessRequestConfig(globalApiConfiguration);
+    await exportNotificationTemplates(globalApiConfiguration);
+    await exportForms(globalApiConfiguration);
+    await exportWorkflows(globalApiConfiguration);
+    await exportBranding(globalApiConfiguration);
+    await exportPasswordInstructions(globalApiConfiguration);
     await exportAccessProfiles(globalApiConfiguration);
     await exportRoles(globalApiConfiguration);
 
@@ -331,22 +331,22 @@ if (isDeploy) {
      * 16. Access Profile
      * 17. Role
      */
-    // await migrateOrgConfigs(globalApiConfiguration, targetEnvName);
-    // await migrateGovernanceGroups(globalApiConfiguration);
-    // await migratePasswordPolicies(globalApiConfiguration);
-    // await migrateCloudRules(globalApiConfiguration);
-    // await migrateConnectorRules(globalApiConfiguration);
-    // await migrateTransforms(globalApiConfiguration);
-    // await migrateSources(globalApiConfiguration, isSkipConnectorLib);
-    // await migrateServiceDeskIntegrations(globalApiConfiguration);
-    // await migrateIdentityAttributeConfig(globalApiConfiguration);
-    // await migrateIdentityProfiles(globalApiConfiguration);
-    // await updateAccessRequestConfig(globalApiConfiguration);
-    // await migrateNotificationTemplates(globalApiConfiguration);
-    // await migrateForms(globalApiConfiguration);
-    // await migrateWorkflows(globalApiConfiguration);
-    // await updateBranding(globalApiConfiguration, targetEnvName);
-    // await migratePasswordInstructions(globalApiConfiguration, targetEnvName);
+    await migrateOrgConfigs(globalApiConfiguration, targetEnvName);
+    await migrateGovernanceGroups(globalApiConfiguration);
+    await migratePasswordPolicies(globalApiConfiguration);
+    await migrateCloudRules(globalApiConfiguration);
+    await migrateConnectorRules(globalApiConfiguration);
+    await migrateTransforms(globalApiConfiguration);
+    await migrateSources(globalApiConfiguration, isSkipConnectorLib);
+    await migrateServiceDeskIntegrations(globalApiConfiguration);
+    await migrateIdentityAttributeConfig(globalApiConfiguration);
+    await migrateIdentityProfiles(globalApiConfiguration);
+    await updateAccessRequestConfig(globalApiConfiguration);
+    await migrateNotificationTemplates(globalApiConfiguration);
+    await migrateForms(globalApiConfiguration);
+    await migrateWorkflows(globalApiConfiguration);
+    await updateBranding(globalApiConfiguration, targetEnvName);
+    await migratePasswordInstructions(globalApiConfiguration, targetEnvName);
     await migrateAccessProfiles(globalApiConfiguration);
     await migrateRoles(globalApiConfiguration);
 }
