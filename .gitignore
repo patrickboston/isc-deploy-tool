@@ -3,6 +3,7 @@ build/
 config/
 *.env.js
 *.secrets.js
+*.target.js
 
 # Logs
 logs

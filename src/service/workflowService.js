@@ -32,6 +32,27 @@ const getWorkflowById = async (apiConfig, workflowId) => {
     return workflowResponse.data;
 }
 
+// api doesn't support a filter so we have to do this very unoptimized and filter the list of all workflows in memory
+const getWorkflowByName = async (apiConfig, workflowName) => {
+    const workflowsApi = new WorkflowsApi(apiConfig);
+    const workflows = await Paginator.paginate(
+        workflowsApi,
+        workflowsApi.listWorkflows,
+        undefined,
+        250,
+    ).catch((error) => {
+        handleHttpException(error);
+    });
+    const workflow = workflows.data.filter(
+        (workflow) => workflow.name === workflowName,
+    );
+    if (!workflow[0])
+        throw new Error(
+            `Could not find workflow by name [${workflowName}] in tenant: ${apiConfig.basePath}`,
+        );
+    return workflow[0];
+};
+
 const fetchFormNameReplacement = async (currentValue, apiConfig) => {
     winston.info(`Fetching workflow form reference by id: ${currentValue}`);
     const form = await getFormById(apiConfig, currentValue);

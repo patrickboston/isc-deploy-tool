@@ -518,7 +518,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                         correlationConfigBeta: correlationConfigCopy,
                     });
 
-                sleep(1000);
+                await sleep(1000);
 
                 const sourceCorrelationConfig =
                     sourceCorrelationConfigResponse.data;
