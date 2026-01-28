@@ -371,4 +371,4 @@ const migrateWorkflows = async apiConfig => {
     winston.info(clc.bgGreen("Completed Workflow Deployment"));
 };
 
-export { exportWorkflows, getWorkflowById, migrateWorkflow, migrateWorkflows };
+export { exportWorkflows, getWorkflowById, migrateWorkflow, migrateWorkflows, getWorkflowByName };
