@@ -1,8 +1,8 @@
 import clc from "cli-color";
-import * as crypto from 'crypto';
+import * as crypto from "crypto";
 import * as fs from "fs";
 import { JSONPath } from "jsonpath-plus";
-import _ from 'lodash';
+import _ from "lodash";
 import { SPConfigBetaApi } from "sailpoint-api-client";
 import winston from "winston";
 import { default as exportConfig } from "../export-config.js";
@@ -10,32 +10,40 @@ import { default as exportIgnore } from "../export-ignore.js";
 import { default as reverseTokens } from "./../reverse.target.js";
 
 /**
-* Sleeps for the specified number of milliseconds
-* @param {number} ms Time to sleep for in milliseconds
-*/
-const sleep = (ms) => {
+ * Sleeps for the specified number of milliseconds
+ * @param {number} ms Time to sleep for in milliseconds
+ */
+const sleep = ms => {
     return new Promise(resolve => setTimeout(resolve, ms));
-}
+};
 
 /**
-* Helper function to handle all of our HTTP requests via the SailPoint SDK
-* @param {Error} e The error which was caught
-*/
-const handleHttpException = async (e) => {
+ * Helper function to handle all of our HTTP requests via the SailPoint SDK
+ * @param {Error} e The error which was caught
+ */
+const handleHttpException = async e => {
     if (e.response) {
         if (await isJson(e.config.data)) {
-            winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+            winston.error(
+                clc.red(
+                    `Error while executing request:\nPath: ${e.request.method} ${e.request.path}\n${JSON.stringify(JSON.parse(e.config.data), null, 4)}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`
+                )
+            );
         } else {
-            winston.error(clc.red(`Error while executing request:\nPath: ${e.request.method} ${e.request.path}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`));
+            winston.error(
+                clc.red(
+                    `Error while executing request:\nPath: ${e.request.method} ${e.request.path}\nStatus Code: ${e.response.status}\nResponse Data: ${JSON.stringify(e.response.data, null, 4)}`
+                )
+            );
         }
     } else {
         winston.error(clc.red(`Generic error while executing request: ${e.message}\n${e.stack}`));
     }
     process.exit(1);
-}
+};
 
-const isJson = async (input) => {
-    if (typeof input !== 'string') {
+const isJson = async input => {
+    if (typeof input !== "string") {
         return false; // Not JSON if it's not a string
     }
     try {
@@ -44,14 +52,14 @@ const isJson = async (input) => {
     } catch (e) {
         return false;
     }
-}
+};
 
 /**
-* Recursively iterates all files in a given directory and returns a list of their full paths
-* @param {string} dir The name of the directory to walk
-* @param {number} [maxDepth=-1] How many directories deep to look
-* @returns {Array} List of full file paths found
-*/
+ * Recursively iterates all files in a given directory and returns a list of their full paths
+ * @param {string} dir The name of the directory to walk
+ * @param {number} [maxDepth=-1] How many directories deep to look
+ * @returns {Array} List of full file paths found
+ */
 function walk(dir, maxDepth = -1, currentDepth = 0, files = []) {
     //Get an array of all files and directories in the passed directory using fs.readdirSync
     if (fs.existsSync(dir)) {
@@ -77,18 +85,37 @@ function walk(dir, maxDepth = -1, currentDepth = 0, files = []) {
 }
 
 //transformDefinition ignore key  is very specific to identity profile transform references using key 'id'
-function deepOmit(obj, keysToOmit = ["id", "created", "modified", "sourceId", "cloudExternalId", "cloudCacheUpdate", "since", "status", "healthy", "identityCount", "standardLogoURL"], keysToIgnore = ["transformDefinition"]) {
+function deepOmit(
+    obj,
+    keysToOmit = [
+        "id",
+        "created",
+        "modified",
+        "sourceId",
+        "cloudExternalId",
+        "cloudCacheUpdate",
+        "since",
+        "status",
+        "healthy",
+        "identityCount",
+        "standardLogoURL",
+    ],
+    keysToIgnore = ["transformDefinition"]
+) {
     let keysToOmitIndex = _.keyBy(Array.isArray(keysToOmit) ? keysToOmit : [keysToOmit]); // create an index object of the keys that should be omitted
 
-    function omitFromObject(obj) { //the inner function which will be called recursively
+    function omitFromObject(obj) {
+        //the inner function which will be called recursively
 
-        return _.transform(obj, function (result, value, key) { // transform to a new object
-            if (key in keysToOmitIndex) { //if the key is in the index skip it
+        return _.transform(obj, function (result, value, key) {
+            // transform to a new object
+            if (key in keysToOmitIndex) {
+                //if the key is in the index skip it
                 return;
             }
 
             result[key] = _.isObject(value) && !keysToIgnore.includes(key) ? omitFromObject(value) : value;
-        })
+        });
     }
     return omitFromObject(obj); //return the inner function result
 }
@@ -108,7 +135,7 @@ const omitPropertiesFromObject = (objectType, object) => {
         let results = JSONPath({
             path: prop,
             json: object,
-            resultType: "all"
+            resultType: "all",
         });
 
         //If we find a matching object via JSONPath, replace it with the reverse token
@@ -125,11 +152,11 @@ const omitPropertiesFromObject = (objectType, object) => {
         object = _.compact(object);
     }
     return object;
-}
+};
 
 /**
  * Asynchronously replaces values of a specified key in a nested object.
- * 
+ *
  * @param {object} obj - The object to traverse.
  * @param {string} targetKey - The key to find and replace values for.
  * @param {function} fetchReplacement - An async function that takes the current value and key and returns the replacement value.
@@ -147,48 +174,49 @@ const replaceKeyValues = async (obj, targetKey, fetchReplacement, apiConfig) => 
     }
 };
 
-
 /**
-* Encrypts a password locally with a public key that could be retrieved from
-* a Virtual Appliance cluster.
-*
-* @param {string} publicKey publicKey from the Virtual Appliance cluster, should not contain -----BEGIN PUBLIC KEY----- or -----END PUBLIC KEY-----, although will be stripped beforehand if it does exist
-* @param {string} toEncrypt Secret you want to encrypt
-*/
+ * Encrypts a password locally with a public key that could be retrieved from
+ * a Virtual Appliance cluster.
+ *
+ * @param {string} publicKey publicKey from the Virtual Appliance cluster, should not contain -----BEGIN PUBLIC KEY----- or -----END PUBLIC KEY-----, although will be stripped beforehand if it does exist
+ * @param {string} toEncrypt Secret you want to encrypt
+ */
 const encrypt = async (publicKey, toEncrypt) => {
     publicKey = publicKey.replace("-----BEGIN PUBLIC KEY-----", "");
     publicKey = publicKey.replace("-----END PUBLIC KEY-----", "");
 
-    const publicKeyBytes = Buffer.from(publicKey, 'base64');
-    const encryptedBytes = await encryptRsa(publicKeyBytes, Buffer.from(toEncrypt, 'utf-8'));
-    return encryptedBytes.toString('base64');
+    const publicKeyBytes = Buffer.from(publicKey, "base64");
+    const encryptedBytes = await encryptRsa(publicKeyBytes, Buffer.from(toEncrypt, "utf-8"));
+    return encryptedBytes.toString("base64");
 };
 
 const encryptRsa = async (publicKeyBytes, toEncryptBytes) => {
     const key = crypto.createPublicKey({
         key: publicKeyBytes,
-        format: 'der',
-        type: 'spki'
+        format: "der",
+        type: "spki",
     });
 
-    const encrypted = crypto.publicEncrypt({
-        key: key,
-        padding: crypto.constants.RSA_PKCS1_PADDING
-    }, toEncryptBytes);
+    const encrypted = crypto.publicEncrypt(
+        {
+            key: key,
+            padding: crypto.constants.RSA_PKCS1_PADDING,
+        },
+        toEncryptBytes
+    );
 
     return encrypted;
 };
 
-
 /**
-* Writes a IDN Config file to the specified location
-* creating a directory if needed to hold the object
-* Also omits certain attributes by default
-* @param {string} objectType Used for directory name and other special checks
-* @param {string} objectName Used for file name
-* @param {Object} object The actual object to write in JSON format
-* @param {string} [overrideDir=null] Override default write directory built from this function
-*/
+ * Writes a IDN Config file to the specified location
+ * creating a directory if needed to hold the object
+ * Also omits certain attributes by default
+ * @param {string} objectType Used for directory name and other special checks
+ * @param {string} objectName Used for file name
+ * @param {Object} object The actual object to write in JSON format
+ * @param {string} [overrideDir=null] Override default write directory built from this function
+ */
 const writeConfigFile = (objectType, objectName, object, overrideDir = null) => {
     //TODO: Create export ignore properties to avoid writing certain config files
     const dir = overrideDir ? "./config/" + overrideDir : "./config/" + objectType;
@@ -198,9 +226,9 @@ const writeConfigFile = (objectType, objectName, object, overrideDir = null) => 
     }
 
     //Write JSON file for object, replace characters not allowed in file names with dash
-    let fileName = dir + "/" + objectName.replace(/[/\\?%*:|"<>]/g, '-') + ".json";
+    let fileName = dir + "/" + objectName.replace(/[/\\?%*:|"<>]/g, "-") + ".json";
 
-    const ignoreFormat = `${objectType}:${objectName}`
+    const ignoreFormat = `${objectType}:${objectName}`;
     if (exportIgnore.includes(ignoreFormat)) {
         winston.info(clc.yellow(`${ignoreFormat} is set up for export ignore, not writing config file`));
         if (fs.existsSync(fileName)) {
@@ -212,15 +240,15 @@ const writeConfigFile = (objectType, objectName, object, overrideDir = null) => 
         let omittedObj = objectType !== "CLOUD_RULE" ? omitPropertiesFromObject(objectType, object) : object;
         fs.writeFileSync(fileName, JSON.stringify(omittedObj, null, 4));
     }
-}
+};
 
 const reverseTokenize = async () => {
     winston.info(clc.bgBlueBright("Starting Reverse Tokenization"));
     return new Promise((resolve, reject) => {
-        if (!reverseTokens) reject("No tokens to process")
+        if (!reverseTokens) reject("No tokens to process");
 
         //Iterate each object/file
-        Object.entries(reverseTokens).forEach((objectEntry) => {
+        Object.entries(reverseTokens).forEach(objectEntry => {
             const [fileName, tokens] = objectEntry;
             const fileLocation = "./config/" + fileName;
             try {
@@ -228,14 +256,14 @@ const reverseTokenize = async () => {
                 let json = JSON.parse(fileSource);
 
                 //Iterate each token for a specific object/file
-                Object.entries(tokens).forEach((token) => {
+                Object.entries(tokens).forEach(token => {
                     const [jPath, tokenValue] = token;
                     winston.debug(`Checking file [${fileName}] for JSONPath [${jPath}]`);
 
                     let results = JSONPath({
                         path: jPath,
                         json: json,
-                        resultType: "all"
+                        resultType: "all",
                     });
 
                     //If we find a matching object via JSONPath, replace it with the reverse token
@@ -243,16 +271,22 @@ const reverseTokenize = async () => {
                         //Convert the JSONPath pointer to make it actual JavaScript dot notation
                         let correctPointer = results[0].pointer.replaceAll("/", ".").substring(1);
                         _.set(json, correctPointer, tokenValue);
-                        winston.info(clc.green(`JSONPath match found in file [${fileLocation}], replacing environment value with token: ${tokenValue}`));
+                        winston.info(
+                            clc.green(
+                                `JSONPath match found in file [${fileLocation}], replacing environment value with token: ${tokenValue}`
+                            )
+                        );
                     } else {
-                        winston.warn(clc.yellow(`Could not find JSON element in file [${fileLocation}] for path: ` + jPath));
+                        winston.warn(
+                            clc.yellow(`Could not find JSON element in file [${fileLocation}] for path: ` + jPath)
+                        );
                     }
                 });
 
                 //Save the updated JSON
                 fs.writeFileSync(fileLocation, JSON.stringify(json, null, 4));
             } catch (err) {
-                if (err.code === 'ENOENT') {
+                if (err.code === "ENOENT") {
                     winston.info(clc.bgRed(`File not found defined in reverse.target.js: ${fileLocation}`));
                 } else {
                     throw err;
@@ -260,18 +294,19 @@ const reverseTokenize = async () => {
             }
         });
         resolve("Reverse tokenization complete");
-    })
-}
+    });
+};
 
-const escapeString = (str) => {
-    return str.replace(/\\/g, '\\\\')
+const escapeString = str => {
+    return str
+        .replace(/\\/g, "\\\\")
         .replace(/"/g, '\\"')
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
-}
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/\t/g, "\\t");
+};
 
-const buildObjectsForEnvironment = async (env) => {
+const buildObjectsForEnvironment = async env => {
     winston.info(clc.bgBlueBright(`Starting object tokenization for target environment: ${env}`));
 
     //Standard Tokens
@@ -307,22 +342,25 @@ const buildObjectsForEnvironment = async (env) => {
     //Iterate each config file from export
     const configFileNames = walk("./config");
     for (const fileName of configFileNames) {
+        if (fileName.endsWith(".json")) {
+            // check if file is json to not process connector rule source files
 
-        if (fileName.endsWith(".json")) { // check if file is json to not process connector rule source files
-
-            
             // get the object type and object name to be used later to check if the object should not be deployed
             // remove config from path - ./config/TRANSFORM/example.json -> TRANSFORM/example.json
             const objectPath = fileName.replace("./config/", "");
             // extract object type from path - TRANSFORM/example.json -> TRANSFORM
             const objectType = objectPath.substring(0, objectPath.indexOf("/"));
             // remove object type from path - TRANSFORM/example.json > example.json
-            const objectNamePath = objectPath.replace(objectType + "/", "") ;
+            const objectNamePath = objectPath.replace(objectType + "/", "");
             // extract the object name from the path by checking if the objectNamePath includes a top level directory - for sources
-            const objectName = objectNamePath.substring(0, objectNamePath.indexOf("/") != -1 ? objectNamePath.indexOf("/") : objectNamePath.length).replace(".json", "");
+            const objectName = objectNamePath
+                .substring(0, objectNamePath.indexOf("/") != -1 ? objectNamePath.indexOf("/") : objectNamePath.length)
+                .replace(".json", "");
             // check if deployIgnore includes object and don't build if so
             if (deployIgnore.includes(`${objectType}:${objectName}`)) {
-                winston.info(clc.green(`Ignoring ${fileName} because of match ${objectType}:${objectName} found in ignore file`));
+                winston.info(
+                    clc.green(`Ignoring ${fileName} because of match ${objectType}:${objectName} found in ignore file`)
+                );
                 continue;
             }
 
@@ -345,12 +383,16 @@ const buildObjectsForEnvironment = async (env) => {
             }
 
             winston.debug(`Checking file ${fileName} for token replacement`);
-            Object.entries(envTokens).forEach((token) => {
+            Object.entries(envTokens).forEach(token => {
                 const [tokenName, tokenValue] = token;
-                const globalRegex = new RegExp(tokenName, 'g');
+                const globalRegex = new RegExp(tokenName, "g");
                 const matches = fileSource.match(globalRegex);
                 if (matches) {
-                    winston.info(clc.green(`${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`));
+                    winston.info(
+                        clc.green(
+                            `${matches.length} occurrence(s) of token name [${tokenName}] found in file [${fileName}]`
+                        )
+                    );
                 }
                 //Stringify the value so it's escaped properly if a secret token or something
                 if (typeof tokenValue === "string") {
@@ -362,15 +404,15 @@ const buildObjectsForEnvironment = async (env) => {
 
             //Write tokenized file to /build/[TYPE] directory
             const outputFileName = "./build/" + fileName.substring(2);
-            const outputDir = outputFileName.substring(0, outputFileName.lastIndexOf('/'));
-            
+            const outputDir = outputFileName.substring(0, outputFileName.lastIndexOf("/"));
+
             if (!fs.existsSync(outputDir)) {
                 fs.mkdirSync(outputDir, { recursive: true });
             }
             fs.writeFileSync(outputFileName, fileSource);
         }
     }
-}
+};
 
 const buildSpConfigDeploymentFile = async (directoryToBuildFrom = "./build/config/") => {
     try {
@@ -387,7 +429,7 @@ const buildSpConfigDeploymentFile = async (directoryToBuildFrom = "./build/confi
             objectArray.push(objectJson);
         }
         const deploymentObj = {
-            objects: objectArray
+            objects: objectArray,
         };
         winston.debug(`Writing SP-Config import file to ${directoryToBuildFrom}`);
         fs.writeFileSync(`${directoryToBuildFrom}/sp-config-deploy.json`, JSON.stringify(deploymentObj, null, 4));
@@ -395,7 +437,7 @@ const buildSpConfigDeploymentFile = async (directoryToBuildFrom = "./build/confi
     } catch (error) {
         throw new Error(error);
     }
-}
+};
 
 const runSpConfigExport = async (apiConfig, exportConfig) => {
     winston.info(clc.green("SP-Config export started"));
@@ -404,7 +446,7 @@ const runSpConfigExport = async (apiConfig, exportConfig) => {
     let jobId;
     try {
         const startExportResponse = await spConfigApi.exportSpConfig({
-            exportPayloadBeta: JSON.stringify(exportConfig)
+            exportPayloadBeta: JSON.stringify(exportConfig),
         });
         jobId = startExportResponse.data.jobId;
         winston.debug(`SP-Config Export jobId: ${jobId}`);
@@ -414,22 +456,31 @@ const runSpConfigExport = async (apiConfig, exportConfig) => {
     }
 
     //Delay function to use with async/await
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     //Function to repeatedly check the import status
     const checkStatus = async () => {
         while (true) {
             try {
                 const currentStatusResponse = await spConfigApi.getSpConfigExportStatus({ id: jobId });
-                winston.debug(`Current SP-Config export status for jobId [${jobId}]:\n${JSON.stringify(currentStatusResponse.data, null, 4)}`);
+                winston.debug(
+                    `Current SP-Config export status for jobId [${jobId}]:\n${JSON.stringify(currentStatusResponse.data, null, 4)}`
+                );
                 if (currentStatusResponse.data.status === "COMPLETE") {
                     winston.info(clc.green("SP-Config export completed"));
                     break;
                 } else if (currentStatusResponse.data.status === "IN_PROGRESS") {
                     winston.info(`SP-Config export job [${jobId}] still in progress...`);
                     await delay(2000); // Wait before checking the status again
-                } else if (currentStatusResponse.data.status === "CANCELLED" || currentStatusResponse.data.status === "FAILED") {
-                    winston.error(clc.red(`SP-Config export job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`));
+                } else if (
+                    currentStatusResponse.data.status === "CANCELLED" ||
+                    currentStatusResponse.data.status === "FAILED"
+                ) {
+                    winston.error(
+                        clc.red(
+                            `SP-Config export job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`
+                        )
+                    );
                     process.exit(1);
                 }
             } catch (error) {
@@ -453,7 +504,7 @@ const runSpConfigExport = async (apiConfig, exportConfig) => {
             handleHttpException(error);
         }
     }
-}
+};
 
 const runSpConfigImport = async (apiConfig, importObj) => {
     winston.info(clc.green("SP-Config import started"));
@@ -461,7 +512,7 @@ const runSpConfigImport = async (apiConfig, importObj) => {
 
     const jsonString = JSON.stringify(importObj);
     const blobPayload = new Blob([jsonString], {
-        type: 'application/json'
+        type: "application/json",
     });
 
     let jobId;
@@ -475,22 +526,31 @@ const runSpConfigImport = async (apiConfig, importObj) => {
     }
 
     //Delay function to use with async/await
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     //Function to repeatedly check the import status
     const checkStatus = async () => {
         while (true) {
             try {
                 const currentStatusResponse = await spConfigApi.getSpConfigImportStatus({ id: jobId });
-                winston.debug(`Current SP-Config import status for jobId [${jobId}]:\n${JSON.stringify(currentStatusResponse.data, null, 4)}`);
+                winston.debug(
+                    `Current SP-Config import status for jobId [${jobId}]:\n${JSON.stringify(currentStatusResponse.data, null, 4)}`
+                );
                 if (currentStatusResponse.data.status === "COMPLETE") {
                     winston.info(clc.green("SP-Config import completed"));
                     break;
                 } else if (currentStatusResponse.data.status === "IN_PROGRESS") {
                     winston.info(`SP-Config import job [${jobId}] still in progress...`);
                     await delay(2000); // Wait before checking the status again
-                } else if (currentStatusResponse.data.status === "CANCELLED" || currentStatusResponse.data.status === "FAILED") {
-                    winston.error(clc.red(`SP-Config import job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`));
+                } else if (
+                    currentStatusResponse.data.status === "CANCELLED" ||
+                    currentStatusResponse.data.status === "FAILED"
+                ) {
+                    winston.error(
+                        clc.red(
+                            `SP-Config import job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`
+                        )
+                    );
                     process.exit(1);
                 }
             } catch (error) {
@@ -517,6 +577,17 @@ const runSpConfigImport = async (apiConfig, importObj) => {
     winston.info(clc.green("SP-Config import completed"));
 };
 
-
-export { buildObjectsForEnvironment, buildSpConfigDeploymentFile, deepOmit, encrypt, handleHttpException, reverseTokenize, runSpConfigExport, runSpConfigImport, sleep, walk, writeConfigFile, replaceKeyValues };
-
+export {
+    buildObjectsForEnvironment,
+    buildSpConfigDeploymentFile,
+    deepOmit,
+    encrypt,
+    handleHttpException,
+    reverseTokenize,
+    runSpConfigExport,
+    runSpConfigImport,
+    sleep,
+    walk,
+    writeConfigFile,
+    replaceKeyValues,
+};

@@ -1,5 +1,5 @@
-import { EntitlementsV2025Api } from 'sailpoint-api-client';
-import { getSourceByName } from './sourceService.js';
+import { EntitlementsV2025Api } from "sailpoint-api-client";
+import { getSourceByName } from "./sourceService.js";
 
 const getEntitlementById = async (apiConfig, entitlementId) => {
     const entitlementsApi = new EntitlementsV2025Api(apiConfig);
@@ -8,23 +8,15 @@ const getEntitlementById = async (apiConfig, entitlementId) => {
     });
 
     if (!entitlement.data) {
-        throw new Error(
-            `Could not find an Entitlement for id [${entitlementId}] in tenant: ${apiConfig.basePath}`,
-        );
+        throw new Error(`Could not find an Entitlement for id [${entitlementId}] in tenant: ${apiConfig.basePath}`);
     }
 
     return entitlement.data;
 };
 
-const getEntitlementByName = async (
-    apiConfig,
-    sourceName,
-    entitlementName,
-    value,
-    attribute,
-) => {
+const getEntitlementByName = async (apiConfig, sourceName, entitlementName, value, attribute) => {
     var filters = [];
-    if (sourceName != null && sourceName !== 'IdentityNow') {
+    if (sourceName != null && sourceName !== "IdentityNow") {
         const source = await getSourceByName(apiConfig, sourceName);
         filters.push(`source.id eq "${source.id}"`);
     }
@@ -42,18 +34,15 @@ const getEntitlementByName = async (
     }
     const entitlementsApi = new EntitlementsV2025Api(apiConfig);
     var entitlementResponse = await entitlementsApi.listEntitlements({
-        filters: filters.join(' and '),
+        filters: filters.join(" and "),
         limit: 1,
     });
 
-    const entitlement =
-        entitlementResponse.data.length == 1
-            ? entitlementResponse.data[0]
-            : null;
+    const entitlement = entitlementResponse.data.length == 1 ? entitlementResponse.data[0] : null;
 
     if (!entitlement) {
         throw new Error(
-            `Could not find entitlement by sourceName [${sourceName}], entitlementName [${entitlementName}], value [${value}], and attribute [${attribute}] in tenant: ${apiConfig.basePath}`,
+            `Could not find entitlement by sourceName [${sourceName}], entitlementName [${entitlementName}], value [${value}], and attribute [${attribute}] in tenant: ${apiConfig.basePath}`
         );
     }
     return entitlement;

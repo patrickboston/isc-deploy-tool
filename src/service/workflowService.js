@@ -1,6 +1,6 @@
 import clc from "cli-color";
 import * as fs from "fs";
-import _ from 'lodash';
+import _ from "lodash";
 import { LaunchersBetaApi, Paginator, WorkflowsApi, WorkflowsBetaApi } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, replaceKeyValues, sleep, walk, writeConfigFile } from "../util.js";
@@ -8,9 +8,7 @@ import { getFormById, getFormByName } from "./formService.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 
 const WORKFLOW = "WORKFLOW";
-const existingAttributeToKeep = [
-    "id"
-];
+const existingAttributeToKeep = ["id"];
 //Cache of workflows we fetch during imports
 let workflowCache = {};
 
@@ -18,38 +16,33 @@ const getWorkflowById = async (apiConfig, workflowId) => {
     if (workflowCache[workflowId]) return workflowCache[workflowId];
 
     const workflowsApi = new WorkflowsApi(apiConfig);
-    const workflowResponse = await workflowsApi.getWorkflow({
-        id: workflowId
-    }).catch(error => {
-        handleHttpException(error);
-    });
+    const workflowResponse = await workflowsApi
+        .getWorkflow({
+            id: workflowId,
+        })
+        .catch(error => {
+            handleHttpException(error);
+        });
 
     if (!workflowResponse) {
-        throw new Error(`Could not find workflow for id [${workflowId}] in tenant: ${apiConfig.basePath}`)
+        throw new Error(`Could not find workflow for id [${workflowId}] in tenant: ${apiConfig.basePath}`);
     }
     workflowCache[workflowId] = workflowResponse.data;
 
     return workflowResponse.data;
-}
+};
 
 // api doesn't support a filter so we have to do this very unoptimized and filter the list of all workflows in memory
 const getWorkflowByName = async (apiConfig, workflowName) => {
     const workflowsApi = new WorkflowsApi(apiConfig);
-    const workflows = await Paginator.paginate(
-        workflowsApi,
-        workflowsApi.listWorkflows,
-        undefined,
-        250,
-    ).catch((error) => {
-        handleHttpException(error);
-    });
-    const workflow = workflows.data.filter(
-        (workflow) => workflow.name === workflowName,
+    const workflows = await Paginator.paginate(workflowsApi, workflowsApi.listWorkflows, undefined, 250).catch(
+        error => {
+            handleHttpException(error);
+        }
     );
+    const workflow = workflows.data.filter(workflow => workflow.name === workflowName);
     if (!workflow[0])
-        throw new Error(
-            `Could not find workflow by name [${workflowName}] in tenant: ${apiConfig.basePath}`,
-        );
+        throw new Error(`Could not find workflow by name [${workflowName}] in tenant: ${apiConfig.basePath}`);
     return workflow[0];
 };
 
@@ -65,12 +58,14 @@ const fetchFormIdReplacement = async (currentValue, apiConfig) => {
     return form.id;
 };
 
-const exportWorkflows = async (apiConfig) => {
+const exportWorkflows = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Workflow Export"));
     const workflowsApi = new WorkflowsApi(apiConfig);
-    const workflows = await Paginator.paginate(workflowsApi, workflowsApi.listWorkflows, undefined, 250).catch(error => {
-        handleHttpException(error);
-    });
+    const workflows = await Paginator.paginate(workflowsApi, workflowsApi.listWorkflows, undefined, 250).catch(
+        error => {
+            handleHttpException(error);
+        }
+    );
     for (let workflow of workflows.data) {
         winston.info(`Exporting Workflow: ${workflow.name} (${workflow.id})`);
         //Update owner/creator/modifiedBy to alias for lookup when migrating
@@ -111,7 +106,10 @@ const exportWorkflows = async (apiConfig) => {
         }
         */
         if (workflow.trigger && workflow.trigger.attributes.id === "idn:interactive-process-launched") {
-            workflow.trigger.attributes["filter.$"] = workflow.trigger.attributes["filter.$"].replace(workflow.id, workflow.name);
+            workflow.trigger.attributes["filter.$"] = workflow.trigger.attributes["filter.$"].replace(
+                workflow.id,
+                workflow.name
+            );
         }
 
         /*
@@ -141,7 +139,7 @@ const exportWorkflows = async (apiConfig) => {
 
         writeConfigFile(WORKFLOW, workflow.name, workflow);
     }
-}
+};
 
 const migrateWorkflow = async (apiConfig, workflowJson) => {
     //Using /beta/workflows here because /v3 seems to fail for no reason
@@ -194,14 +192,17 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
                     definition: localWorkflow.definition,
                     description: localWorkflow.description,
                     enabled: false, //Workflows cannot be created in an enabled state, so we have to create it disabled
-                    trigger: localWorkflow.trigger
-                }
+                    trigger: localWorkflow.trigger,
+                },
             });
             currentTargetWorkflow = createWorkflowResponse.data;
 
             //After initial create, if this is an interactive process trigger, we need to update the filter with the new workflow id
             if (localWorkflow.trigger && localWorkflow.trigger.attributes.id === "idn:interactive-process-launched") {
-                const newFilterValue = localWorkflow.trigger.attributes["filter.$"].replace(localWorkflow.name, currentTargetWorkflow.id);
+                const newFilterValue = localWorkflow.trigger.attributes["filter.$"].replace(
+                    localWorkflow.name,
+                    currentTargetWorkflow.id
+                );
                 //Patch workflow to update the filter
                 try {
                     await workflowsApi.patchWorkflow({
@@ -210,9 +211,9 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
                             {
                                 op: "replace",
                                 path: "/trigger/attributes/filter.$",
-                                value: newFilterValue
-                            }
-                        ]
+                                value: newFilterValue,
+                            },
+                        ],
                     });
                 } catch (error) {
                     await handleHttpException(error);
@@ -231,9 +232,9 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
                             type: "INTERACTIVE_PROCESS",
                             reference: {
                                 id: currentTargetWorkflow.id,
-                                type: "WORKFLOW"
-                            }
-                        }
+                                type: "WORKFLOW",
+                            },
+                        },
                     });
                 } catch (error) {
                     await handleHttpException(error);
@@ -241,9 +242,16 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
             }
 
             //If external trigger, need to update the URL to use the version with the ID
-            if (localWorkflow.trigger && localWorkflow.trigger.type === "EXTERNAL" && localWorkflow.trigger.attributes.url) {
+            if (
+                localWorkflow.trigger &&
+                localWorkflow.trigger.type === "EXTERNAL" &&
+                localWorkflow.trigger.attributes.url
+            ) {
                 //Use currently deployed URL
-                const newExternalUrl = localWorkflow.trigger.attributes.url.replace(localWorkflow.name, currentTargetWorkflow.id);
+                const newExternalUrl = localWorkflow.trigger.attributes.url.replace(
+                    localWorkflow.name,
+                    currentTargetWorkflow.id
+                );
 
                 //Patch workflow to update the url
                 try {
@@ -253,9 +261,9 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
                             {
                                 op: "replace",
                                 path: "/trigger/attributes/url",
-                                value: newExternalUrl
-                            }
-                        ]
+                                value: newExternalUrl,
+                            },
+                        ],
                     });
                 } catch (error) {
                     await handleHttpException(error);
@@ -274,9 +282,9 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
                             {
                                 op: "replace",
                                 path: "/enabled",
-                                value: true
-                            }
-                        ]
+                                value: true,
+                            },
+                        ],
                     });
                 } catch (error) {
                     await handleHttpException(error);
@@ -294,8 +302,8 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
          * Additionally, the repo is authoritative for whether the workflow stays enabled or not after
          * it's been modified, so we won't re-enable it if it was enabled in the target, but the repo
          * has it set as disabled
-        */
-        winston.info(`Updating existing workflow: ${currentTargetWorkflow.name} (${currentTargetWorkflow.id})`)
+         */
+        winston.info(`Updating existing workflow: ${currentTargetWorkflow.name} (${currentTargetWorkflow.id})`);
         if (currentTargetWorkflow.enabled) {
             winston.warn("Workflow is enabled, disabling it to allow modification");
             //Patch workflow to disable so we can update
@@ -306,9 +314,9 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
                         {
                             op: "replace",
                             path: "/enabled",
-                            value: false
-                        }
-                    ]
+                            value: false,
+                        },
+                    ],
                 });
             } catch (error) {
                 await handleHttpException(error);
@@ -324,7 +332,11 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         }
 
         //If external trigger, need to update the URL to use the version with the ID
-        if (localWorkflow.trigger && currentTargetWorkflow.trigger.type === "EXTERNAL" && currentTargetWorkflow.trigger.attributes.url) {
+        if (
+            localWorkflow.trigger &&
+            currentTargetWorkflow.trigger.type === "EXTERNAL" &&
+            currentTargetWorkflow.trigger.attributes.url
+        ) {
             //Use currently deployed URL
             localWorkflow.trigger.attributes.url = currentTargetWorkflow.trigger.attributes.url;
         }
@@ -338,15 +350,15 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         try {
             await workflowsApi.putWorkflow({
                 id: localWorkflow.id,
-                workflowBodyBeta: localWorkflow
+                workflowBodyBeta: localWorkflow,
             });
         } catch (error) {
             await handleHttpException(error);
         }
     }
-}
+};
 
-const migrateWorkflows = async (apiConfig) => {
+const migrateWorkflows = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Workflow Deployment"));
     //Only read one directory down where main source files are
     const workflowFilePaths = walk("./build/config/WORKFLOW");
@@ -357,10 +369,6 @@ const migrateWorkflows = async (apiConfig) => {
         await migrateWorkflow(apiConfig, workflow);
     }
     winston.info(clc.bgGreen("Completed Workflow Deployment"));
-}
-
-export {
-    exportWorkflows, getWorkflowById, migrateWorkflow,
-    migrateWorkflows
 };
 
+export { exportWorkflows, getWorkflowById, migrateWorkflow, migrateWorkflows };

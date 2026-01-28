@@ -17,10 +17,10 @@ const availablePageIds = [
     "reset-password:enter-username",
     "reset-password:finish",
     "unlock-account:enter-username",
-    "unlock-account:finish"
+    "unlock-account:finish",
 ];
 
-const exportPasswordInstructions = async (apiConfig) => {
+const exportPasswordInstructions = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Password Instruction Export"));
 
     /*
@@ -28,14 +28,15 @@ const exportPasswordInstructions = async (apiConfig) => {
      * pass each available pageId one by one and whatever one does not return a 404 can
      * be written as a config file. If custom customInstructionsEnabled is not enabled via
      * beta/password-org-config, then we will get a 400 for all of them which we also account for
-     * 
-    */
+     *
+     */
     const customPasswordInstructionsApi = new CustomPasswordInstructionsBetaApi(apiConfig);
     for (const pageId of availablePageIds) {
         try {
-            const customPasswordInstructionsResponse = await customPasswordInstructionsApi.getCustomPasswordInstructions({
-                pageId: pageId
-            });
+            const customPasswordInstructionsResponse =
+                await customPasswordInstructionsApi.getCustomPasswordInstructions({
+                    pageId: pageId,
+                });
             winston.info(`Exporting Password Instruction for pageId: ${pageId}`);
             writeConfigFile(PASSWORD_INSTRUCTION, pageId, customPasswordInstructionsResponse.data);
         } catch (error) {
@@ -44,7 +45,7 @@ const exportPasswordInstructions = async (apiConfig) => {
             }
         }
     }
-}
+};
 
 const migratePasswordInstructions = async (apiConfig, targetEnvName) => {
     winston.info(clc.bgBlueBright("Starting Password Instruction Deployment"));
@@ -59,17 +60,13 @@ const migratePasswordInstructions = async (apiConfig, targetEnvName) => {
 
         try {
             await customPasswordInstructionsApi.createCustomPasswordInstructions({
-                customPasswordInstructionBeta: localPasswordInstructionSource
+                customPasswordInstructionBeta: localPasswordInstructionSource,
             });
         } catch (error) {
             handleHttpException(error);
         }
     }
     winston.info(clc.bgGreen("Completed Password Instruction Deployment"));
-}
-
-export {
-    exportPasswordInstructions,
-    migratePasswordInstructions
 };
 
+export { exportPasswordInstructions, migratePasswordInstructions };
