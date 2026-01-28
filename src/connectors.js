@@ -4,10 +4,10 @@ import clc from "cli-color";
 import * as fs from "fs";
 import path from "path";
 import winston from "winston";
-import { handleHttpException } from "./util.js"
+import { handleHttpException } from "./util.js";
 import FormData from "form-data";
 
-const buildAndDeployConnectors = async (apiConfig) => {
+const buildAndDeployConnectors = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting SaaS Connector Build & Deployment"));
     const connectorsDir = "./connectors";
 
@@ -24,40 +24,44 @@ const buildAndDeployConnectors = async (apiConfig) => {
                 execSync("npm run pack-zip", { cwd: connectorPath, stdio: "inherit" });
 
                 const distPath = path.join(connectorsDir, connectorDirAlias, "dist");
-                const zipFile = fs.readdirSync(distPath).find((file) => file.endsWith(".zip"));
+                const zipFile = fs.readdirSync(distPath).find(file => file.endsWith(".zip"));
                 const zipPath = path.join(distPath, zipFile);
                 const fullFilePath = path.resolve(zipPath);
                 const fileStream = fs.createReadStream(fullFilePath);
                 winston.info(`Uploading SaaS connector archive file: [${zipPath}]`);
 
                 let data = new FormData();
-                data.append('file', fileStream);
+                data.append("file", fileStream);
 
                 //Check if there is platform connector yet for this based on alias
                 try {
                     const lookupResponse = await axios.request({
-                        method: 'get',
+                        method: "get",
                         url: `${apiConfig.basePath}/beta/platform-connectors/${connectorDirAlias}`,
                         headers: {
-                            'Authorization': `Bearer ${await apiConfig.accessToken}`,
+                            Authorization: `Bearer ${await apiConfig.accessToken}`,
                         },
                     });
-                    winston.info(`Connector by alias [${connectorDirAlias}] already exists with id: ${lookupResponse.data.id}`);
+                    winston.info(
+                        `Connector by alias [${connectorDirAlias}] already exists with id: ${lookupResponse.data.id}`
+                    );
                 } catch (error) {
                     if (error.response.status === 404) {
                         winston.debug(`Connector by alias [${connectorDirAlias}] does not exist yet, creating it`);
                         try {
                             const createResponse = await axios.request({
-                                method: 'post',
+                                method: "post",
                                 url: `${apiConfig.basePath}/beta/platform-connectors`,
                                 headers: {
-                                    'Authorization': `Bearer ${await apiConfig.accessToken}`,
+                                    Authorization: `Bearer ${await apiConfig.accessToken}`,
                                 },
                                 data: {
-                                    alias: connectorDirAlias
-                                }
+                                    alias: connectorDirAlias,
+                                },
                             });
-                            winston.info(`Connector by alias [${connectorDirAlias}] created successfully with id: ${createResponse.data.id}`);
+                            winston.info(
+                                `Connector by alias [${connectorDirAlias}] created successfully with id: ${createResponse.data.id}`
+                            );
                         } catch (error) {
                             handleHttpException(error);
                         }
@@ -69,24 +73,26 @@ const buildAndDeployConnectors = async (apiConfig) => {
                 //Upload the connector archive zip, always just creates/updates latest tag
                 try {
                     const uploadResponse = await axios.request({
-                        method: 'post',
+                        method: "post",
                         maxBodyLength: Infinity,
                         url: `${apiConfig.basePath}/beta/platform-connectors/${connectorDirAlias}/versions`,
                         headers: {
-                            'Authorization': `Bearer ${await apiConfig.accessToken}`,
-                            ...data.getHeaders()
+                            Authorization: `Bearer ${await apiConfig.accessToken}`,
+                            ...data.getHeaders(),
                         },
-                        data: data
+                        data: data,
                     });
-                    winston.info(`Connector archive for [${connectorDirAlias}] uploaded successfully with version number: ${uploadResponse.data.version}`);
+                    winston.info(
+                        `Connector archive for [${connectorDirAlias}] uploaded successfully with version number: ${uploadResponse.data.version}`
+                    );
                 } catch (error) {
                     await handleHttpException(error);
                 }
             }
-        };
+        }
     } else {
         winston.warn(clc.yellow(`Directory [${connectorsDir}] does not exist`));
     }
-}
+};
 
 export { buildAndDeployConnectors };
