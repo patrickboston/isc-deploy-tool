@@ -1,37 +1,42 @@
 import clc from "cli-color";
 import * as fs from "fs";
-import _ from 'lodash';
+import _ from "lodash";
 import { NotificationsBetaApi, Paginator } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, walk, writeConfigFile } from "../util.js";
 
 const NOTIFICATION_TEMPLATE = "NOTIFICATION_TEMPLATE";
-const existingAttributeToKeep = [
-    "id"
-];
+const existingAttributeToKeep = ["id"];
 
-const exportNotificationTemplates = async (apiConfig) => {
+const exportNotificationTemplates = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Notification Template Export"));
     const notificationsBetaApi = new NotificationsBetaApi(apiConfig);
-    const notificationTemplatesResponse = await Paginator.paginate(notificationsBetaApi, notificationsBetaApi.listNotificationTemplates, undefined, 250).catch(error => {
+    const notificationTemplatesResponse = await Paginator.paginate(
+        notificationsBetaApi,
+        notificationsBetaApi.listNotificationTemplates,
+        undefined,
+        250
+    ).catch(error => {
         handleHttpException(error);
     });
     for (const notificationTemplate of notificationTemplatesResponse.data) {
         winston.info(`Exporting Notification Template: ${notificationTemplate.name} (${notificationTemplate.id})`);
         writeConfigFile(NOTIFICATION_TEMPLATE, notificationTemplate.name, notificationTemplate);
     }
-}
+};
 
 const migrateNotificationTemplate = async (apiConfig, templateJson) => {
     const notificationsBetaApi = new NotificationsBetaApi(apiConfig);
     let localTemplate = JSON.parse(templateJson);
 
     //Check and see if a template with this name already exists in the target environment
-    const currentTemplateResponse = await notificationsBetaApi.listNotificationTemplates({
-        filters: `name eq "${localTemplate.name}"`
-    }).catch(error => {
-        handleHttpException(error);
-    });
+    const currentTemplateResponse = await notificationsBetaApi
+        .listNotificationTemplates({
+            filters: `name eq "${localTemplate.name}"`,
+        })
+        .catch(error => {
+            handleHttpException(error);
+        });
     let currentTargetTemplate = currentTemplateResponse.data.length == 1 ? currentTemplateResponse.data[0] : null;
 
     if (!currentTargetTemplate) {
@@ -47,15 +52,17 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
                     from: localTemplate.from,
                     name: localTemplate.name,
                     replyTo: localTemplate.replyTo,
-                    subject: localTemplate.subject
-                }
+                    subject: localTemplate.subject,
+                },
             });
             currentTargetTemplate = createTemplateResponse.data;
         } catch (error) {
             await handleHttpException(error);
         }
     } else {
-        winston.info(`Updating existing notification template: ${currentTargetTemplate.name} (${currentTargetTemplate.id})`)
+        winston.info(
+            `Updating existing notification template: ${currentTargetTemplate.name} (${currentTargetTemplate.id})`
+        );
 
         //Restore attributes from the currently deployed target template into our template template
         for (const templateKey of existingAttributeToKeep) {
@@ -76,16 +83,16 @@ const migrateNotificationTemplate = async (apiConfig, templateJson) => {
                     from: localTemplate.from,
                     name: localTemplate.name,
                     replyTo: localTemplate.replyTo,
-                    subject: localTemplate.subject
-                }
+                    subject: localTemplate.subject,
+                },
             });
         } catch (error) {
             await handleHttpException(error);
         }
     }
-}
+};
 
-const migrateNotificationTemplates = async (apiConfig) => {
+const migrateNotificationTemplates = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Notification Template Deployment"));
     const notificationTemplateFilePaths = walk("./build/config/NOTIFICATION_TEMPLATE");
 
@@ -95,11 +102,6 @@ const migrateNotificationTemplates = async (apiConfig) => {
         await migrateNotificationTemplate(apiConfig, notificationTemplate);
     }
     winston.info(clc.bgGreen("Completed Notification Template Deployment"));
-}
-
-export {
-    exportNotificationTemplates,
-    migrateNotificationTemplate,
-    migrateNotificationTemplates
 };
 
+export { exportNotificationTemplates, migrateNotificationTemplate, migrateNotificationTemplates };

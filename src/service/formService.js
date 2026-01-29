@@ -1,15 +1,13 @@
 import clc from "cli-color";
 import * as fs from "fs";
-import _ from 'lodash';
+import _ from "lodash";
 import { CustomFormsBetaApi, Paginator } from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
 
 const FORM = "FORM_DEFINITION";
-const existingAttributeToKeep = [
-    "id"
-];
+const existingAttributeToKeep = ["id"];
 //Cache of forms we fetch during imports
 let formCache = {};
 
@@ -17,49 +15,58 @@ const getFormById = async (apiConfig, formId) => {
     if (formCache[formId]) return formCache[formId];
 
     const formsApi = new CustomFormsBetaApi(apiConfig);
-    const formsResponse = await formsApi.getFormDefinitionByKey({
-        formDefinitionID: formId
-    }).catch(error => {
-        handleHttpException(error);
-    });
+    const formsResponse = await formsApi
+        .getFormDefinitionByKey({
+            formDefinitionID: formId,
+        })
+        .catch(error => {
+            handleHttpException(error);
+        });
 
     if (!formsResponse) {
-        throw new Error(`Could not find form for id [${formId}] in tenant: ${apiConfig.basePath}`)
+        throw new Error(`Could not find form for id [${formId}] in tenant: ${apiConfig.basePath}`);
     }
     formCache[formId] = formsResponse.data;
 
     return formsResponse.data;
-}
+};
 
 const getFormByName = async (apiConfig, formName) => {
     if (formCache[formName]) return formCache[formName];
 
     const formsApi = new CustomFormsBetaApi(apiConfig);
-    const formsResponse = await formsApi.exportFormDefinitionsByTenant({
-        filters: `name eq "${formName}"`
-    }).catch(error => {
-        handleHttpException(error);
-    });
+    const formsResponse = await formsApi
+        .exportFormDefinitionsByTenant({
+            filters: `name eq "${formName}"`,
+        })
+        .catch(error => {
+            handleHttpException(error);
+        });
 
     if (!formsResponse || formsResponse.data.length === 0) {
-        throw new Error(`Could not find form for name [${formName}] in tenant: ${apiConfig.basePath}`)
+        throw new Error(`Could not find form for name [${formName}] in tenant: ${apiConfig.basePath}`);
     }
     formCache[formName] = formsResponse.data[0].object;
 
     return formsResponse.data[0].object;
-}
+};
 
-const exportForms = async (apiConfig) => {
+const exportForms = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Form Export"));
     const formsApi = new CustomFormsBetaApi(apiConfig);
-    const formsResponse = await Paginator.paginate(formsApi, formsApi.exportFormDefinitionsByTenant, undefined, 250).catch(error => {
+    const formsResponse = await Paginator.paginate(
+        formsApi,
+        formsApi.exportFormDefinitionsByTenant,
+        undefined,
+        250
+    ).catch(error => {
         handleHttpException(error);
     });
-    /* 
+    /*
      * They get exported in sp-config format like identity profile export,
      * but we will store just the object itself so we can use the other normal create/update endpoints
      * For some reason the SDK does not have the normal GET endpoint, just the sp-config one is available
-    */
+     */
     for (let formContainer of formsResponse.data) {
         const form = formContainer.object;
         winston.info(`Exporting Form: ${form.name} (${form.id})`);
@@ -71,7 +78,7 @@ const exportForms = async (apiConfig) => {
 
         writeConfigFile(FORM, form.name, form);
     }
-}
+};
 
 const migrateForm = async (apiConfig, formJson) => {
     const formsApi = new CustomFormsBetaApi(apiConfig);
@@ -83,7 +90,7 @@ const migrateForm = async (apiConfig, formJson) => {
 
     //Check and see if a form with this name already exists in the target environment
     const currentFormsResponse = await formsApi.exportFormDefinitionsByTenant({
-        filters: `name eq "${localForm.name}"`
+        filters: `name eq "${localForm.name}"`,
     });
     let currentTargetForm = currentFormsResponse.data.length == 1 ? currentFormsResponse.data[0].object : null;
 
@@ -99,8 +106,8 @@ const migrateForm = async (apiConfig, formJson) => {
                     formElements: localForm.formElements,
                     formInput: localForm.formInput,
                     formButtons: localForm.formButtons,
-                    usedBy: localForm.usedBy
-                }
+                    usedBy: localForm.usedBy,
+                },
             });
             currentTargetForm = createFormResponse.data;
         } catch (error) {
@@ -118,73 +125,63 @@ const migrateForm = async (apiConfig, formJson) => {
             {
                 op: "replace",
                 path: "/name",
-                value: localForm.name
+                value: localForm.name,
             },
             {
                 op: "replace",
                 path: "/description",
-                value: localForm.description
+                value: localForm.description,
             },
             {
                 op: "replace",
                 path: "/owner",
-                value: localForm.owner
+                value: localForm.owner,
             },
         ];
 
         //Add in optional forms components if they exist
-        patchOperations.push(
-            {
-                op: "replace",
-                path: "/formConditions",
-                value: localForm.formConditions ? localForm.formConditions : []
-            }
-        )
+        patchOperations.push({
+            op: "replace",
+            path: "/formConditions",
+            value: localForm.formConditions ? localForm.formConditions : [],
+        });
 
-        patchOperations.push(
-            {
-                op: "replace",
-                path: "/formElements",
-                value: localForm.formElements ? localForm.formElements : []
-            }
-        )
+        patchOperations.push({
+            op: "replace",
+            path: "/formElements",
+            value: localForm.formElements ? localForm.formElements : [],
+        });
 
-        patchOperations.push(
-            {
-                op: "replace",
-                path: "/formInput",
-                value: localForm.formInput ? localForm.formInput : []
-            }
-        )
+        patchOperations.push({
+            op: "replace",
+            path: "/formInput",
+            value: localForm.formInput ? localForm.formInput : [],
+        });
 
-        patchOperations.push(
-            {
-                op: "replace",
-                path: "/formButtons",
-                value: localForm.formButtons ? localForm.formButtons : []
-            }
-        )
+        patchOperations.push({
+            op: "replace",
+            path: "/formButtons",
+            value: localForm.formButtons ? localForm.formButtons : [],
+        });
 
-        patchOperations.push(
-            {
-                op: "replace",
-                path: "/usedBy",
-                value: localForm.usedBy ? localForm.usedBy : []
-            }
-        )
+        patchOperations.push({
+            op: "replace",
+            path: "/usedBy",
+            value: localForm.usedBy ? localForm.usedBy : [],
+        });
 
         try {
             await formsApi.patchFormDefinition({
                 formDefinitionID: currentTargetForm.id,
-                body: patchOperations
-            })
+                body: patchOperations,
+            });
         } catch (error) {
             await handleHttpException(error);
         }
     }
-}
+};
 
-const migrateForms = async (apiConfig) => {
+const migrateForms = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Form Deployment"));
     //Only read one directory down where main source files are
     const formFilePaths = walk("./build/config/FORM_DEFINITION");
@@ -195,13 +192,6 @@ const migrateForms = async (apiConfig) => {
         await migrateForm(apiConfig, form);
     }
     winston.info(clc.bgGreen("Completed Form Deployment"));
-}
-
-export {
-    exportForms,
-    migrateForm,
-    migrateForms,
-    getFormById,
-    getFormByName
 };
 
+export { exportForms, migrateForm, migrateForms, getFormById, getFormByName };

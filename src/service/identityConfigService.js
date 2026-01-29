@@ -1,6 +1,6 @@
 import clc from "cli-color";
 import * as fs from "fs";
-import _ from 'lodash';
+import _ from "lodash";
 import { IdentityAttributesBetaApi, IdentityProfilesApi, LifecycleStatesApi, SourcesApi } from "sailpoint-api-client";
 import winston from "winston";
 import { deepOmit, handleHttpException, walk, writeConfigFile } from "../util.js";
@@ -12,28 +12,24 @@ import { getSourceById, getSourceByName } from "./sourceService.js";
 const IDENTITY_OBJECT_CONFIG = "IDENTITY_OBJECT_CONFIG";
 const IDENTITY_PROFILE = "IDENTITY_PROFILE";
 const LIFECYCLE_STATE = "LIFECYCLE_STATE";
-const identityProfileExistingAttributeToKeep = [
-    "object.id", "self.id"
-];
-const lifecycleStateExistingAttributeToKeep = [
-    "id"
-];
+const identityProfileExistingAttributeToKeep = ["object.id", "self.id"];
+const lifecycleStateExistingAttributeToKeep = ["id"];
 
 /**
-* Gets all sources via v3/sources and write appropriate 
-* Source files and referenced objects
-* @param {Configuration} apiConfig
-*/
-const exportIdentityAttributeConfig = async (apiConfig) => {
+ * Gets all sources via v3/sources and write appropriate
+ * Source files and referenced objects
+ * @param {Configuration} apiConfig
+ */
+const exportIdentityAttributeConfig = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Identity Attribute Configuration Export"));
     const identityAttributesApi = new IdentityAttributesBetaApi(apiConfig);
     const identityAttributeConfig = await identityAttributesApi.listIdentityAttributes().catch(error => {
         handleHttpException(error);
-    });;
+    });
     writeConfigFile(IDENTITY_OBJECT_CONFIG, IDENTITY_OBJECT_CONFIG, identityAttributeConfig.data);
 };
 
-const exportIdentityProfiles = async (apiConfig) => {
+const exportIdentityProfiles = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Identity Profile Export"));
     const identityProfilesApi = new IdentityProfilesApi(apiConfig);
     const lifecycleStatesApi = new LifecycleStatesApi(apiConfig);
@@ -49,11 +45,13 @@ const exportIdentityProfiles = async (apiConfig) => {
         }
 
         //Lifecycle states are attached to Identity Profiles so let's grab them
-        const lifecycleStatesResponse = await lifecycleStatesApi.getLifecycleStates({
-            identityProfileId: profile.self.id
-        }).catch(error => {
-            handleHttpException(error);
-        });
+        const lifecycleStatesResponse = await lifecycleStatesApi
+            .getLifecycleStates({
+                identityProfileId: profile.self.id,
+            })
+            .catch(error => {
+                handleHttpException(error);
+            });
         if (lifecycleStatesResponse.data) {
             for (let lifecycleState of lifecycleStatesResponse.data) {
                 if (lifecycleState.accountActions) {
@@ -87,16 +85,21 @@ const exportIdentityProfiles = async (apiConfig) => {
                     lifecycleState.accessProfileIds = accessProfileNames;
                 }
 
-                writeConfigFile(LIFECYCLE_STATE, lifecycleState.technicalName, lifecycleState, `IDENTITY_PROFILE/${profile.self.name}/LIFECYCLE_STATE`);
+                writeConfigFile(
+                    LIFECYCLE_STATE,
+                    lifecycleState.technicalName,
+                    lifecycleState,
+                    `IDENTITY_PROFILE/${profile.self.name}/LIFECYCLE_STATE`
+                );
             }
         }
 
         //This is basically using SP-Config in the backend so we need to reference self.name here
         writeConfigFile(IDENTITY_PROFILE, profile.self.name, profile, `IDENTITY_PROFILE/${profile.self.name}`);
     }
-}
+};
 
-const migrateIdentityAttributeConfig = async (apiConfig) => {
+const migrateIdentityAttributeConfig = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Identity Attribute Configuration Deployment"));
     const identityAttributesApi = new IdentityAttributesBetaApi(apiConfig);
 
@@ -113,7 +116,7 @@ const migrateIdentityAttributeConfig = async (apiConfig) => {
             let currentTargetIdentityAttribute;
             try {
                 const currentIdentityAttributeResponse = await identityAttributesApi.getIdentityAttribute({
-                    name: localIdentityAttribute.name
+                    name: localIdentityAttribute.name,
                 });
                 currentTargetIdentityAttribute = currentIdentityAttributeResponse.data;
             } catch (error) {
@@ -136,8 +139,8 @@ const migrateIdentityAttributeConfig = async (apiConfig) => {
                             sources: localIdentityAttribute.sources,
                             standard: localIdentityAttribute.standard,
                             system: localIdentityAttribute.system,
-                            type: localIdentityAttribute.type
-                        }
+                            type: localIdentityAttribute.type,
+                        },
                     });
                     currentTargetIdentityAttribute = createIdentityAttributeResponse.data;
                 } catch (error) {
@@ -158,8 +161,8 @@ const migrateIdentityAttributeConfig = async (apiConfig) => {
                             sources: localIdentityAttribute.sources,
                             standard: localIdentityAttribute.standard,
                             system: localIdentityAttribute.system,
-                            type: localIdentityAttribute.type
-                        }
+                            type: localIdentityAttribute.type,
+                        },
                     });
                 } catch (error) {
                     await handleHttpException(error);
@@ -168,7 +171,7 @@ const migrateIdentityAttributeConfig = async (apiConfig) => {
         }
     }
     winston.info(clc.bgGreen("Completed Identity Attribute Configuration Deployment"));
-}
+};
 
 const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     const identityProfilesApi = new IdentityProfilesApi(apiConfig);
@@ -180,14 +183,19 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     const rules = await getAllRules(apiConfig);
 
     //Check and see if an identity profile with this name already exists in the target environment
-    let currentIdentityProfileResponse = await identityProfilesApi.exportIdentityProfiles({
-        filters: `name eq "${localIdentityProfile.object.name}"`
-    }).catch(error => {
-        handleHttpException(error);
-    });
-    let currentTargetIdentityProfile = currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
+    let currentIdentityProfileResponse = await identityProfilesApi
+        .exportIdentityProfiles({
+            filters: `name eq "${localIdentityProfile.object.name}"`,
+        })
+        .catch(error => {
+            handleHttpException(error);
+        });
+    let currentTargetIdentityProfile =
+        currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
     if (currentTargetIdentityProfile) {
-        winston.info(`Updating existing identity profile: ${localIdentityProfile.self.name} (${currentTargetIdentityProfile.self.id})`);
+        winston.info(
+            `Updating existing identity profile: ${localIdentityProfile.self.name} (${currentTargetIdentityProfile.self.id})`
+        );
         //Restore attributes from the currently deployed target identity profile into our template transform
         for (const key of identityProfileExistingAttributeToKeep) {
             _.set(localIdentityProfile, key, _.get(currentTargetIdentityProfile, key));
@@ -204,19 +212,23 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
 
     //Lookup target source. The source name in identity profiles is the backend app name with [source]
     const sourceLookupName = localIdentityProfile.object.authoritativeSource.name.replaceAll(" [source]", "").trim();
-    const targetSourceResponse = await sourcesApi.listSources({
-        filters: `name eq "${sourceLookupName}"`,
-        limit: 1
-    }).catch(error => {
-        handleHttpException(error);
-    });
+    const targetSourceResponse = await sourcesApi
+        .listSources({
+            filters: `name eq "${sourceLookupName}"`,
+            limit: 1,
+        })
+        .catch(error => {
+            handleHttpException(error);
+        });
 
     let currentTargetSource = targetSourceResponse.data.length == 1 ? targetSourceResponse.data[0] : null;
 
     //If the source does not exist, we need to create at least a shell source so schemas, etc. can reference it
-    if (!currentTargetSource) throw new Error(`Cannot find authoritative source [${sourceLookupName}] for Identity Profile [${localIdentityProfile.self.name}] in target environment`);
+    if (!currentTargetSource)
+        throw new Error(
+            `Cannot find authoritative source [${sourceLookupName}] for Identity Profile [${localIdentityProfile.self.name}] in target environment`
+        );
     localIdentityProfile.object.authoritativeSource.id = currentTargetSource.id;
-
 
     //Iterate each identity attribute mapping and update references
     for (let attributeMapping of localIdentityProfile.object.identityAttributeConfig.attributeTransforms) {
@@ -225,15 +237,22 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
 
         if (transformDefinitonType === "accountAttribute" || transformDefinitonType === "reference") {
             //Looks for accountAttribute source first, if not truthy, assumes it's a transform reference and dives deeper for source reference
-            const mappingSourceName = !!transformDefinition.attributes.sourceName ? transformDefinition.attributes.sourceName : transformDefinition.attributes.input.attributes.sourceName;
-            const mappingSourceResponse = await sourcesApi.listSources({
-                filters: `name eq "${mappingSourceName}"`,
-                limit: 1
-            }).catch(error => {
-                handleHttpException(error);
-            });
+            const mappingSourceName = !!transformDefinition.attributes.sourceName
+                ? transformDefinition.attributes.sourceName
+                : transformDefinition.attributes.input.attributes.sourceName;
+            const mappingSourceResponse = await sourcesApi
+                .listSources({
+                    filters: `name eq "${mappingSourceName}"`,
+                    limit: 1,
+                })
+                .catch(error => {
+                    handleHttpException(error);
+                });
             let currentMappingSource = mappingSourceResponse.data.length == 1 ? mappingSourceResponse.data[0] : null;
-            if (!currentMappingSource) throw new Error(`Cannot find source [${mappingSourceName}] for attribute mapping [${attributeMapping.identityAttributeName}] for Identity Profile [${localIdentityProfile.self.name}] in target environment`);
+            if (!currentMappingSource)
+                throw new Error(
+                    `Cannot find source [${mappingSourceName}] for attribute mapping [${attributeMapping.identityAttributeName}] for Identity Profile [${localIdentityProfile.self.name}] in target environment`
+                );
 
             //Update source ID reference
             if (transformDefinitonType === "accountAttribute") {
@@ -241,11 +260,10 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
             } else if (transformDefinitonType === "reference") {
                 attributeMapping.transformDefinition.attributes.input.attributes.sourceId = currentMappingSource.id;
             }
-
         } else if (transformDefinitonType === "rule") {
             const ruleName = transformDefinition.attributes.name;
 
-            //OOTB rules don't export so we we might not always find these, but name just name reference seems to work here 
+            //OOTB rules don't export so we we might not always find these, but name just name reference seems to work here
             for (const rule of rules) {
                 if (rule.self.name === ruleName) {
                     attributeMapping.transformDefinition.attributes.id = rule.self.id;
@@ -256,24 +274,21 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
 
     /*
      * Current Identity Profile endpoints only support a single "import" as opposed to create vs update
-     * so we will just run the import process whether it is a new object (no existing id references) or 
+     * so we will just run the import process whether it is a new object (no existing id references) or
      * an existing object (existing id references). This also basically seems to be a special SP-Config
      * endpoint based on the format of the exported/imported objects. This is also why the input body below
      * is wrapped in an array containing the identity profile (since sp-config import expects this)
-    */
+     */
     let importResponse;
     try {
         importResponse = await identityProfilesApi.importIdentityProfiles({
-            identityProfileExportedObject: [
-                localIdentityProfile
-            ]
+            identityProfileExportedObject: [localIdentityProfile],
         });
 
         if (importResponse.data.errors.length > 0) {
             winston.error(clc.red(JSON.stringify(importResponse.data, null, 4)));
             process.exit(1);
         }
-
     } catch (error) {
         await handleHttpException(error);
     }
@@ -281,11 +296,16 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
     //We need to fetch it now since it's not returned in the response
     try {
         currentIdentityProfileResponse = await identityProfilesApi.exportIdentityProfiles({
-            filters: `name eq "${localIdentityProfile.object.name}"`
-        })
-        currentTargetIdentityProfile = currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
+            filters: `name eq "${localIdentityProfile.object.name}"`,
+        });
+        currentTargetIdentityProfile =
+            currentIdentityProfileResponse.data.length == 1 ? currentIdentityProfileResponse.data[0] : null;
         if (currentTargetIdentityProfile == null) {
-            winston.error(clc.red(`Could not fetch identity profile by name [${localIdentityProfile.object.name}] after create/update`));
+            winston.error(
+                clc.red(
+                    `Could not fetch identity profile by name [${localIdentityProfile.object.name}] after create/update`
+                )
+            );
             process.exit(1);
         }
     } catch (error) {
@@ -294,26 +314,30 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
 
     //If the initial profile is created/updated OK, move onto lifecycle states tied to it
     //Read directly from build directly for now instead of param passed in
-    const localLifecycleStateFileNames = walk(`./build/config/IDENTITY_PROFILE/${localIdentityProfile.self.name}/LIFECYCLE_STATE`);
+    const localLifecycleStateFileNames = walk(
+        `./build/config/IDENTITY_PROFILE/${localIdentityProfile.self.name}/LIFECYCLE_STATE`
+    );
     if (localLifecycleStateFileNames && currentTargetIdentityProfile) {
         const lifecycleStateApi = new LifecycleStatesApi(apiConfig);
 
         //Get current lifecycle states if any
-        const currentTargetLifecycleStatesResponse = await lifecycleStateApi.getLifecycleStates({
-            identityProfileId: currentTargetIdentityProfile.self.id
-        }).catch(error => {
-            handleHttpException(error);
-        });
+        const currentTargetLifecycleStatesResponse = await lifecycleStateApi
+            .getLifecycleStates({
+                identityProfileId: currentTargetIdentityProfile.self.id,
+            })
+            .catch(error => {
+                handleHttpException(error);
+            });
 
         //Iterate each local, check if it exists in remote, and create/update accordingly
         for (const localLifecycleStateFileName of localLifecycleStateFileNames) {
             let localLifecycleState = JSON.parse(fs.readFileSync(localLifecycleStateFileName, { encoding: "utf8" }));
 
             /*
-            * Need to do a lookup on access profiles and sources if configured
-            * When they are exported, we replace IDs with names, so we will try
-            * to find the same object by name in the target environment and get it's id
-            */
+             * Need to do a lookup on access profiles and sources if configured
+             * When they are exported, we replace IDs with names, so we will try
+             * to find the same object by name in the target environment and get it's id
+             */
             let accessProfileIds = [];
             if (localLifecycleState.accessProfileIds && localLifecycleState.accessProfileIds.length > 0) {
                 for (const accessProfileName of localLifecycleState.accessProfileIds) {
@@ -323,7 +347,6 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                 localLifecycleState.accessProfileIds = accessProfileIds;
             }
 
-            
             if (localLifecycleState.accountActions && localLifecycleState.accountActions.length > 0) {
                 for (const accountAction of localLifecycleState.accountActions) {
                     //Include Sources
@@ -365,62 +388,60 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                             {
                                 op: "replace",
                                 path: "/emailNotificationOption",
-                                value: localLifecycleState.emailNotificationOption
+                                value: localLifecycleState.emailNotificationOption,
                             },
                             {
                                 op: "replace",
                                 path: "/enabled",
-                                value: localLifecycleState.enabled
+                                value: localLifecycleState.enabled,
                             },
                             {
                                 op: "replace",
                                 path: "/identityState",
-                                value: localLifecycleState.identityState
+                                value: localLifecycleState.identityState,
                             },
                             {
                                 op: "replace",
                                 path: "/priority",
-                                value: localLifecycleState.priority
+                                value: localLifecycleState.priority,
                             },
                             {
                                 op: "replace",
                                 path: "/accessActionConfiguration",
-                                value: localLifecycleState.accessActionConfiguration
+                                value: localLifecycleState.accessActionConfiguration,
                             },
                             {
                                 op: "replace",
                                 path: "/accountActions",
-                                value: localLifecycleState.accountActions
-                            }
+                                value: localLifecycleState.accountActions,
+                            },
                         ];
 
                         if (localLifecycleState.description) {
-                            patchOperations.push(
-                                {
-                                    op: "replace",
-                                    path: "/description",
-                                    value: localLifecycleState.description
-                                }
-                            )
+                            patchOperations.push({
+                                op: "replace",
+                                path: "/description",
+                                value: localLifecycleState.description,
+                            });
                         }
 
                         if (accessProfileIds.length > 0) {
-                            patchOperations.push(
-                                {
-                                    op: "replace",
-                                    path: "/accessProfileIds",
-                                    value: accessProfileIds
-                                }
-                            )
+                            patchOperations.push({
+                                op: "replace",
+                                path: "/accessProfileIds",
+                                value: accessProfileIds,
+                            });
                         }
 
                         //Update lifecycle state
                         try {
-                            winston.info(`Updating existing lifecycle state: ${currentTargetLifecycleState.technicalName} (${currentTargetLifecycleState.id})`)
+                            winston.info(
+                                `Updating existing lifecycle state: ${currentTargetLifecycleState.technicalName} (${currentTargetLifecycleState.id})`
+                            );
                             await lifecycleStateApi.updateLifecycleStates({
                                 identityProfileId: currentTargetIdentityProfile.self.id,
                                 lifecycleStateId: currentTargetLifecycleState.id,
-                                jsonPatchOperation: patchOperations
+                                jsonPatchOperation: patchOperations,
                             });
                         } catch (error) {
                             await handleHttpException(error);
@@ -429,11 +450,11 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                 }
             }
             if (!existsInTarget) {
-                winston.info(`Creating new lifecycle state: ${localLifecycleState.name})`)
+                winston.info(`Creating new lifecycle state: ${localLifecycleState.name})`);
                 try {
                     const createLifecycleStateResponse = await lifecycleStateApi.createLifecycleState({
                         identityProfileId: currentTargetIdentityProfile.self.id,
-                        lifecycleState: localLifecycleState
+                        lifecycleState: localLifecycleState,
                     });
                 } catch (error) {
                     await handleHttpException(error);
@@ -441,9 +462,9 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
             }
         }
     }
-}
+};
 
-const migrateIdentityProfiles = async (apiConfig) => {
+const migrateIdentityProfiles = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Identity Profile Deployment"));
     //Only read one directory down where main source files are
     const identityProfileFilePaths = walk("./build/config/IDENTITY_PROFILE", 1);
@@ -454,13 +475,12 @@ const migrateIdentityProfiles = async (apiConfig) => {
         await migrateIdentityProfile(apiConfig, identityProfile);
     }
     winston.info(clc.bgGreen("Completed Identity Profile Deployment"));
-}
+};
 
 export {
     exportIdentityAttributeConfig,
     exportIdentityProfiles,
     migrateIdentityAttributeConfig,
     migrateIdentityProfile,
-    migrateIdentityProfiles
+    migrateIdentityProfiles,
 };
-

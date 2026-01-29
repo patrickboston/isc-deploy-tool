@@ -1,6 +1,11 @@
 import clc from "cli-color";
 import * as fs from "fs";
-import { GlobalTenantSecuritySettingsApi, PasswordConfigurationApi, PublicIdentitiesApi, PublicIdentitiesConfigApi } from "sailpoint-api-client";
+import {
+    GlobalTenantSecuritySettingsApi,
+    PasswordConfigurationApi,
+    PublicIdentitiesApi,
+    PublicIdentitiesConfigApi,
+} from "sailpoint-api-client";
 import winston from "winston";
 import { handleHttpException, walk, writeConfigFile } from "../util.js";
 import path from "path";
@@ -13,7 +18,7 @@ const LOCKOUT_ORG_CONFIG = "LOCKOUT_ORG_CONFIG";
 const SERVICE_PROVIDER_ORG_CONFIG = "SERVICE_PROVIDER_ORG_CONFIG";
 const PUBLIC_IDENTITIES_ORG_CONFIG = "PUBLIC_IDENTITIES_ORG_CONFIG";
 
-const exportOrgConfigs = async (apiConfig) => {
+const exportOrgConfigs = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Org Config Export"));
     const globalTenantSecuritySettingsApi = new GlobalTenantSecuritySettingsApi(apiConfig);
     const passwordConfigApi = new PasswordConfigurationApi(apiConfig);
@@ -42,9 +47,9 @@ const exportOrgConfigs = async (apiConfig) => {
     const publicIdentitiesConfigApi = new PublicIdentitiesConfigApi(apiConfig);
     const publicIdentitiesConfigResponse = await publicIdentitiesConfigApi.getPublicIdentityConfig();
     writeConfigFile(ORG_CONFIG, PUBLIC_IDENTITIES_ORG_CONFIG, publicIdentitiesConfigResponse.data);
-}
+};
 
-const migrateOrgConfigs = async (apiConfig) => {
+const migrateOrgConfigs = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Org Config Deployment"));
     const globalTenantSecuritySettingsApi = new GlobalTenantSecuritySettingsApi(apiConfig);
     const orgConfigFilePaths = walk("./build/config/ORG_CONFIG");
@@ -61,7 +66,7 @@ const migrateOrgConfigs = async (apiConfig) => {
             const passwordConfigApi = new PasswordConfigurationApi(apiConfig);
             try {
                 await passwordConfigApi.putPasswordOrgConfig({
-                    passwordOrgConfig: localOrgConfigSource
+                    passwordOrgConfig: localOrgConfigSource,
                 });
             } catch (error) {
                 handleHttpException(error);
@@ -74,19 +79,19 @@ const migrateOrgConfigs = async (apiConfig) => {
                         {
                             op: "replace",
                             path: "/range",
-                            value: localOrgConfigSource.range
+                            value: localOrgConfigSource.range,
                         },
                         {
                             op: "replace",
                             path: "/geolocation",
-                            value: localOrgConfigSource.geolocation
+                            value: localOrgConfigSource.geolocation,
                         },
                         {
                             op: "replace",
                             path: "/whitelisted",
-                            value: localOrgConfigSource.whitelisted
-                        }
-                    ]
+                            value: localOrgConfigSource.whitelisted,
+                        },
+                    ],
                 });
             } catch (error) {
                 handleHttpException(error);
@@ -99,19 +104,19 @@ const migrateOrgConfigs = async (apiConfig) => {
                         {
                             op: "replace",
                             path: "/maxSessionTime",
-                            value: localOrgConfigSource.maxSessionTime
+                            value: localOrgConfigSource.maxSessionTime,
                         },
                         {
                             op: "replace",
                             path: "/maxIdleTime",
-                            value: localOrgConfigSource.maxIdleTime
+                            value: localOrgConfigSource.maxIdleTime,
                         },
                         {
                             op: "replace",
                             path: "/rememberMe",
-                            value: localOrgConfigSource.rememberMe
-                        }
-                    ]
+                            value: localOrgConfigSource.rememberMe,
+                        },
+                    ],
                 });
             } catch (error) {
                 handleHttpException(error);
@@ -124,19 +129,19 @@ const migrateOrgConfigs = async (apiConfig) => {
                         {
                             op: "replace",
                             path: "/maximumAttempts",
-                            value: localOrgConfigSource.maximumAttempts
+                            value: localOrgConfigSource.maximumAttempts,
                         },
                         {
                             op: "replace",
                             path: "/lockoutDuration",
-                            value: localOrgConfigSource.lockoutDuration
+                            value: localOrgConfigSource.lockoutDuration,
                         },
                         {
                             op: "replace",
                             path: "/lockoutWindow",
-                            value: localOrgConfigSource.lockoutWindow
-                        }
-                    ]
+                            value: localOrgConfigSource.lockoutWindow,
+                        },
+                    ],
                 });
             } catch (error) {
                 handleHttpException(error);
@@ -149,19 +154,19 @@ const migrateOrgConfigs = async (apiConfig) => {
                         {
                             op: "replace",
                             path: "/enabled",
-                            value: localOrgConfigSource.enabled
+                            value: localOrgConfigSource.enabled,
                         },
                         {
                             op: "replace",
                             path: "/bypassIDP",
-                            value: localOrgConfigSource.bypassIDP
+                            value: localOrgConfigSource.bypassIDP,
                         },
                         {
                             op: "replace",
                             path: "/federationProtocolDetails",
-                            value: localOrgConfigSource.federationProtocolDetails
-                        }
-                    ]
+                            value: localOrgConfigSource.federationProtocolDetails,
+                        },
+                    ],
                 });
             } catch (error) {
                 handleHttpException(error);
@@ -171,7 +176,7 @@ const migrateOrgConfigs = async (apiConfig) => {
             try {
                 const publicIdentitiesConfigApi = new PublicIdentitiesConfigApi(apiConfig);
                 const publicIdentitiesConfigResponse = await publicIdentitiesConfigApi.updatePublicIdentityConfig({
-                    publicIdentityConfig: localOrgConfigSource
+                    publicIdentityConfig: localOrgConfigSource,
                 });
             } catch (error) {
                 handleHttpException(error);
@@ -179,10 +184,6 @@ const migrateOrgConfigs = async (apiConfig) => {
         }
     }
     winston.info(clc.bgGreen("Completed Org Config Deployment"));
-}
-
-export {
-    exportOrgConfigs,
-    migrateOrgConfigs
 };
 
+export { exportOrgConfigs, migrateOrgConfigs };

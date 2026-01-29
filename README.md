@@ -33,7 +33,7 @@ The following object types are currently supported for export/deploy:
 - ACCESS_PROFILE
 - ROLE
 
-## Setup/Configuration Files
+## Contributing
 
 This a NodeJS project that was written on NodeJS 18. You will need NodeJS installed prior to using this tool. Find the latest NodeJS download here: https://nodejs.org/en/download
 
@@ -45,10 +45,10 @@ You will also need to set up the following files in the root of your project to 
 
 ```js
 export default {
-    baseurl: 'https://<env>.api.identitynow.com',
-    clientId: 'id1234',
-    clientSecret: 'secret1234',
-    tokenUrl: 'https://<env>.api.identitynow.com/oauth/token',
+    baseurl: "https://<env>.api.identitynow.com",
+    clientId: "id1234",
+    clientSecret: "secret1234",
+    tokenUrl: "https://<env>.api.identitynow.com/oauth/token",
 };
 ```
 
@@ -59,9 +59,9 @@ export default {
 
 ```js
 export default {
-    'SOURCE/Active Directory.json': {
-        '$.object.owner.id': '%%AD_OWNER_ID%%',
-        '$.object.connectorAttributes.IQServicePort': '%%AD_IQSERVICE_PORT%%',
+    "SOURCE/Active Directory.json": {
+        "$.object.owner.id": "%%AD_OWNER_ID%%",
+        "$.object.connectorAttributes.IQServicePort": "%%AD_IQSERVICE_PORT%%",
     },
 };
 ```
@@ -70,8 +70,8 @@ export default {
 
 ```js
 export default {
-    '%%AD_OWNER_ID%%': 'ABCD1234',
-    '%%AD_IQSERVICE_PORT%%': '888888',
+    "%%AD_OWNER_ID%%": "ABCD1234",
+    "%%AD_IQSERVICE_PORT%%": "888888",
 };
 ```
 
@@ -79,17 +79,14 @@ export default {
 
 ```js
 export default {
-    '%%AD_PASSWORD%%': 'StrongPassword1234',
+    "%%AD_PASSWORD%%": "StrongPassword1234",
 };
 ```
 
 - `<env>.ignore.js` - (Optional) Contains an array of specific objects to not deploy. This can be useful when deployment objects differ in ISC environments such as production integrating with prod and non-prod sources and sandbox integrating with only non-prod sources. See examples below:
 
 ```js
-export default [
-    'SOURCE:ProductionWebApplication',
-    'SOURCE:ProductionDatabaseApplication',
-];
+export default ["SOURCE:ProductionWebApplication", "SOURCE:ProductionDatabaseApplication"];
 ```
 
 - `export-config.js` - Contains import configuration items that pertain to the export process, particularly it holds `omitProperties` which has all of the JSON properties that should be omitted from objects such as `id` references, created/modified timestamps, rule `id` references, etc. Additional entries can be added/removed as needed per implementation requirements, but the standard set provided is meant to make objects repository-oriented
@@ -97,14 +94,18 @@ export default [
 
 ```js
 export default [
-    'TRANSFORM:identityDisplayName',
-    'SOURCE:TestAD',
-    'IDENTITY_OBJECT_CONFIG:IDENTITY_OBJECT_CONFIG', //Doesn't have a name so we put the type twice
+    "TRANSFORM:identityDisplayName",
+    "SOURCE:TestAD",
+    "IDENTITY_OBJECT_CONFIG:IDENTITY_OBJECT_CONFIG", //Doesn't have a name so we put the type twice
 ];
 ```
 
 - `tenant-features.js` - Holds entries for any special licensed features which may break export or deployment processes due to APIs not being available. The following entries are supported (with `true`/`false` values):
     - machineIdentity - Machine Identity Security (MIS) feature support
+
+### Code Formatting
+
+This project uses Prettier to format all JavaScript/JSON. You should install the Prettier VSCode extension or use the npm command `format` as defined in the `package.json`. It's expected all code be formatted with the local Prettier config in this project.
 
 ## Project Structure
 

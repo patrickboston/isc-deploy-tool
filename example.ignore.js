@@ -1,4 +1,1 @@
-export default
-    [
-        "TRANSFORM:TransformExample"
-    ]
+export default ["TRANSFORM:TransformExample"];

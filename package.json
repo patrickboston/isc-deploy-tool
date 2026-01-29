@@ -1,33 +1,36 @@
 {
-  "name": "isc-deploy-tool",
-  "version": "1.0.0",
-  "description": "Identity Security Cloud Deploy Tool",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "export": "node src/index.js --export --detokenize",
-    "build": "node src/index.js --build",
-    "deploy": "node src/index.js --deploy"
-  },
-  "keywords": [],
-  "author": "Patrick Boston <pboston@ipllc.co>",
-  "license": "ISC",
-  "dependencies": {
-    "axios-debug-log": "^1.0.0",
-    "cli-color": "^2.0.4",
-    "form-data": "^4.0.0",
-    "jsonpath": "^1.1.1",
-    "jsonpath-plus": "^10.2.0",
-    "lodash": "^4.17.21",
-    "sailpoint-api-client": "1.6.9",
-    "typescript": "^5.5.2",
-    "winston": "^3.13.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.5.0",
-    "@types/node": "^20.14.9",
-    "eslint": "^9.5.0",
-    "globals": "^15.6.0",
-    "ts-node": "^10.9.2"
-  }
+    "name": "isc-deploy-tool",
+    "version": "1.0.0",
+    "description": "Identity Security Cloud Deploy Tool",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "export": "node src/index.js --export --detokenize",
+        "build": "node src/index.js --build",
+        "deploy": "node src/index.js --deploy",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
+    },
+    "keywords": [],
+    "author": "Patrick Boston <pboston@ipllc.co>",
+    "license": "ISC",
+    "dependencies": {
+        "axios-debug-log": "^1.0.0",
+        "cli-color": "^2.0.4",
+        "form-data": "^4.0.0",
+        "jsonpath": "^1.1.1",
+        "jsonpath-plus": "^10.2.0",
+        "lodash": "^4.17.21",
+        "sailpoint-api-client": "1.6.9",
+        "typescript": "^5.5.2",
+        "winston": "^3.13.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.5.0",
+        "@types/node": "^20.14.9",
+        "eslint": "^9.5.0",
+        "globals": "^15.6.0",
+        "prettier": "^3.8.1",
+        "ts-node": "^10.9.2"
+    }
 }
