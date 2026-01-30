@@ -1,6 +1,6 @@
 {
     "name": "isc-deploy-tool",
-    "version": "1.0.0",
+    "version": "1.4.0",
     "description": "Identity Security Cloud Deploy Tool",
     "main": "index.js",
     "type": "module",
@@ -12,7 +12,7 @@
         "format:check": "prettier --check ."
     },
     "keywords": [],
-    "author": "Patrick Boston <pboston@ipllc.co>",
+    "author": "Patrick Boston <patrick.boston@xalient.com>",
     "license": "ISC",
     "dependencies": {
         "axios-debug-log": "^1.0.0",
