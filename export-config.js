@@ -60,6 +60,7 @@ export default {
             "$.since",
             "$.healthy",
             "$.accountsFile",
+            "$.entitlementFiles",
         ],
         MACHINE_MAPPING: [
             "$.[*].transformDefinition.attributes.input.attributes.sourceId",
