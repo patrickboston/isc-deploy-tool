@@ -6,6 +6,7 @@ import winston from "winston";
 import { handleHttpException, replaceKeyValues, sleep, walk, writeConfigFile } from "../util.js";
 import { getFormById, getFormByName } from "./formService.js";
 import { getIdentityByAlias, getIdentityById } from "./identityService.js";
+import { getParameterStorageById, getParameterStorageByName } from "./parameterStorageService.js";
 
 const WORKFLOW = "WORKFLOW";
 const existingAttributeToKeep = ["id"];
@@ -58,6 +59,18 @@ const fetchFormIdReplacement = async (currentValue, apiConfig) => {
     return form.id;
 };
 
+const fetchParameterStorageNameReplacement = async (currentValue, apiConfig) => {
+    winston.info(`Fetching parameter storage reference by id: ${currentValue}`);
+    const parameter = await getParameterStorageById(apiConfig, currentValue);
+    return parameter.name;
+};
+
+const fetchParameterStorageIdReplacement = async (currentValue, apiConfig) => {
+    winston.info(`Fetching parameter storage reference by name: ${currentValue}`);
+    const parameter = await getParameterStorageByName(apiConfig, currentValue);
+    return parameter.id;
+};
+
 const exportWorkflows = async apiConfig => {
     winston.info(clc.bgBlueBright("Starting Workflow Export"));
     const workflowsApi = new WorkflowsApi(apiConfig);
@@ -74,8 +87,11 @@ const exportWorkflows = async apiConfig => {
             workflow.owner.name = owner.alias;
         }
 
-        //Replace formDefinitionId instances with the workflow name
+        //Replace formDefinitionId instances with the form name
         await replaceKeyValues(workflow, "formDefinitionId", fetchFormNameReplacement, apiConfig);
+
+        //Replace paramID instances with the parameter storage name
+        await replaceKeyValues(workflow, "paramID", fetchParameterStorageNameReplacement, apiConfig);
 
         /*
          * Handle External Triggers type name/id replacement
@@ -160,8 +176,11 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         }
     }
 
-    //Replace formDefinitionId instances with the workflow id
+    //Replace formDefinitionId instances with the form id
     await replaceKeyValues(localWorkflow, "formDefinitionId", fetchFormIdReplacement, apiConfig);
+
+    //Replace paramID instances with the parameter storage id
+    await replaceKeyValues(localWorkflow, "paramID", fetchParameterStorageIdReplacement, apiConfig);
 
     //Handle form submitted trigger type name/id replacement
     if (localWorkflow.trigger && localWorkflow.trigger.attributes) {
@@ -347,6 +366,7 @@ const migrateWorkflow = async (apiConfig, workflowJson) => {
         }
 
         //Update the workflow with all config, references, etc.
+        winston.debug(`Patching workflow with body: ${JSON.stringify(localWorkflow, null, 4)}`);
         try {
             await workflowsApi.putWorkflow({
                 id: localWorkflow.id,
@@ -371,4 +391,4 @@ const migrateWorkflows = async apiConfig => {
     winston.info(clc.bgGreen("Completed Workflow Deployment"));
 };
 
-export { exportWorkflows, getWorkflowById, migrateWorkflow, migrateWorkflows, getWorkflowByName };
+export { exportWorkflows, getWorkflowById, getWorkflowByName, migrateWorkflow, migrateWorkflows };

@@ -120,24 +120,36 @@ const TOKEN_URL = process.env.TOKEN_URL;
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 let globalApiConfiguration;
+
+const buildApiConfiguration = envParams => {
+    const configUse = {
+        ...envParams,
+        retriesConfig: globalRetryConfig,
+        experimental: true,
+    };
+
+    const cfg = new Configuration(configUse);
+    cfg.retriesConfig = globalRetryConfig;
+    cfg.experimental = true;
+    return cfg;
+};
+
+const validateApiConfiguration = configuration => {
+    if (!configuration.tokenUrl.includes(".api.") || !configuration.basePath.includes(".api.")) {
+        winston.error(clc.bgRed("FAILED: baseurl or tokenUrl provided does not contain .api. in the endpoint URI"));
+        process.exit(1);
+    }
+};
+
 if (BASE_URL && TOKEN_URL && CLIENT_ID && CLIENT_SECRET) {
     winston.debug("Detected required environment variables, using those instead of env.js config file");
-    globalApiConfiguration = new Configuration({
+    globalApiConfiguration = buildApiConfiguration({
         baseurl: BASE_URL,
         tokenUrl: TOKEN_URL,
         clientId: CLIENT_ID,
         clientSecret: CLIENT_SECRET,
     });
-    globalApiConfiguration.retriesConfig = globalRetryConfig;
-
-    //Make sure we have api in endpoints
-    if (!globalApiConfiguration.tokenUrl.includes(".api.") || !globalApiConfiguration.basePath.includes(".api.")) {
-        winston.error(clc.bgRed("FAILED: baseurl or tokenUrl provided does not contain .api. in the endpoint URI"));
-        process.exit(1);
-    }
-
-    //Need to set experimental to true to use some newer APIs and also need to add header since it's not documented in specs sometimes
-    globalApiConfiguration.experimental = true;
+    validateApiConfiguration(globalApiConfiguration);
 }
 
 //Process input args
@@ -177,14 +189,8 @@ if (isExport && isDetokenize) {
 
     if (!globalApiConfiguration) {
         const { default: srcEnvParams } = await import("./../" + srcEnvName + ".env.js");
-        globalApiConfiguration = new Configuration(srcEnvParams);
-        globalApiConfiguration.retriesConfig = globalRetryConfig;
-
-        //Make sure we have api in endpoints
-        if (!globalApiConfiguration.tokenUrl.includes(".api.") || !globalApiConfiguration.basePath.includes(".api.")) {
-            winston.error(clc.bgRed("FAILED: baseurl or tokenUrl provided does not contain .api. in the endpoint URI"));
-            process.exit(1);
-        }
+        globalApiConfiguration = buildApiConfiguration(srcEnvParams);
+        validateApiConfiguration(globalApiConfiguration);
     }
 
     await exportOrgConfigs(globalApiConfiguration);
@@ -219,14 +225,8 @@ if (isBuild) {
 if (isDeploy) {
     if (!globalApiConfiguration) {
         const { default: targetEnvParams } = await import("./../" + targetEnvName + ".env.js");
-        globalApiConfiguration = new Configuration(targetEnvParams);
-        globalApiConfiguration.retriesConfig = globalRetryConfig;
-
-        //Make sure we have api in endpoints
-        if (!globalApiConfiguration.tokenUrl.includes(".api.") || !globalApiConfiguration.basePath.includes(".api.")) {
-            winston.error(clc.bgRed("FAILED: baseurl or tokenUrl provided does not contain .api. in the endpoint URI"));
-            process.exit(1);
-        }
+        globalApiConfiguration = buildApiConfiguration(targetEnvParams);
+        validateApiConfiguration(globalApiConfiguration);
     }
 
     //Deploy SaaS Connectors

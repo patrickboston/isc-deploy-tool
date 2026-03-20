@@ -165,7 +165,9 @@ const omitPropertiesFromObject = (objectType, object) => {
 const replaceKeyValues = async (obj, targetKey, fetchReplacement, apiConfig) => {
     for (const [key, value] of Object.entries(obj)) {
         if (key === targetKey) {
-            obj[key] = await fetchReplacement(value, apiConfig);
+            if (value) {
+                obj[key] = await fetchReplacement(value, apiConfig);
+            }
         }
 
         if (_.isObject(value)) {
