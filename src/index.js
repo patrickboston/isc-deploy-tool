@@ -179,6 +179,7 @@ if (isExport && isDetokenize) {
         const { default: srcEnvParams } = await import("./../" + srcEnvName + ".env.js");
         globalApiConfiguration = new Configuration(srcEnvParams);
         globalApiConfiguration.retriesConfig = globalRetryConfig;
+        globalApiConfiguration.experimental = true;
 
         //Make sure we have api in endpoints
         if (!globalApiConfiguration.tokenUrl.includes(".api.") || !globalApiConfiguration.basePath.includes(".api.")) {
@@ -221,6 +222,7 @@ if (isDeploy) {
         const { default: targetEnvParams } = await import("./../" + targetEnvName + ".env.js");
         globalApiConfiguration = new Configuration(targetEnvParams);
         globalApiConfiguration.retriesConfig = globalRetryConfig;
+        globalApiConfiguration.experimental = true;
 
         //Make sure we have api in endpoints
         if (!globalApiConfiguration.tokenUrl.includes(".api.") || !globalApiConfiguration.basePath.includes(".api.")) {
