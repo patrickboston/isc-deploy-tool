@@ -450,7 +450,7 @@ const migrateIdentityProfile = async (apiConfig, identityProfileJson) => {
                 }
             }
             if (!existsInTarget) {
-                winston.info(`Creating new lifecycle state: ${localLifecycleState.name})`);
+                winston.info(`Creating new lifecycle state: ${localLifecycleState.name}`);
                 try {
                     const createLifecycleStateResponse = await lifecycleStateApi.createLifecycleState({
                         identityProfileId: currentTargetIdentityProfile.self.id,
