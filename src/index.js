@@ -218,9 +218,7 @@ if (isExport && isDetokenize) {
         await exportAccessProfiles(globalApiConfiguration);
         await exportRoles(globalApiConfiguration);
     } else {
-        winston.warn(
-            clc.yellow("Skipping export of Access Profiles and Roles due to --skip_roles_aps argument being set")
-        );
+        winston.warn(clc.yellow("Skipping export of Access Profiles and Roles due to argument being set"));
     }
 
     //Perform reverse tokenization on all exported files
