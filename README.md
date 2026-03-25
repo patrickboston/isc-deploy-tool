@@ -256,6 +256,7 @@ Below is a reference for all arguments for the commands above
 - target_env=<env> - Target environment for build/deploy commands
 - log_level=<level> - Sets winston log level
 - skip_connector_lib - Allows you to skip connector file upload if arg is present
+- skip_roles_aps - Allows you to skip roles and access profiles export if arg is present
 ```
 
 ## Custom SaaS Connectors
@@ -333,7 +334,12 @@ The following object types have owner references that will need to be considered
 
 Objects such as sources and service desk integrations contain encrypted secrets/passwords for connecting to downstream applications. Plain text secrets are either entered through the UI or via API and when saved, they are automatically encrypted using SailPoint's backend encryption process. Additionally, you may be connecting to different environments of these downstream applications from different ISC environments (i.e. Non-Prod AD vs Prod AD). This means the encrypted secret value will differ per ISC environments. Passwords can be deployed via this build tool and there are two methods for doing that:
 
-1. Tokenization of Encrypted Secrets - Encrypted secret values can simply be stored in your `<env>.target.js` file. The issue here is that you will need to have those encrypted secret values for all environments. For example, if you onboard a source into your sandbox ISC environment which connects to a non-prod downstream application where in your production ISC tenant it will be connecting to the production instance of that downstream application, before you can deploy that new source to production ISC for the first time, you need the encrypted secret value. One way to do this would to create a dummy source in your production ISC tenant and provide the password in a password/secret field, save the source, and then fetch the encrypted value via API/VSCode/etc. and then plug that value into the appropriate token for that secret in your repository
+1. Tokenization of Encrypted Secrets - Encrypted secret values can simply be stored in your `<env>.target.js` file. The issue here is that you will need to have those encrypted secret values for all environments. For example, if you onboard a source into your sandbox ISC environment which connects to a non-prod downstream application where in your production ISC tenant it will be connecting to the production instance of that downstream application, before you can deploy that new source to production ISC for the first time, you need the encrypted secret value. There are a few ways to get the encrypted value specifically for source objects which is going to be most common:
+    - If the source already exists in all environments managed by ODT, just copy and paste the existing values
+    - If the source does not exist in a target environment:
+        - (Preferred) Use the [isc-encrypt](https://github.com/IPLLC/isc-encrypt) CLI tool to pre-encrypt clear text secrets
+        - Create a dummy source or use a dummy field in an existing source in the target environment to save and get the encrypted value from the source JSON
+        - Allow the source to be deployed with incorrect/empty secret values, place them directly in the source UI, save, and then tokenize the encrypted values
 2. Plaintext Secrets via Separate Secret Tokens - Another less-secure option this tool provides is a separate tokens file named `<env>.secrets.js`. This has the same exact concept of your `<env>.target.js` file, but is only used to store secrets in plaintext. These files would never be committed to a remote repository and would only be held by a trusted member of the team who is running the deployment process. The plaintext passwords would be provided when creating/updating objects via API calls and would be automatically encrypted by ISC
 
 ### Branding
