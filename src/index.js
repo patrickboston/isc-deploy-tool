@@ -75,6 +75,7 @@ let {
     target_env: targetEnvName, //Target environment for build/deploy commands
     log_level: logLevel, //Sets winston log level
     skip_connector_lib: isSkipConnectorLib, //Allows you to skip connector file upload if arg is present
+    skip_roles_aps: isSkipRolesAps, //Allows you to skip roles and access profiles export if arg is present
 } = nodeArgs;
 
 //Global winston logger
@@ -119,7 +120,11 @@ const BASE_URL = process.env.BASE_URL;
 const TOKEN_URL = process.env.TOKEN_URL;
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const SKIP_ROLES_APS = process.env.SKIP_ROLES_APS;
 let globalApiConfiguration;
+
+const skipRolesAps =
+    Boolean(SKIP_ROLES_APS && SKIP_ROLES_APS !== "false" && SKIP_ROLES_APS !== "0") || Boolean(isSkipRolesAps);
 
 const buildApiConfiguration = envParams => {
     const configUse = {
@@ -209,8 +214,14 @@ if (isExport && isDetokenize) {
     await exportWorkflows(globalApiConfiguration);
     await exportBranding(globalApiConfiguration);
     await exportPasswordInstructions(globalApiConfiguration);
-    await exportAccessProfiles(globalApiConfiguration);
-    await exportRoles(globalApiConfiguration);
+    if (!skipRolesAps) {
+        await exportAccessProfiles(globalApiConfiguration);
+        await exportRoles(globalApiConfiguration);
+    } else {
+        winston.warn(
+            clc.yellow("Skipping export of Access Profiles and Roles due to --skip_roles_aps argument being set")
+        );
+    }
 
     //Perform reverse tokenization on all exported files
     await reverseTokenize();
