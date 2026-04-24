@@ -68,6 +68,13 @@ export default {
         ],
         MACHINE_CLASSIFICATION: ["$.sourceId"],
         MACHINE_SUBTYPES: ["$.[*].id", "$.[*].created", "$.[*].modified", "$.[*].sourceId"],
-        WORKFLOW: ["$.modifiedBy", "$.creator", "$.owner.id"],
+        WORKFLOW: [
+            "$.modifiedBy",
+            "$.creator",
+            "$.owner.id",
+            "$.dailyExecutionCount",
+            "$.dailyExecutionCountLimitThreshold",
+            "$.dailyExecutionCountWarningThreshold",
+        ],
     },
 };
