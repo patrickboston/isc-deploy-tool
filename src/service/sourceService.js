@@ -126,9 +126,9 @@ const exportSources = async apiConfig => {
             winston.info(`Exporting correlation config for source: ${sourceName}`);
             writeConfigFile(
                 CORRELATION_CONFIG,
-                sourceCorrelationConfig.name,
+                `${sourceName}_${CORRELATION_CONFIG}`,
                 sourceCorrelationConfig,
-                `SOURCE/${sourceName}/CORRELATION_CONFIG`
+                `SOURCE/${sourceName}/${CORRELATION_CONFIG}`
             );
         }
 
