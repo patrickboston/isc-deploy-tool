@@ -187,7 +187,7 @@ config
  ┃ ┃ ┃ ┣ group.json
  ┃ ┃ ┃ ┗ sharedMailbox.json
  ┃ ┃ ┣ CORRELATION_CONFIG
- ┃ ┃ ┃ ┗ Active Directory [source] Account Correlation.json
+ ┃ ┃ ┃ ┗ Active Directory_CORRELATION_CONFIG.json
  ┃ ┃ ┣ NATIVE_CHANGE_DETECTION
  ┃ ┃ ┃ ┗ Active Directory_NATIVE_CHANGE_DETECTION.json
  ┃ ┃ ┣ PROVISIONING_POLICY
