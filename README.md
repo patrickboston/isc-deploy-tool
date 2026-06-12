@@ -8,6 +8,18 @@ It offers the following features:
 - **BUILD/TOKENIZE:** Tokenize and build objects for a target Identity Security Cloud environment to validate tokenization before deployment which is the process of replacing the repository tokens with actual target configuration values which are needed for a specific target environment (i.e. IQService host for an Active Directory Source)
 - **DEPLOY:** Deploy built/tokenized objects to a target Identity Security Cloud environment with dynamic object reference lookup and insertion (i.e. owners, source schemas, etc.)
 
+## Authors, Support and Disclaimer
+
+@patrickboston and @jusewell are the original authors of this tool.
+
+ISC ODT is an independent open-source project. This project is not affiliated with, endorsed by, supported by, or sponsored by SailPoint Technologies, Inc.
+
+This software is provided "as is" without warranties or guarantees of any kind. Users are responsible for testing and validating the tool within their own environments before use.
+
+This project is maintained on a best-effort basis. Issues, feature requests, and pull requests are welcome, but response times and implementation schedules are not guaranteed. No commercial support, service-level agreements (SLAs), or warranty obligations are provided.
+
+Use of this project is at your own risk.
+
 ## Supported Object Types
 
 The following object types are currently supported for export/deploy:
@@ -106,6 +118,33 @@ export default [
 ### Code Formatting
 
 This project uses Prettier to format all JavaScript/JSON. You should install the Prettier VSCode extension or use the npm command `format` as defined in the `package.json`. It's expected all code be formatted with the local Prettier config in this project.
+
+### Git Exclude
+
+When contributing, you will most likely be running export/deploy commands frequently to test. Defining the follow git exclude file will prevent config/target files from being committed:
+
+```
+# git ls-files --others --exclude-from=.git/info/exclude
+# Lines that start with '#' are comments.
+# For a project mostly in C, the following would be a good set of
+# exclude patterns (uncomment them if you want to use them):
+# *.[oa]
+# *~
+config/
+*.target.js
+reverse.target.js
+connectorLib/
+connectors/
+assets/
+```
+
+## Implementation Options
+
+There are two options for utilizing this repository/tool for ISC configuration management:
+
+- Fork this repository and run the `npm` commands right out of it
+- Clone the repository into a working directory via CI/CD pipeline and run the npm commands (separates core ODT tooling from tenant configuration repository)
+    - There are example GitHub Actions workflow definitions in the [.github/workflows](.github/workflows) directory
 
 ## Project Structure
 

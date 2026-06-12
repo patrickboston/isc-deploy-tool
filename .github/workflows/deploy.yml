@@ -1,0 +1,36 @@
+name: Deploy
+on:
+    workflow_call:
+        inputs:
+            target:
+                description: 'The target tenant name to perform the deployment on. e.g. partner4164'
+                required: true
+                type: string
+
+jobs:
+    deploy:
+        name: Deploy ${{ inputs.target }}
+        runs-on: ubuntu-latest
+        environment: ${{ inputs.target }}
+        steps:
+            - name: Setup Node
+              uses: actions/setup-node@v4
+            - name: Checkout
+              uses: actions/checkout@v4
+            - name: Checkout Object Deployment Tool
+              uses: actions/checkout@v4
+              with:
+                  repository: patrickboston/isc-deploy-tool
+                  token: ${{ secrets.GH_PAT }}
+                  path: odt
+            - name: Deploy ${{ inputs.target }}
+              run: |
+                  export BASE_URL=${{ vars.TENANT_API_URL }}
+                  export TOKEN_URL=${{ vars.TENANT_API_URL }}/oauth/token
+                  export CLIENT_ID=${{ vars.PAT_CLIENT_ID }}
+                  export CLIENT_SECRET=${{ secrets.PAT_CLIENT_SECRET }}
+                  cp -R ./odt/src ./src
+                  cp ./odt/package.json .
+                  cp ./odt/export-config.js .
+                  npm install
+                  npm run deploy -- --target_env=${{ inputs.target }}

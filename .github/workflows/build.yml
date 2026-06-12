@@ -1,0 +1,61 @@
+name: Build
+on:
+    workflow_call:
+        inputs:
+            target:
+                description: 'The target tenant name to perform the build for. e.g. partner4164'
+                required: true
+                type: string
+            base-ref:
+                description: 'The name of the branch to commit the build and push to'
+                required: true
+                type: string
+            head-ref:
+                description: 'The name of the branch to checkout the target.js files from'
+                required: true
+                type: string
+        secrets:
+            github-token:
+                description: 'A github personal access token required to checkout the object deployment tool'
+                required: true
+
+jobs:
+    build:
+        name: Build ${{ inputs.target }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Base Branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.base-ref }}
+            - name: Checkout Head Branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.head-ref }}
+                  path: head
+            - name: Checkout Object Deployment Tool
+              uses: actions/checkout@v4
+              with:
+                  repository: patrickboston/isc-deploy-tool
+                  path: odt
+            - name: Setup Node
+              uses: actions/setup-node@v4
+            - name: Build ${{ inputs.target }}
+              run: |
+                  cp -R ./odt/src ./src
+                  cp ./odt/package.json .
+                  cp ./odt/export-config.js .
+                  cp ./head/${{ inputs.target }}.target.js .
+                  cp ./head/tenant-features.js .
+                  rm -rf ./config
+                  cp -R ./head/config .
+                  npm install
+                  npm run build -- --target_env=${{ inputs.target }}
+            - name: Push to ${{ inputs.base-ref }}
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add ./build/
+                  git add ./${{ inputs.target }}.target.js
+                  git commit -m "${{ inputs.head-ref }} ${{ inputs.target }}"
+                  git push

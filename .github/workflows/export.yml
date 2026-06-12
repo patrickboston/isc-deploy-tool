@@ -1,0 +1,81 @@
+name: Export
+on:
+    workflow_call:
+        inputs:
+            source:
+                description: "The source tenant name to perform the export on. e.g. partner4164"
+                required: true
+                type: string
+            skip-roles-aps:
+                description: "Skip export of roles and access profiles"
+                default: true
+                type: boolean
+            tenant-api-url:
+                description: "The tenant api url. e.g. https://partner4164.api.identitynow-demo.com"
+                required: true
+                type: string
+            base-ref:
+                description: "The name of the branch to commit the export and push to"
+                required: true
+                type: string
+            head-ref:
+                description: "The name of the branch to checkout the reverse.target.js and export-config.js files from"
+                required: true
+                type: string
+            client-id:
+                description: "A personal access token client id to be used to authenticate with the ISC API"
+                required: true
+                type: string
+        secrets:
+            github-token:
+                description: "A github personal access token required to checkout the object deployment tool"
+                required: true
+            client-secret:
+                description: "A personal access token client secret to be used to authenticate with the ISC API"
+                required: true
+
+jobs:
+    export:
+        name: Export ${{ inputs.source }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Base Branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.base-ref }}
+            - name: Checkout Head Branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.head-ref }}
+                  path: head
+            - name: Checkout Object Deployment Tool
+              uses: actions/checkout@v4
+              with:
+                  repository: patrickboston/isc-deploy-tool
+                  path: odt
+            - name: Setup Node
+              uses: actions/setup-node@v4
+            - name: Export ${{ inputs.source }}
+              run: |
+                  export BASE_URL=${{ inputs.tenant-api-url }}
+                  export TOKEN_URL=${{ inputs.tenant-api-url }}/oauth/token
+                  export CLIENT_ID=${{ inputs.client-id }}
+                  export CLIENT_SECRET=${{ secrets.client-secret }}
+                  export SKIP_ROLES_APS=${{ inputs.skip-roles-aps }}
+                  cp -R ./odt/src ./src
+                  cp ./odt/package.json .
+                  cp ./odt/export-config.js .
+                  cp ./head/reverse.target.js .
+                  rm -rf ./config
+                  npm install
+                  npm run export -- --src_env=${{ inputs.source }}
+            - name: Push to ${{ inputs.base-ref }}
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add ./config/
+                  git add ./reverse.target.js
+                  git add ./export-config.js
+                  git commit -m "${{ inputs.head-ref }} ${{ inputs.source }}"
+                  git pull --no-rebase
+                  git push
