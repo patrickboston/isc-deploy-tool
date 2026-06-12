@@ -10,7 +10,7 @@ It offers the following features:
 
 ## Authors, Support and Disclaimer
 
-@patrickboston and @jusewell are the original authors of this tool.
+[@patrickboston](https://github.com/patrickboston/) and [@jusewell](https://github.com/jusewell/) are the original authors of this tool.
 
 ISC ODT is an independent open-source project. This project is not affiliated with, endorsed by, supported by, or sponsored by SailPoint Technologies, Inc.
 
