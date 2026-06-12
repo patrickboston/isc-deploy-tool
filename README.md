@@ -20,6 +20,54 @@ This project is maintained on a best-effort basis. Issues, feature requests, and
 
 Use of this project is at your own risk.
 
+## GitOps Approach
+
+ISC ODT enables a GitOps-based approach for managing SailPoint Identity Security Cloud (ISC) configuration. Configuration objects are first exported from a source ISC tenant and tokenized to remove environment-specific values. The resulting artifacts are stored in source control and committed to a feature branch where changes can be reviewed and validated. Once the changes are approved through a pull request workflow and merged into the main branch, a deployment process can be triggered either manually or through a CI/CD pipeline. ISC ODT then deploys the approved configuration into the target ISC tenant, providing a repeatable and auditable method for promoting ISC configuration across development, test, and production environments.
+
+```mermaid
+flowchart TD
+
+    A[ISC Sandbox Tenant]
+
+    subgraph Export["Export & Tokenization"]
+        B[Export Objects]
+        C[Tokenize Environment Values]
+    end
+
+    subgraph GitOps["GitOps Workflow"]
+        D[Feature Branch]
+        E[Commit Changes]
+        F[Create Pull Request]
+        G[Review & Approval]
+        H[Merge to Main]
+    end
+
+    subgraph Deploy["Deployment"]
+        I[Run Deployment]
+        J[ISC Production Tenant]
+    end
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+
+    classDef source fill:#D6EAF8,stroke:#1F618D,color:#000
+    classDef export fill:#D5F5E3,stroke:#1E8449,color:#000
+    classDef gitops fill:#FCF3CF,stroke:#B7950B,color:#000
+    classDef deploy fill:#FADBD8,stroke:#C0392B,color:#000
+
+    class A source
+    class B,C export
+    class D,E,F,G,H gitops
+    class I,J deploy
+```
+
 ## Supported Object Types
 
 The following object types are currently supported for export/deploy:
