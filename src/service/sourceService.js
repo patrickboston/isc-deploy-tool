@@ -13,7 +13,7 @@ import {
 import winston from "winston";
 import { handleHttpException, sleep, walk, writeConfigFile } from "../util.js";
 import { getAllClusters } from "./clusterService.js";
-import { getIdentityByAlias, getIdentityById } from "./identityService.js";
+import { getGovGroupByName, getIdentityByAlias, getIdentityById } from "./identityService.js";
 import { getAllRules } from "./ruleService.js";
 import { getAllPasswordPolicies } from "./passwordPolicyService.js";
 import path from "path";
@@ -56,7 +56,7 @@ const getSourceByName = async (apiConfig, sourceName) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const currentSourceResponse = await sourcesApi
         .listSourcesV1({
-            filters: `name eq "${sourceName}"`,
+            filters: `name eq "${sourceName}" and (category isnull or category eq "CredentialProvider")`,
             limit: 1,
         })
         .catch(error => {
@@ -76,7 +76,7 @@ const getSourceById = async (apiConfig, sourceId) => {
     const sourcesApi = new SourcesApi(apiConfig);
     const currentSourceResponse = await sourcesApi
         .listSourcesV1({
-            filters: `id eq "${sourceId}"`,
+            filters: `id eq "${sourceId}" and (category isnull or category eq "CredentialProvider")`,
             limit: 1,
         })
         .catch(error => {
@@ -102,7 +102,12 @@ const exportSources = async apiConfig => {
     const machineClassificationApi = new MachineClassificationConfigApi(apiConfig);
     const machineMappingApi = new MachineAccountMappingsApi(apiConfig);
 
-    const sources = await Paginator.paginate(sourcesApi, sourcesApi.listSourcesV1, undefined, 250).catch(error => {
+    const sources = await Paginator.paginate(
+        sourcesApi,
+        sourcesApi.listSourcesV1,
+        { filters: `(category isnull or category eq "CredentialProvider")` },
+        250
+    ).catch(error => {
         handleHttpException(error);
     });
     for (const source of sources.data) {
@@ -319,10 +324,17 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
     const owner = await getIdentityByAlias(apiConfig, _.get(localSource, "owner.name"));
     _.set(localSource, "owner.id", owner.id);
 
+    const localGovGroupName = _.get(localSource, "managementWorkgroup.name");
+    if (localGovGroupName) {
+        //Get corresponding source management group by name and add id
+        const govGroup = await getGovGroupByName(apiConfig, localGovGroupName);
+        _.set(localSource, "managementWorkgroup.id", govGroup.id);
+    }
+
     //Check and see if a source with this name already exists in the target environment
     const currentSourceResponse = await sourcesApi
         .listSourcesV1({
-            filters: `name eq "${localSource.name}"`,
+            filters: `name eq "${localSource.name}" and (category isnull or category eq "CredentialProvider")`,
             limit: 1,
         })
         .catch(error => {
@@ -705,7 +717,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
             //Get all schedules from current target source
             let currentTargetScheduleResponse;
             currentTargetScheduleResponse = await sourcesApi
-                .getSourceSchedules({
+                .getSourceSchedulesV1({
                     sourceId: currentTargetSource.id,
                 })
                 .catch(error => {
@@ -747,7 +759,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                 try {
                     await sourcesApi.createSourceScheduleV1({
                         sourceId: currentTargetSource.id,
-                        schedule1: {
+                        schedule3: {
                             type: scheduleCopy.type,
                             cronExpression: scheduleCopy.cronExpression,
                         },
@@ -803,7 +815,7 @@ const migrateSource = async (apiConfig, sourceJson, skipConnectorLib) => {
                             : transformDefinition.attributes.input.attributes.sourceName;
                         const mappingSourceResponse = await sourcesApi
                             .listSourcesV1({
-                                filters: `name eq "${mappingSourceName}"`,
+                                filters: `name eq "${mappingSourceName}" and (category isnull or category eq "CredentialProvider")`,
                                 limit: 1,
                             })
                             .catch(error => {
