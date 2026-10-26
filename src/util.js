@@ -233,15 +233,16 @@ const encryptRsa = async (publicKeyBytes, toEncryptBytes) => {
  * @param {string} [overrideDir=null] Override default write directory built from this function
  */
 const writeConfigFile = (objectType, objectName, object, overrideDir = null) => {
-    //TODO: Create export ignore properties to avoid writing certain config files
-    const dir = overrideDir ? "./config/" + overrideDir : "./config/" + objectType;
+    //replace characters not allowed in file names with dash
+    const sanitize = name => name.replace(/[/\\?%*:|"<>]/g, "-");
+    const dir = overrideDir ? "./config/" + overrideDir.split("/").map(sanitize).join("/") : "./config/" + objectType;
     //Create directory for object type if it does not exist yet
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
 
-    //Write JSON file for object, replace characters not allowed in file names with dash
-    let fileName = dir + "/" + objectName.replace(/[/\\?%*:|"<>]/g, "-") + ".json";
+    //Write JSON file for object
+    let fileName = dir + "/" + sanitize(objectName) + ".json";
 
     const ignoreFormat = `${objectType}:${objectName}`;
     if (exportIgnore.includes(ignoreFormat)) {
@@ -417,7 +418,7 @@ const buildObjectsForEnvironment = async env => {
                     fileSource = fileSource.replace(
                         new RegExp(`"?${escapedTokenName}"?`, "g"),
                         JSON.stringify(tokenValue)
-                    );                
+                    );
                 } else {
                     fileSource = fileSource.replaceAll(tokenName, JSON.stringify(tokenValue));
                 }
