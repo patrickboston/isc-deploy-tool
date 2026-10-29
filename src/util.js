@@ -133,6 +133,18 @@ function deepOmit(
     return omitFromObject(obj); //return the inner function result
 }
 
+/**
+ * Converts a JSON Pointer (e.g. "/connectorAttributes/group.searchDNs/0") into a lodash path array.
+ * An array is used instead of dot notation so keys containing dots are not split into nested keys.
+ * @param {string} pointer JSON Pointer returned by JSONPath
+ * @returns {string[]} Path segments
+ */
+const pointerToPath = pointer =>
+    pointer
+        .split("/")
+        .slice(1)
+        .map(segment => segment.replaceAll("~1", "/").replaceAll("~0", "~"));
+
 const omitPropertiesFromObject = (objectType, object) => {
     const globalOmitProperties = exportConfig.omitProperties.GLOBAL;
     const objectTypeProperties = exportConfig.omitProperties[objectType];
@@ -153,9 +165,7 @@ const omitPropertiesFromObject = (objectType, object) => {
 
         //If we find a matching object via JSONPath, replace it with the reverse token
         for (const result of results) {
-            //Convert the JSONPath pointer to make it actual JavaScript dot notation
-            let correctPointer = result.pointer.replaceAll("/", ".").substring(1);
-            _.unset(object, correctPointer);
+            _.unset(object, pointerToPath(result.pointer));
         }
     }
     // lodash replaces elements at array indexes with 'null'
@@ -284,9 +294,7 @@ const reverseTokenize = async () => {
 
                     //If we find a matching object via JSONPath, replace it with the reverse token
                     if (Array.isArray(results) && results.length > 0) {
-                        //Convert the JSONPath pointer to make it actual JavaScript dot notation
-                        let correctPointer = results[0].pointer.replaceAll("/", ".").substring(1);
-                        _.set(json, correctPointer, tokenValue);
+                        _.set(json, pointerToPath(results[0].pointer), tokenValue);
                         winston.info(
                             clc.green(
                                 `JSONPath match found in file [${fileLocation}], replacing environment value with token: ${tokenValue}`
@@ -497,10 +505,9 @@ const runSpConfigExport = async (apiConfig, exportConfig) => {
                 ) {
                     winston.info(`SP-Config export job [${jobId}] still in progress...`);
                     await delay(2000); // Wait before checking the status again
-                } else if (
-                    currentStatusResponse.data.status === "CANCELLED" ||
-                    currentStatusResponse.data.status === "FAILED"
-                ) {
+                } else {
+                    //Any other status (CANCELLED, FAILED, FAILED_EXTERNAL_COMMUNICATION, etc.) is terminal
+                    //Treating unknown statuses as failures prevents polling in a tight loop with no delay
                     winston.error(
                         clc.red(
                             `SP-Config export job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`
@@ -570,10 +577,9 @@ const runSpConfigImport = async (apiConfig, importObj) => {
                 ) {
                     winston.info(`SP-Config import job [${jobId}] still in progress...`);
                     await delay(2000); // Wait before checking the status again
-                } else if (
-                    currentStatusResponse.data.status === "CANCELLED" ||
-                    currentStatusResponse.data.status === "FAILED"
-                ) {
+                } else {
+                    //Any other status (CANCELLED, FAILED, FAILED_EXTERNAL_COMMUNICATION, etc.) is terminal
+                    //Treating unknown statuses as failures prevents polling in a tight loop with no delay
                     winston.error(
                         clc.red(
                             `SP-Config import job [${jobId}] has been cancelled or failed!\n${JSON.stringify(currentStatusResponse.data, null, 4)}`

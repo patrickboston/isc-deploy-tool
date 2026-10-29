@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import clc from "cli-color";
 import * as fs from "fs";
-import { Configuration } from "sailpoint-api-client";
+import { axiosRetry, Configuration } from "sailpoint-api-client";
 import winston from "winston";
 import { exportAccessRequestConfig, updateAccessRequestConfig } from "./service/accessRequestService.js";
 import { exportBranding, updateBranding } from "./service/brandingService.js";
@@ -136,6 +136,12 @@ const buildApiConfiguration = envParams => {
     const cfg = new Configuration(configUse);
     cfg.retriesConfig = globalRetryConfig;
     cfg.experimental = true;
+
+    //The SDK attaches axios-retry in its constructor before retriesConfig is set, so the defaults
+    //(which never retry a 429) are used. Swap in a fresh instance (create() does not copy interceptors)
+    //and attach our retry config to it instead.
+    cfg.axiosInstance = cfg.axiosInstance.create();
+    axiosRetry.default(cfg.axiosInstance, globalRetryConfig);
     return cfg;
 };
 
