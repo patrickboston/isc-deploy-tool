@@ -21,6 +21,7 @@ export default {
             "$.object.identityAttributeConfig.attributeTransforms[?(@.transformDefinition.type == 'accountAttribute')].transformDefinition.attributes.sourceId",
             "$.object.identityCount",
             "$.object.identityRefreshRequired",
+            "$.object.identityExceptionReportReference",
         ],
         LIFECYCLE_STATE: ["identityCount"],
         ORG_CONFIG: ["$.modifiedBy"],
